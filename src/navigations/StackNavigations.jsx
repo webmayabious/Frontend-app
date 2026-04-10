@@ -12,6 +12,8 @@ import MissedFollowup from "../pages/MissedFollowup";
 import UploadedLeads from "../pages/UploadedLeads";
 import TotalLeadScreen from "../pages/TotalLeadScreen";
 import LeadsListScreen from "../pages/LeadsListScreen";
+import AssignRM from "../pages/AssignRM";
+import ChangeRM from "../pages/ChangeRM";
 const Stack = createNativeStackNavigator();
 export default function StackNavigations() {
   return (
@@ -61,6 +63,14 @@ export default function StackNavigations() {
           <Stack.Screen
           name="LeadsListScreen"
           component={LeadsListScreen}
+        />
+          <Stack.Screen
+          name="AssignRM"
+          component={AssignRM}
+        />
+          <Stack.Screen
+          name="ChangeRM"
+          component={ChangeRM}
         />
       </Stack.Navigator>
     </NavigationContainer>
