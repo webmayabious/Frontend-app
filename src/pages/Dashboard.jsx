@@ -95,12 +95,15 @@ const Dashboard = () => {
             title="Total Bookings / Agreements"
             subtitle="Month"
             value={`${dashboardCards?.total_bookings_per_month || 0} / ₹${dashboardCards?.total_agreement_value_per_month || 0}`}
+             onPress={() => navigation.navigate('TotalBookingsAgreementsPerMonth')}
           />
 
           <Card
             title="Total Bookings / Agreements"
             subtitle="Till Date"
             value={`${dashboardCards?.total_booking_till_date || 0} / ₹${dashboardCards?.total_agreement_value_till_date || 0}`}
+            onPress={() => navigation.navigate('TotalBookingsAgreementsTillDateScreen')}
+            
           />
 
           <Card

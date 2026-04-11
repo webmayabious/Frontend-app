@@ -12,12 +12,22 @@ import Icon from "react-native-vector-icons/MaterialIcons";
 import BottomNav from "../navigations/BottomNav";
 import Header from "../Layout/Header";
 import { useNavigation } from "@react-navigation/native";
+import { useQuery } from "@tanstack/react-query";
+import api from "../api/AxiosInstance";
 
 const AssignRM = () => {
     const navigation = useNavigation();
     const [selected, setSelected] = useState([]);
     const data = [1, 2, 3, 4];
-
+  /* ================= API ================= */
+ const { data:Rm, isLoading } = useQuery({
+    queryKey: ["AssignRm"],
+    queryFn: async () => {
+      const res = await api.get('/api/pm/getAllPropertyLeadWithoutRM');
+      return res?.data;
+    },
+  });
+ 
     const toggleSelect = (index) => {
         setSelected(prev =>
             prev.includes(index)
@@ -46,7 +56,7 @@ const AssignRM = () => {
                     <View style={styles.titleRow}>
                         <Text style={styles.title}>Assign RM</Text>
                         <View style={styles.badge}>
-                            <Text style={styles.total}>4492 Records</Text>
+                            <Text style={styles.total}>{Rm?.totalRecords}</Text>
                         </View>
                     </View>
                     <TouchableOpacity
@@ -120,7 +130,7 @@ const AssignRM = () => {
                     <Icon name="keyboard-arrow-down" size={14} color="#fff" />
                 </TouchableOpacity>
             </View>
-                {data.map((item, index) => {
+                {Rm?.data?.map((item, index) => {
                     const isChecked = selected.includes(index);
                     return (
                         <View key={index} style={[styles.card, isChecked && styles.cardSelected]}>
@@ -136,7 +146,7 @@ const AssignRM = () => {
                                         )}
                                     </TouchableOpacity>
                                     <View style={styles.nameIndicator} />
-                                    <Text style={styles.name}>BAYABI PAUL</Text>
+                                    <Text style={styles.name}>{item.name||'N/A'}</Text>
                                 </View>
                                 <View style={styles.iconRow}>
                                     <Icon name="delete" size={16} color="#ff4444" />
@@ -151,24 +161,24 @@ const AssignRM = () => {
                             <View style={styles.contactRow}>
                                 <View style={styles.contactItem}>
                                     <Icon name="call" size={13} color="#00cfff" />
-                                    <Text style={styles.text}>1234567890</Text>
+                                    <Text style={styles.text}>{item.phone||'N/A'}</Text>
                                 </View>
                                 <View style={styles.contactItem}>
                                     <Icon name="email" size={13} color="#00cfff" />
                                     <Text style={styles.text} numberOfLines={1}>
-                                        bayabipaul@gmail.com
+                                        {item.email||'N/A'}
                                     </Text>
                                 </View>
                             </View>
 
                             <View style={styles.row}>
                                 <Icon name="location-on" size={13} color="#00cfff" />
-                                <Text style={styles.text}>Kolkata</Text>
+                                <Text style={styles.text}>{item.address||'N/A'}</Text>
                             </View>
 
                             <View style={styles.refRow}>
                                 <Text style={styles.refLabel}>Reference: </Text>
-                                <Text style={styles.refValue}>Akhil</Text>
+                                <Text style={styles.refValue}>{item?.mrreference?.mrf_name||'N/A'}</Text>
                             </View>
 
                         </View>

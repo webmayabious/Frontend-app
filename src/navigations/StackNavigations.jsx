@@ -12,6 +12,8 @@ import MissedFollowup from "../pages/MissedFollowup";
 import UploadedLeads from "../pages/UploadedLeads";
 import TotalLeadScreen from "../pages/TotalLeadScreen";
 import LeadsListScreen from "../pages/LeadsListScreen";
+import TotalBookingsAgreementsTillDateScreen from '../pages/TotalBookingsAgreementsTillDateScreen'
+import TotalBookingsAgreementsPerMonth from '../pages/TotalBookingsAgreementsPerMonth'
 import AssignRM from "../pages/AssignRM";
 import ChangeRM from "../pages/ChangeRM";
 const Stack = createNativeStackNavigator();
@@ -64,6 +66,16 @@ export default function StackNavigations() {
           name="LeadsListScreen"
           component={LeadsListScreen}
         />
+           <Stack.Screen
+          name="TotalBookingsAgreementsTillDateScreen"
+          component={TotalBookingsAgreementsTillDateScreen}
+        />
+            <Stack.Screen
+          name="TotalBookingsAgreementsPerMonth"
+          component={TotalBookingsAgreementsPerMonth}
+        />
+       
+        
           <Stack.Screen
           name="AssignRM"
           component={AssignRM}
