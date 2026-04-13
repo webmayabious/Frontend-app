@@ -1,5 +1,4 @@
-package com.mulyam
-
+package com.mavie.mulyam.pm
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate
 import com.facebook.react.defaults.DefaultNewArchitectureEntryPoint.fabricEnabled

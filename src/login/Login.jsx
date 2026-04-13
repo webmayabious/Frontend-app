@@ -9,12 +9,15 @@ import {
   ImageBackground,
   ActivityIndicator,
   Alert,
+  Platform
 } from 'react-native';
-
+import socket from '../socket';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useDispatch } from 'react-redux';
 import { useNavigation } from '@react-navigation/native';
 import api from '../api/AxiosInstance';
+import messaging from '@react-native-firebase/messaging';
+import DeviceInfo from 'react-native-device-info';
 // import socket from '../../socket'
 // import AnimatedSplash from "../../AnimatedSplash";
 const bgImage = require("../asset/image/background0.jpg");
@@ -61,53 +64,79 @@ const LoginUI = () => {
     checkToken();
   }, []);
 
-  const handleLogin = async () => {
-    if (!loginData.userid.trim() || !loginData.password.trim()) {
-      Alert.alert('Error', 'Please enter User ID and Password');
+const handleLogin = async () => {
+  if (!loginData.userid.trim() || !loginData.password.trim()) {
+    Alert.alert('Error', 'Please enter User ID and Password');
+    return;
+  }
+
+  try {
+    setLoading(true);
+
+    // FCM TOKEN
+    const fcmToken = await messaging().getToken();
+
+    // DEVICE INFO (SAFE)
+    const deviceId = await DeviceInfo.getUniqueId();
+    const deviceType = Platform.OS === 'ios' ? 'IOS' : 'ANDROID';
+    const appVersion = DeviceInfo.getVersion();
+    const buildNumber = DeviceInfo.getBuildNumber();
+    let deviceName = 'Unknown Device';
+    try {
+      deviceName = await DeviceInfo.getDeviceName();
+    } catch (e) {}
+
+    const body = {
+      ...loginData,
+      fcm_token: fcmToken,
+      mobile_device_id: deviceId,
+      device_type: deviceType,
+      device_name: deviceName,
+      application_name: 'CRM_APP',
+      app_version: appVersion,
+      build_number: buildNumber,
+    };
+
+    console.log('📤 LOGIN REQUEST BODY:', body);
+
+    const response = await api.post('/api/pm/auth/login', body);
+    const data = response.data;
+
+    if (!data.status) {
+      Alert.alert('Login Failed', data.message || 'Invalid credentials');
       return;
     }
 
-    try {
-      setLoading(true);
+    // Save to AsyncStorage
+    await AsyncStorage.setItem('PM_TOKEN', data.token);
+    await AsyncStorage.setItem('PM_USER', JSON.stringify(data.user));
+    await AsyncStorage.setItem('PM_ROLES', JSON.stringify(data.roles));
 
-      const response = await api.post('/api/pm/auth/login', loginData);
-      const data = response.data;
+    // Redux Dispatch
+    dispatch({ type: 'setToken', payload: data.token });
+    dispatch({ type: 'setUserInfo', payload: data.user });
+    dispatch({ type: 'setRole', payload: data.roles });
 
-      // console.log("LOGIN DATA:", data);
-
-      if (!data.status) {
-        Alert.alert('Login Failed', data.message || 'Invalid credentials');
-        return;
-      }
-
-      // Save to AsyncStorage
-      await AsyncStorage.setItem('PM_TOKEN', data.token);
-      await AsyncStorage.setItem('PM_USER', JSON.stringify(data.user));
-      await AsyncStorage.setItem('PM_ROLES', JSON.stringify(data.roles));
-
-      // Redux Dispatch
-      dispatch({ type: 'setToken', payload: data.token });
-      dispatch({ type: 'setUserInfo', payload: data.user });
-      dispatch({ type: 'setRole', payload: data.roles });
-
-      // // Socket connect
-      // if (!socket.connected) {
-      //   socket.auth = { token: data.token };
-      //   socket.connect();
-      // }
-
-      navigation.replace('Dashboard', {
-        screen: 'Dashboard',
-      });
-    } catch (error) {
-      Alert.alert(
-        'Login Failed',
-        error?.response?.data?.message || 'Something went wrong',
-      );
-    } finally {
-      setLoading(false);
+    // ✅ Socket Connect
+    if (!socket.connected) {
+      socket.auth = { token: data.token };
+      socket.connect();
     }
-  };
+
+    navigation.replace('Dashboard', {
+      screen: 'Dashboard',
+    });
+  } catch (error) {
+    console.log('❌ LOGIN ERROR:', error);
+
+    Alert.alert(
+      'Login Failed',
+      error?.response?.data?.message || 'Something went wrong',
+    );
+  } finally {
+    setLoading(false);
+  }
+};
 
   // if (showSplash) {
   //   return <AnimatedSplash onFinish={() => setShowSplash(false)} />;

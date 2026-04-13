@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "855465228934",
+    "project_id": "mulyam-notification",
+    "storage_bucket": "mulyam-notification.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:855465228934:android:91792152dfa6414326af07",
+        "android_client_info": {
+          "package_name": "com.mavie.mulyam.pm"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA7kc4mnckry7ceZweuMfkVSo1_hFifEHY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
