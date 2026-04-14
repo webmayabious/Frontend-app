@@ -4,67 +4,98 @@ import notifee, { AndroidImportance } from '@notifee/react-native';
 import App from './App';
 import { name as appName } from './app.json';
 import store from './src/redux/store';
-import 'react-native-gesture-handler'; 
-// ✅ BACKGROUND HANDLER
-messaging().setBackgroundMessageHandler(async remoteMessage => {
-  console.log("🔥 BG MSG:", JSON.stringify(remoteMessage));
+import 'react-native-gesture-handler';
 
-  if (remoteMessage.notification) return;
-  
-  const title = remoteMessage.data?.title;
-  const body = remoteMessage.data?.body;
-  if (!title) return;
+const CHANNEL_ID = 'souravk-notification';
 
-  const badgeCount = Number(remoteMessage.data?.badge || 0);
-
-  if (Platform.OS === "ios") {
-    await notifee.setBadgeCount(badgeCount);
-  }
-
-  if (Platform.OS === "android") {
+async function ensureChannel() {
+  if (Platform.OS === 'android') {
     await notifee.createChannel({
-      id: "souravk-notification",
-      name: "Default Channel",
+      id: CHANNEL_ID,
+      name: 'Default Channel',
       importance: AndroidImportance.HIGH,
+      sound: 'default',
     });
   }
+}
+
+async function displayNotification(remoteMessage) {
+  await ensureChannel();
+
+  const title =
+    remoteMessage.data?.title ||
+    remoteMessage.notification?.title ||
+    'New Message';
+
+  const body =
+    remoteMessage.data?.body ||
+    remoteMessage.notification?.body ||
+    '';
 
   await notifee.displayNotification({
     title,
-    body: body ?? "",
+    body,
     data: remoteMessage.data,
     android: {
-      channelId: "souravk-notification",
-      smallIcon: "ic_launcher",
-      pressAction: { id: "default" },
-      sound: "default",
+      channelId: CHANNEL_ID,
+      smallIcon: 'ic_launcher',
+      pressAction: { id: 'default' },
+      sound: 'default',
     },
     ios: {
-      sound: "default",
-      badgeCount,
+      sound: 'default',
+      foregroundPresentationOptions: {
+        alert: true,
+        badge: false,
+        sound: true,
+      },
     },
   });
+}
+
+// ✅ BACKGROUND HANDLER
+messaging().setBackgroundMessageHandler(async remoteMessage => {
+  console.log('🔥 BG MSG:', JSON.stringify(remoteMessage));
+
+  // notification payload থাকলে FCM নিজেই দেখায়
+  if (remoteMessage.notification) return;
+
+  const title = remoteMessage.data?.title;
+  if (!title) return;
+
+  if (Platform.OS === 'ios') {
+    const badgeCount = Number(remoteMessage.data?.badge || 0);
+    await notifee.setBadgeCount(badgeCount);
+  }
+
+  await displayNotification(remoteMessage);
 });
 
 // ✅ FOREGROUND HANDLER
-const lastMessageId = { current: null };
+const seenMessageIds = new Set();
 
 messaging().onMessage(async remoteMessage => {
-  console.log("🔔 Foreground MSG:", JSON.stringify(remoteMessage));
+  console.log('🔔 Foreground MSG:', JSON.stringify(remoteMessage));
 
   const state = store.getState();
-  if (!state.isLoggedIn) return;
 
+  // ✅ undefined হলে block করবে না, শুধু false হলে skip
+  if (state.isLoggedIn === false) return;
+
+  // Deduplication
   const msgId = remoteMessage?.data?.message_id || remoteMessage?.messageId;
-  if (msgId && lastMessageId.current === msgId) {
-    console.log("⛔ Duplicate skip");
-    return;
+  if (msgId) {
+    if (seenMessageIds.has(msgId)) {
+      console.log('⛔ Duplicate skip');
+      return;
+    }
+    seenMessageIds.add(msgId);
+    if (seenMessageIds.size > 50) seenMessageIds.clear();
   }
-  if (msgId) lastMessageId.current = msgId;
 
+  // Active chat-এ থাকলে notification দেখাবে না
   const { type, sender_id, group_id } = remoteMessage.data || {};
-  const incomingChatId = type === "group_chat" ? group_id : sender_id;
-
+  const incomingChatId = type === 'group_chat' ? group_id : sender_id;
   if (
     incomingChatId &&
     state.isChatOpen &&
@@ -73,64 +104,22 @@ messaging().onMessage(async remoteMessage => {
     return;
   }
 
-  if (Platform.OS === "ios") {
+  // iOS stale message check
+  if (Platform.OS === 'ios') {
     const badgeCount = Number(remoteMessage.data?.badge || 0);
     if (badgeCount > 0) await notifee.setBadgeCount(badgeCount);
 
-    if (remoteMessage.notification) {
-      const sentTime = remoteMessage.sentTime;
-
-      // ✅ sentTime
-      if (sentTime) {
-        const diffSeconds = (Date.now() - sentTime) / 1000;
-        console.log("⏱️ diffSeconds:", diffSeconds);
-
-        if (diffSeconds > 5) {
-          console.log("⛔ Old iOS pending message, skip");
-          return;
-        }
+    if (remoteMessage.notification && remoteMessage.sentTime) {
+      const diffSeconds = (Date.now() - remoteMessage.sentTime) / 1000;
+      if (diffSeconds > 5) {
+        console.log('⛔ Old iOS pending message, skip');
+        return;
       }
-      // sentTime 
     }
   }
 
-  if (Platform.OS === "android") {
-    await notifee.createChannel({
-      id: "souravk-notification",
-      name: "Default Channel",
-      importance: AndroidImportance.HIGH,
-    });
-  }
-
-  const title =
-    remoteMessage.data?.title ||
-    remoteMessage.notification?.title ||
-    "New Message";
-
-  const body =
-    remoteMessage.data?.body ||
-    remoteMessage.notification?.body ||
-    "";
-
-  await notifee.displayNotification({
-    title,
-    body,
-    data: remoteMessage.data,
-    android: {
-      channelId: "souravk-notification",
-      smallIcon: "ic_launcher",
-      pressAction: { id: "default" },
-      sound: "default",
-    },
-    ios: {
-      sound: "default",
-      foregroundPresentationOptions: {
-        alert: true,
-        badge: false,
-        sound: true,
-      },
-    },
-  });
+  console.log('📢 Displaying notification...');
+  await displayNotification(remoteMessage);
 });
 
 AppRegistry.registerComponent(appName, () => App);

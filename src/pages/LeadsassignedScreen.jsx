@@ -1,4 +1,4 @@
-// FollowUpsScreen.js
+// FollowUpsScreen.js (Fixed - useNavigation inside component)
 import React, { useRef, useState } from 'react';
 import {
   View,
@@ -16,12 +16,11 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import Header from '../Layout/Header';
 import BottomNav from '../navigations/BottomNav';
 import { useNavigation } from '@react-navigation/native';
-import { useQuery } from '@tanstack/react-query';
 import api from '../api/AxiosInstance';
+import { useQuery } from '@tanstack/react-query';
 
 const STATUSBAR_HEIGHT =
   Platform.OS === 'android' ? StatusBar.currentHeight : 44;
-/* ================= CALL ================= */
 const makeCall = phoneNumber => {
   if (!phoneNumber) return;
   Alert.alert('Call', `Do you want to call ${phoneNumber}?`, [
@@ -29,13 +28,12 @@ const makeCall = phoneNumber => {
     { text: 'Call', onPress: () => Linking.openURL(`tel:${phoneNumber}`) },
   ]);
 };
-// ✅ CARD
-const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
+const FollowCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
   <View style={styles.card}>
     {/* Header */}
     <View style={styles.cardHeader}>
       <View style={styles.nameRow}>
-        <Text style={styles.name}>{data?.propertylead?.name}</Text>
+        <Text style={styles.name}>{data?.name}</Text>
 
         <View
           style={[
@@ -76,7 +74,7 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
           style={{ marginLeft: 8 }}
           onPress={() =>
             navigation.navigate('MeetingsEdit', {
-              id: data?.property_lead_id,
+              id: data?.id,
             })
           }
         />
@@ -85,34 +83,32 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
 
     {/* Info */}
     <Text style={styles.location}>
-      {data?.propertylead?.propertyproject?.project_name} |{' '}
-      {data?.propertylead?.propertylocation?.name}
+      {data?.propertyproject?.project_name || 'N/A'} |{' '}
+      {data?.propertylocation?.name || 'N/A'}
     </Text>
     <View style={styles.rowBetween}>
-      <TouchableOpacity onPress={() => makeCall(data?.propertylead?.phone)}>
+      <TouchableOpacity onPress={() => makeCall(data?.phone)}>
         <Text style={styles.label}>
-          Phone:{' '}
-          <Text style={styles.value}>{data?.propertylead?.phone || 'N/A'}</Text>
+          Phone: <Text style={styles.value}>{data?.phone || 'N/A'}</Text>
         </Text>
       </TouchableOpacity>
       <Text style={styles.label}>
-        Email:{' '}
-        <Text style={styles.value}>{data?.propertylead?.email || 'N/A'}</Text>
+        Email: <Text style={styles.value}>{data?.email || 'N/A'}</Text>
       </Text>
     </View>
     <View style={styles.rowBetween}>
-      <Text style={styles.label}>
+      {/* <Text style={styles.label}>
         <Text style={styles.label}>
           Site Visit Date:
           <Text style={styles.value}> {data?.site_visit_date}</Text>
         </Text>
-      </Text>
+      </Text> */}
 
       <Text style={styles.label}>
         RM:{' '}
         <Text style={styles.value}>
-          {data?.propertylead?.relationshipManager
-            ? `${data.propertylead.relationshipManager.usr_fname} ${data.propertylead.relationshipManager.usr_lname}`
+          {data?.relationshipManager
+            ? `${data.relationshipManager.usr_fname} ${data.relationshipManager.usr_lname}`
             : 'N/A'}
         </Text>
       </Text>
@@ -120,9 +116,7 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
 
     <Text style={{ color: '#fb9e08', fontSize: 12, marginTop: 4 }}>
       Lead Source:{' '}
-      <Text style={styles.value}>
-        {data?.propertylead?.mrreference?.mrf_name}
-      </Text>
+      <Text style={styles.value}>{data?.mrreference?.mrf_name || 'N/A'}</Text>
     </Text>
 
     {/* Footer */}
@@ -131,40 +125,39 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
         style={styles.button}
         onPress={() =>
           navigation.navigate('AllInteractionsScreen', {
-            id: data?.property_lead_id,
+            id: data?.id,
           })
         }
       >
         <Text style={styles.buttonText}>View Interaction</Text>
       </TouchableOpacity>
 
-      <Text style={styles.completed}>{data?.propertycallstatus?.name}</Text>
+      <Text style={styles.completed}>
+        {data?.propertycallstatus?.name || 'N/A'}
+      </Text>
     </View>
   </View>
 );
 
-// ✅ MAIN SCREEN
-const SiteVisitsScreen = () => {
+const LeadsassignedScreen = () => {
   const navigation = useNavigation();
-
   const [showRemarks, setShowRemarks] = useState(false);
   const [remarksText, setRemarksText] = useState('');
   const [searchText, setSearchText] = useState('');
-  const { data,isLoading } = useQuery({
-    queryKey: ['SiteVisitandBookingsData'],
+  /* ================= API CALL ================= */
+  const { data: leadassigned, isLoading } = useQuery({
+    queryKey: ['Leads Assigned'],
     queryFn: async () => {
-      const res = await api.get('/api/pm/siteVisitAndBookingsData');
-      console.log('res site visite', res.data);
-
+      const res = await api.get('/api/pm/getLeadAssignedToday');
       return res.data.data;
     },
   });
 
-  const siteVisits = data?.todays_siteVisit || [];
-  const filteredSiteVisits = siteVisits.filter(item => {
-    const name = item?.propertylead?.name?.toLowerCase() || '';
-    const phone = item?.propertylead?.phone || '';
-    const email = item?.propertylead?.email?.toLowerCase() || '';
+  //   const followUps = data?.todays_followUps || [];
+  const filteredfollowUps = leadassigned?.filter(item => {
+    const name = item?.name?.toLowerCase() || '';
+    const phone = item?.phone || '';
+    const email = item?.email?.toLowerCase() || '';
 
     const search = searchText.toLowerCase();
 
@@ -172,8 +165,15 @@ const SiteVisitsScreen = () => {
       name.includes(search) || phone.includes(search) || email.includes(search)
     );
   });
-  const scrollRef = useRef();
+  //   const meetings = data?.todays_meetings || [];
+  // console.log('followUps', followUps);
+
   const [showTopBtn, setShowTopBtn] = useState(false);
+  const scrollRef = useRef();
+
+  const scrollToTop = () => {
+    scrollRef.current?.scrollTo({ y: 0, animated: true });
+  };
 
   return (
     <View style={styles.container}>
@@ -183,22 +183,27 @@ const SiteVisitsScreen = () => {
         barStyle="light-content"
       />
 
+      {/* Header */}
       <Header />
 
-      {/* Top Bar */}
+      {/* Title Row */}
       <View style={styles.topBarContainer}>
         <View style={styles.topBar}>
+          {/* Left */}
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <Icon name="event-note" size={18} color="#cfd8dc" />
-            <Text style={styles.screenTitle}>Site-Visits</Text>
+            <Text style={styles.screenTitle}>Today's All Assigned Leads</Text>
           </View>
 
-          <TouchableOpacity
-            style={styles.backBtn}
-            onPress={() => navigation.navigate('Dashboard')}
-          >
-            <Text style={styles.backText}>Back</Text>
-          </TouchableOpacity>
+          {/* Right */}
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <TouchableOpacity
+              style={styles.backBtn}
+              onPress={() => navigation.navigate('Dashboard')}
+            >
+              <Text style={styles.backText}>Back</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
 
@@ -206,8 +211,8 @@ const SiteVisitsScreen = () => {
       <ScrollView
         ref={scrollRef}
         showsVerticalScrollIndicator={false}
-        onScroll={e => {
-          const y = e.nativeEvent.contentOffset.y;
+        onScroll={event => {
+          const y = event.nativeEvent.contentOffset.y;
           setShowTopBtn(y > 200);
         }}
         scrollEventThrottle={16}
@@ -224,20 +229,19 @@ const SiteVisitsScreen = () => {
           />
         </View>
 
-        {/* Cards */}
-         {isLoading ? (
-                  <Text style={{ color: '#fff', textAlign: 'center', marginTop: 20 }}>
-                    Loading...
-                  </Text>
-                ) :
-        filteredSiteVisits?.length > 0 ? (
-          filteredSiteVisits.map((visit, i) => (
-            <SiteCard
+        {/* ✅ navigation prop pass করা হচ্ছে প্রতিটি card এ */}
+        {isLoading ? (
+          <Text style={{ color: '#fff', textAlign: 'center', marginTop: 20 }}>
+            Loading...
+          </Text>
+        ) : filteredfollowUps?.length > 0 ? (
+          filteredfollowUps.map((visit, i) => (
+            <FollowCard
               key={visit.id || i}
               data={visit}
-              navigation={navigation}
               setShowRemarks={setShowRemarks}
               setRemarksText={setRemarksText}
+              navigation={navigation}
             />
           ))
         ) : (
@@ -248,7 +252,6 @@ const SiteVisitsScreen = () => {
           </Text>
         )}
       </ScrollView>
-
       {/* ✅ REMARKS MODAL */}
       {showRemarks && (
         <View style={styles.modalOverlay}>
@@ -270,25 +273,20 @@ const SiteVisitsScreen = () => {
           </View>
         </View>
       )}
-
-      {/* Scroll Top */}
       {showTopBtn && (
-        <TouchableOpacity
-          style={styles.topButton}
-          onPress={() => scrollRef.current?.scrollTo({ y: 0, animated: true })}
-        >
+        <TouchableOpacity style={styles.topButton} onPress={scrollToTop}>
           <Icon name="keyboard-arrow-up" size={26} color="#fff" />
         </TouchableOpacity>
       )}
 
+      {/* Bottom Nav */}
       <BottomNav />
     </View>
   );
 };
 
-export default SiteVisitsScreen;
+export default LeadsassignedScreen;
 
-// ✅ STYLES (same as yours)
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#070c4d' },
 

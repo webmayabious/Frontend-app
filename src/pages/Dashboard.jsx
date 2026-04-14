@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   View,
   Text,
@@ -44,17 +44,23 @@ const Card = ({ title, subtitle, value, onPress }) => (
 const Dashboard = () => {
   const navigation = useNavigation();
 
-  const { data: dashboardCards } = useQuery({
+  const { data: dashboardCards,refetch:dashboardrefetch } = useQuery({
     queryKey: ['dashboardCards'],
     queryFn: async () => {
       const res = await api.get('/api/pm/PropertyCrmDashboardData');
       return res.data?.data;
     },
   });
-
+useEffect(() => {
+  dashboardrefetch();
+}, []);
   return (
     <View style={styles.container}>
-      <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
+      <StatusBar
+        translucent
+        backgroundColor="transparent"
+        barStyle="light-content"
+      />
 
       <Header />
 
@@ -73,42 +79,55 @@ const Dashboard = () => {
           <Card
             title="Follow-ups / Meetings"
             subtitle="Today"
-            value={`${dashboardCards?.todays_callbacks || 0} / ${dashboardCards?.todays_meetings || 0}`}
+            value={`${dashboardCards?.todays_callbacks || 0} / ${
+              dashboardCards?.todays_meetings || 0
+            }`}
             onPress={() => navigation.navigate('FollowUpsScreen')}
           />
 
           <Card
             title="Site Visits / Bookings"
             subtitle="Today"
-            value={`${dashboardCards?.todays_site_visits || 0} / ${dashboardCards?.todays_booking || 0}`}
+            value={`${dashboardCards?.todays_site_visits || 0} / ${
+              dashboardCards?.todays_booking || 0
+            }`}
             onPress={() => navigation.navigate('SiteVisitsScreen')}
           />
 
           <Card
             title="Active Leave / Total Leads"
             subtitle="Month"
-            value={`${dashboardCards?.total_active_leads || 0} / ${dashboardCards?.total_leads_count || 0}`}
+            value={`${dashboardCards?.total_active_leads || 0} / ${
+              dashboardCards?.total_leads_count || 0
+            }`}
             onPress={() => navigation.navigate('TotalLeadScreen')}
           />
 
           <Card
             title="Total Bookings / Agreements"
             subtitle="Month"
-            value={`${dashboardCards?.total_bookings_per_month || 0} / ₹${dashboardCards?.total_agreement_value_per_month || 0}`}
-             onPress={() => navigation.navigate('TotalBookingsAgreementsPerMonth')}
+            value={`${dashboardCards?.total_bookings_per_month || 0} / ₹${
+              dashboardCards?.total_agreement_value_per_month || 0
+            }`}
+            onPress={() =>
+              navigation.navigate('TotalBookingsAgreementsPerMonth')
+            }
           />
 
           <Card
             title="Total Bookings / Agreements"
             subtitle="Till Date"
-            value={`${dashboardCards?.total_booking_till_date || 0} / ₹${dashboardCards?.total_agreement_value_till_date || 0}`}
-            onPress={() => navigation.navigate('TotalBookingsAgreementsTillDateScreen')}
-            
+            value={`${dashboardCards?.total_booking_till_date || 0} / ₹${
+              dashboardCards?.total_agreement_value_till_date || 0
+            }`}
+            onPress={() =>
+              navigation.navigate('TotalBookingsAgreementsTillDateScreen')
+            }
           />
 
           <Card
             title="Missed Follow Up"
-            subtitle="Month"
+            subtitle="Till Date"
             value={`${dashboardCards?.total_missed_callback || 0}`}
             onPress={() => navigation.navigate('MissedFollowup')}
           />
@@ -119,7 +138,13 @@ const Dashboard = () => {
             value={`${dashboardCards?.total_leads_uploaded_today || 0}`}
             onPress={() => navigation.navigate('UploadedLeads')}
           />
-
+          <Card
+            title="Leads Assigned"
+            subtitle="Today"
+            value={`${dashboardCards?.total_assigned_lead || 0}`}
+            onPress={() => navigation.navigate('LeadsassignedScreen')}
+            
+          />
           <Card
             title="Leads List"
             subtitle="Till Date"

@@ -30,7 +30,7 @@ const makeCall = phoneNumber => {
   ]);
 };
 //  navigation prop টা বাইরে থেকে pass করা হচ্ছে
-const SiteCard = ({ data, navigation,setShowRemarks, setRemarksText }) => (
+const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
   <View style={styles.card}>
     {/* Header */}
     <View style={styles.cardHeader}>
@@ -44,26 +44,29 @@ const SiteCard = ({ data, navigation,setShowRemarks, setRemarksText }) => (
               backgroundColor:
                 data?.active === '1'
                   ? '#4caf50' // Active
-                  : data?.active === '2'
-                  ? '#f44336' // Inactive
-                  : data?.active === '3'
-                  ? '#2196f3' // Site Visit
-                  : data?.active === '4'
-                  ? '#ff9800' // Meeting Done
-                  : '#9c27b0', // Booking Done (or default)
+                  : '#f44336'
+                  // data?.active === '2'
+                  // ? '#f44336' // Inactive
+                  // : data?.active === '3'
+                  // ? '#2196f3' // Site Visit
+                  // : data?.active === '4'
+                  // ? '#ff9800' // Meeting Done
+                  // : '#9c27b0', // Booking Done (or default)
             },
           ]}
         >
           <Text style={styles.activeText}>
             {data?.active === '1'
               ? 'Active'
-              : data?.active === '2'
-              ? 'Inactive'
-              : data?.active === '3'
-              ? 'Site Visit'
-              : data?.active === '4'
-              ? 'Meeting Done'
-              : 'Booking Done'}
+              : 'Inactive'
+              // data?.active === '2'
+              // ? 'Inactive'
+              // : data?.active === '3'
+              // ? 'Site Visit'
+              // : data?.active === '4'
+              // ? 'Meeting Done'
+              // : 'Booking Done'
+              }
           </Text>
         </View>
       </View>
@@ -87,7 +90,7 @@ const SiteCard = ({ data, navigation,setShowRemarks, setRemarksText }) => (
         >
           <Text style={styles.remarksText}>Remarks</Text>
         </TouchableOpacity> */}
-{/* 
+        {/* 
         <Icon
           name="edit"
           size={18}
@@ -99,6 +102,17 @@ const SiteCard = ({ data, navigation,setShowRemarks, setRemarksText }) => (
             })
           }
         /> */}
+        <Icon
+          name="visibility"
+          size={18}
+          color="#00e5ff"
+          style={{ marginLeft: 8 }}
+          onPress={() =>
+            navigation.navigate('BookingDetailScreen', {
+              id: data?.id,
+            })
+          }
+        />
       </View>
     </View>
 
@@ -120,9 +134,10 @@ const SiteCard = ({ data, navigation,setShowRemarks, setRemarksText }) => (
       <Text style={styles.label}>
         <Text style={styles.label}>
           Site Visit Date:
-          <Text style={styles.value}> {data?.propertyfeedbacks
-          ?.map(x => x?.site_visit_date)
-          .join(', ')}</Text>
+          <Text style={styles.value}>
+            {' '}
+            {data?.propertyfeedbacks?.map(x => x?.site_visit_date).join(', ')}
+          </Text>
         </Text>
       </Text>
 
@@ -164,31 +179,33 @@ const SiteCard = ({ data, navigation,setShowRemarks, setRemarksText }) => (
 );
 
 const TotalBookingsAgreementsPerMonth = () => {
- 
   const navigation = useNavigation();
   const [showRemarks, setShowRemarks] = useState(false);
   const [remarksText, setRemarksText] = useState('');
   const [searchText, setSearchText] = useState('');
   /* ================= API ================= */
- const { data:Lead, isLoading } = useQuery({
-    queryKey: ["TotalBookingAndAgreementDataPerMonth"],
+  const { data: Lead, isLoading } = useQuery({
+    queryKey: ['TotalBookingAndAgreementDataPerMonth'],
     queryFn: async () => {
-      const res = await api.get("/api/pm/totalBookingAndAgreementDataPerMonth");
-      return res?.data?.data?.Bookings||[];
+      const res = await api.get('/api/pm/totalBookingAndAgreementDataPerMonth');
+      return res?.data?.data?.Bookings || [];
     },
   });
-    // const BookingsTillDate = data?.total_BookingsTillDate || [];
-//   const bookings = data?.todays_bookings || [];
+  // const BookingsTillDate = data?.total_BookingsTillDate || [];
+  //   const bookings = data?.todays_bookings || [];
   const filteredfollowUps = (Lead || [])?.filter(item => {
     const name = item?.name?.toLowerCase() || '';
     const phone = item?.phone || '';
     const email = item?.email?.toLowerCase() || '';
-    const office_location=item?.office_location.toLowerCase()|| ''
+    const office_location = item?.office_location.toLowerCase() || '';
 
     const search = searchText.toLowerCase();
 
     return (
-      name.includes(search) || phone.includes(search) || email.includes(search) || office_location.includes(search)
+      name.includes(search) ||
+      phone.includes(search) ||
+      email.includes(search) ||
+      office_location.includes(search)
     );
   });
   // console.log('siteVisits1', Lead);
@@ -215,7 +232,9 @@ const TotalBookingsAgreementsPerMonth = () => {
         <View style={styles.topBar}>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <Icon name="event-note" size={18} color="#cfd8dc" />
-            <Text style={styles.screenTitle}>Total Bookings Agreements Till Date</Text>
+            <Text style={styles.screenTitle}>
+              Total Bookings and Agreement(Month)
+            </Text>
           </View>
 
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -251,18 +270,29 @@ const TotalBookingsAgreementsPerMonth = () => {
             style={{ marginLeft: 8, color: '#fff', flex: 1 }}
           />
         </View>
-
-        {filteredfollowUps?.map((visit, i) => (
-          <SiteCard
-            key={visit.id || i}
-            data={visit}
-            setShowRemarks={setShowRemarks}
-            setRemarksText={setRemarksText}
-            navigation={navigation}
-          />
-        ))}
+        {isLoading ? (
+          <Text style={{ color: '#fff', textAlign: 'center', marginTop: 20 }}>
+            Loading...
+          </Text>
+        ) : filteredfollowUps?.length > 0 ? (
+          filteredfollowUps?.map((visit, i) => (
+            <SiteCard
+              key={visit.id || i}
+              data={visit}
+              setShowRemarks={setShowRemarks}
+              setRemarksText={setRemarksText}
+              navigation={navigation}
+            />
+          ))
+        ) : (
+          <Text
+            style={{ textAlign: 'center', marginTop: 20, color: '#ffffff' }}
+          >
+            No data found
+          </Text>
+        )}
       </ScrollView>
-  {/* ✅ REMARKS MODAL */}
+      {/* ✅ REMARKS MODAL */}
       {/* {showRemarks && (
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>

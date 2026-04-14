@@ -24,22 +24,29 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 
 const statusColors = {
   'Call Completed': 'green',
-  'BusyT': 'orange',
+  BusyT: 'orange',
   'Unable To Contact': 'red',
   'Call Status-3': 'gray',
 };
 const SectionHeader = ({ navigation, route }) => (
-
   <View style={styles.sectionHeader}>
     <View style={styles.sectionTitleRow}>
       <Text style={styles.sectionIcon}>👥</Text>
       <Text style={styles.sectionTitle}>All Interactions</Text>
     </View>
     <View style={styles.sectionActions}>
-      <TouchableOpacity style={styles.addNewBtn} onPress={() => navigation.navigate('AddNewInteraction', { id: route.params.id })}>
+      <TouchableOpacity
+        style={styles.addNewBtn}
+        onPress={() =>
+          navigation.navigate('AddNewInteraction', { id: route.params.id })
+        }
+      >
         <Text style={styles.addNewText}>Add New Interaction</Text>
       </TouchableOpacity>
-      <TouchableOpacity style={styles.closeBtn} onPress={() => navigation.goBack()}>
+      <TouchableOpacity
+        style={styles.closeBtn}
+        onPress={() => navigation.goBack()}
+      >
         <Text style={styles.closeBtnText}>✕</Text>
       </TouchableOpacity>
     </View>
@@ -52,7 +59,7 @@ const InfoRow = ({ label, value, style }) => (
   </View>
 );
 
-const InteractionCard = ({ item , setShowRemarks, setRemarksText }) => (
+const InteractionCard = ({ item, setShowRemarks, setRemarksText }) => (
   <View style={styles.card}>
     {/* Card Header */}
     <View style={styles.cardHeader}>
@@ -63,7 +70,7 @@ const InteractionCard = ({ item , setShowRemarks, setRemarksText }) => (
       <TouchableOpacity
         style={styles.remarksBtn}
         onPress={() => {
-          setRemarksText(item?.remarks || "No remarks available");
+          setRemarksText(item?.remarks || 'No remarks available');
           setShowRemarks(true);
         }}
       >
@@ -74,41 +81,48 @@ const InteractionCard = ({ item , setShowRemarks, setRemarksText }) => (
     {/* Lead Qualification */}
     <Text style={styles.leadQualification}>
       Lead Qualification:{' '}
-      <Text style={styles.leadQualificationValue}>{item?.lead_qualification?.name}</Text>
+      <Text style={styles.leadQualificationValue}>
+        {item?.lead_qualification?.name}
+      </Text>
     </Text>
 
     {/* Status Row */}
     <View style={styles.statusRow}>
       <Text style={styles.statusLabel}>
-        Lead Status: <Text style={styles.statusValue}>{item?.lead_status?.name}</Text>
+        Lead Status:{' '}
+        <Text style={styles.statusValue}>{item?.lead_status?.name}</Text>
       </Text>
       <Text style={styles.fieldLabel}>
-        Site Visit Date: <Text style={styles.fieldValue}>{item?.dates?.site_visit}</Text>
+        Site Visit Date:{' '}
+        <Text style={styles.fieldValue}>{item?.dates?.site_visit}</Text>
       </Text>
     </View>
 
     {/* Site Visit */}
 
     <Text style={styles.statusLabel}>
-      Lead Sub Status: <Text style={styles.statusValue}>{item?.lead_sub_status?.name}</Text>
+      Lead Sub Status:{' '}
+      <Text style={styles.statusValue}>{item?.lead_sub_status?.name}</Text>
     </Text>
     {/* Call Back */}
     <Text style={styles.fieldLabelHighlight}>
       Call Back Date & Time:{' '}
-      <Text style={styles.fieldValueHighlight}>{item?.dates?.call_back}/{item?.dates?.call_back_time}</Text>
+      <Text style={styles.fieldValueHighlight}>
+        {item?.dates?.call_back}/{item?.dates?.call_back_time}
+      </Text>
     </Text>
 
     {/* Closure Row */}
     <View style={styles.closureRow}>
       <Text style={styles.fieldLabel}>
-        Expected Closure Date: <Text style={styles.fieldValue}>{item?.dates?.expected_closure}</Text>
+        Expected Closure Date:{' '}
+        <Text style={styles.fieldValue}>{item?.dates?.expected_closure}</Text>
       </Text>
       <Text
         style={[
           styles.callResult,
           {
-            color:
-              statusColors[item?.call_status?.name] || 'black',
+            color: statusColors[item?.call_status?.name] || 'black',
           },
         ]}
       >
@@ -118,16 +132,19 @@ const InteractionCard = ({ item , setShowRemarks, setRemarksText }) => (
   </View>
 );
 
-
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 const AllInteractionsScreen = ({ route }) => {
   const [showRemarks, setShowRemarks] = useState(false);
-  const [remarksText, setRemarksText] = useState("");
+  const [remarksText, setRemarksText] = useState('');
   const { id } = route.params;
   const navigation = useNavigation();
   // ================= Fetch Feedback =================
-  const { data: feedback, isLoading, refetch } = useQuery({
+  const {
+    data: feedback,
+    isLoading,
+    refetch,
+  } = useQuery({
     queryKey: ['feedback', id],
     queryFn: async () => {
       const res = await api.get(`/api/pm/getAllLeadFeedbacksById/${id}`);
@@ -144,7 +161,6 @@ const AllInteractionsScreen = ({ route }) => {
 
   return (
     <>
-
       <SafeAreaView style={styles.safeArea}>
         <StatusBar barStyle="light-content" backgroundColor="#0A0F2E" />
 
@@ -153,43 +169,49 @@ const AllInteractionsScreen = ({ route }) => {
         <ScrollView
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}>
+          showsVerticalScrollIndicator={false}
+        >
           <SectionHeader navigation={navigation} route={route} />
-
-          {feedback?.map(item => (
-            <InteractionCard
-              key={item.id}
-              item={item}
-              setShowRemarks={setShowRemarks}
-              setRemarksText={setRemarksText}
-            />
-          ))}
+          {isLoading ? (
+            <Text style={{ color: '#fff', textAlign: 'center', marginTop: 20 }}>
+              Loading...
+            </Text>
+          ) : feedback?.length >0 ? (
+            feedback?.map(item => (
+              <InteractionCard
+                key={item.id}
+                item={item}
+                setShowRemarks={setShowRemarks}
+                setRemarksText={setRemarksText}
+              />
+            ))
+          ) : (
+            <Text style={{ color: '#fff', textAlign: 'center', marginTop: 20 }}>
+              No Data Found
+            </Text>
+          )}
         </ScrollView>
 
-         {showRemarks && (
-  <View style={styles.modalOverlay}>
-    <View style={styles.modalCard}>
-      
-      <View style={styles.checkIcon}>
-        <Icon name="check-circle" size={32} color="#00acc1" />
-      </View>
+        {showRemarks && (
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalCard}>
+              <View style={styles.checkIcon}>
+                <Icon name="check-circle" size={32} color="#00acc1" />
+              </View>
 
-      <Text style={styles.modalTitle}>Latest Remarks</Text>
+              <Text style={styles.modalTitle}>Latest Remarks</Text>
 
-      <Text style={styles.modalText}>
-        {remarksText}
-      </Text>
+              <Text style={styles.modalText}>{remarksText}</Text>
 
-      <TouchableOpacity
-        style={styles.modalCloseBtn}
-        onPress={() => setShowRemarks(false)}
-      >
-        <Text style={styles.modalCloseText}>OK</Text>
-      </TouchableOpacity>
-
-    </View>
-  </View>
-)}
+              <TouchableOpacity
+                style={styles.modalCloseBtn}
+                onPress={() => setShowRemarks(false)}
+              >
+                <Text style={styles.modalCloseText}>OK</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
         <BottomNav />
       </SafeAreaView>
     </>
@@ -309,7 +331,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     borderRadius: 10,
     padding: 14,
-    borderWidth: .5,
+    borderWidth: 0.5,
     borderColor: COLORS.borderColor,
     borderColor: '#FFFFFF',
   },
@@ -418,56 +440,56 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '500',
   },
-modalOverlay: {
-  position: 'absolute',
-  width: '100%',
-  height: '100%',
-  backgroundColor: 'rgba(0,0,0,0.6)',
-  justifyContent: 'center',
-  alignItems: 'center',
-},
+  modalOverlay: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
 
-modalCard: {
-  width: '85%',
-  backgroundColor: '#2f2f8f',
-  borderRadius: 12,
-  padding: 20,
-  alignItems: 'center',
-},
+  modalCard: {
+    width: '85%',
+    backgroundColor: '#2f2f8f',
+    borderRadius: 12,
+    padding: 20,
+    alignItems: 'center',
+  },
 
-checkIcon: {
-  width: 50,
-  height: 50,
-  borderRadius: 25,
-  backgroundColor: '#e6f7ff',
-  justifyContent: 'center',
-  alignItems: 'center',
-  marginBottom: 10,
-},
+  checkIcon: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#e6f7ff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
 
-modalTitle: {
-  color: '#00e5ff',
-  fontSize: 18,
-  marginBottom: 10,
-},
+  modalTitle: {
+    color: '#00e5ff',
+    fontSize: 18,
+    marginBottom: 10,
+  },
 
-modalText: {
-  color: '#fff',
-  textAlign: 'center',
-  marginBottom: 15,
-},
+  modalText: {
+    color: '#fff',
+    textAlign: 'center',
+    marginBottom: 15,
+  },
 
-modalCloseBtn: {
-  backgroundColor: '#00acc1',
-  paddingHorizontal: 20,
-  paddingVertical: 6,
-  borderRadius: 20,
-},
+  modalCloseBtn: {
+    backgroundColor: '#00acc1',
+    paddingHorizontal: 20,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
 
-modalCloseText: {
-  color: '#fff',
-  fontWeight: '600',
-},
+  modalCloseText: {
+    color: '#fff',
+    fontWeight: '600',
+  },
 });
 
 export default AllInteractionsScreen;

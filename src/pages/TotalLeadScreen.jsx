@@ -30,7 +30,7 @@ const makeCall = phoneNumber => {
   ]);
 };
 //  navigation prop টা বাইরে থেকে pass করা হচ্ছে
-const SiteCard = ({ data, navigation,setShowRemarks, setRemarksText }) => (
+const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
   <View style={styles.card}>
     {/* Header */}
     <View style={styles.cardHeader}>
@@ -79,9 +79,10 @@ const SiteCard = ({ data, navigation,setShowRemarks, setRemarksText }) => (
         <TouchableOpacity
           style={styles.remarksBtn}
           onPress={() => {
-            setRemarksText(data?.propertyfeedbacks
-          ?.map(x => x?.remarks)
-          .join(', ') || 'No remarks available');
+            setRemarksText(
+              data?.propertyfeedbacks?.map(x => x?.remarks).join(', ') ||
+                'No remarks available',
+            );
             setShowRemarks(true);
           }}
         >
@@ -120,9 +121,10 @@ const SiteCard = ({ data, navigation,setShowRemarks, setRemarksText }) => (
       <Text style={styles.label}>
         <Text style={styles.label}>
           Site Visit Date:
-          <Text style={styles.value}> {data?.propertyfeedbacks
-          ?.map(x => x?.site_visit_date)
-          .join(', ')}</Text>
+          <Text style={styles.value}>
+            {' '}
+            {data?.propertyfeedbacks?.map(x => x?.site_visit_date).join(', ')}
+          </Text>
         </Text>
       </Text>
 
@@ -157,14 +159,13 @@ const SiteCard = ({ data, navigation,setShowRemarks, setRemarksText }) => (
       <Text style={styles.completed}>
         {data?.propertyfeedbacks
           ?.map(x => x.propertycallstatus?.name)
-          .join(', ')||'N/A'}
+          .join(', ') || 'N/A'}
       </Text>
     </View>
   </View>
 );
 
 const TotalLeadScreen = () => {
- 
   const navigation = useNavigation();
   const [showRemarks, setShowRemarks] = useState(false);
   const [remarksText, setRemarksText] = useState('');
@@ -248,18 +249,29 @@ const TotalLeadScreen = () => {
             style={{ marginLeft: 8, color: '#fff', flex: 1 }}
           />
         </View>
-
-        {filteredfollowUps?.map((visit, i) => (
-          <SiteCard
-            key={visit.id || i}
-            data={visit}
-            setShowRemarks={setShowRemarks}
-            setRemarksText={setRemarksText}
-            navigation={navigation}
-          />
-        ))}
+        {isLoading ? (
+          <Text style={{ color: '#fff', textAlign: 'center', marginTop: 20 }}>
+            Loading...
+          </Text>
+        ) : filteredfollowUps?.length > 0 ? (
+          filteredfollowUps?.map((visit, i) => (
+            <SiteCard
+              key={visit.id || i}
+              data={visit}
+              setShowRemarks={setShowRemarks}
+              setRemarksText={setRemarksText}
+              navigation={navigation}
+            />
+          ))
+        ) : (
+          <Text
+            style={{ textAlign: 'center', marginTop: 20, color: '#ffffff' }}
+          >
+            No data found
+          </Text>
+        )}
       </ScrollView>
-  {/* ✅ REMARKS MODAL */}
+      {/* ✅ REMARKS MODAL */}
       {showRemarks && (
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>

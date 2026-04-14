@@ -46,26 +46,27 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
               backgroundColor:
                 data?.active === '1'
                   ? '#4caf50' // Active
-                  : data?.active === '2'
-                  ? '#f44336' // Inactive
-                  : data?.active === '3'
-                  ? '#2196f3' // Site Visit
-                  : data?.active === '4'
-                  ? '#ff9800' // Meeting Done
-                  : '#9c27b0', // Booking Done
+                  : '#f44336'
+                  // ? '#f44336' // Inactive
+                  // : data?.active === '3'
+                  // ? '#2196f3' // Site Visit
+                  // : data?.active === '4'
+                  // ? '#ff9800' // Meeting Done
+                  // : '#9c27b0', // Booking Done
             },
           ]}
         >
           <Text style={styles.activeText}>
             {data?.active === '1'
               ? 'Active'
-              : data?.active === '2'
-              ? 'Inactive'
-              : data?.active === '3'
-              ? 'Site Visit'
-              : data?.active === '4'
-              ? 'Meeting Done'
-              : 'Booking Done'}
+              : 'Inactive'
+              // ? 'Inactive'
+              // : data?.active === '3'
+              // ? 'Site Visit'
+              // : data?.active === '4'
+              // ? 'Meeting Done'
+              // : 'Booking Done'
+              }
           </Text>
         </View>
       </View>

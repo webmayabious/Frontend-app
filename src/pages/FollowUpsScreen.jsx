@@ -156,7 +156,7 @@ const FollowUpsScreen = () => {
   });
 
   const followUps = data?.todays_followUps || [];
-   const filteredfollowUps = followUps.filter(item => {
+  const filteredfollowUps = followUps.filter(item => {
     const name = item?.propertylead?.name?.toLowerCase() || '';
     const phone = item?.propertylead?.phone || '';
     const email = item?.propertylead?.email?.toLowerCase() || '';
@@ -199,7 +199,6 @@ const FollowUpsScreen = () => {
 
           {/* Right */}
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            
             <TouchableOpacity
               style={styles.backBtn}
               onPress={() => navigation.navigate('Dashboard')}
@@ -221,27 +220,40 @@ const FollowUpsScreen = () => {
         scrollEventThrottle={16}
       >
         {/* Search */}
-         <View style={styles.searchBox}>
-                  <Icon name="search" size={18} color="#aaa" />
-                  <TextInput
-                    placeholder="Search name / phone / email..."
-                    placeholderTextColor="#aaa"
-                    value={searchText}
-                    onChangeText={setSearchText}
-                    style={{ marginLeft: 8, color: '#fff', flex: 1 }}
-                  />
-                </View>
+        <View style={styles.searchBox}>
+          <Icon name="search" size={18} color="#aaa" />
+          <TextInput
+            placeholder="Search name / phone / email..."
+            placeholderTextColor="#aaa"
+            value={searchText}
+            onChangeText={setSearchText}
+            style={{ marginLeft: 8, color: '#fff', flex: 1 }}
+          />
+        </View>
 
         {/* ✅ navigation prop pass করা হচ্ছে প্রতিটি card এ */}
-        {filteredfollowUps?.map((visit, i) => (
-          <FollowCard
-            key={visit.id || i}
-            data={visit}
-            setShowRemarks={setShowRemarks}
-            setRemarksText={setRemarksText}
-            navigation={navigation}
-          />
-        ))}
+         {isLoading ? (
+                  <Text style={{ color: '#fff', textAlign: 'center', marginTop: 20 }}>
+                    Loading...
+                  </Text>
+                ) :
+        filteredfollowUps?.length > 0 ? (
+          filteredfollowUps.map((visit, i) => (
+            <FollowCard
+              key={visit.id || i}
+              data={visit}
+              setShowRemarks={setShowRemarks}
+              setRemarksText={setRemarksText}
+              navigation={navigation}
+            />
+          ))
+        ) : (
+          <Text
+            style={{ textAlign: 'center', marginTop: 20, color: '#ffffff' }}
+          >
+            No data found
+          </Text>
+        )}
       </ScrollView>
       {/* ✅ REMARKS MODAL */}
       {showRemarks && (

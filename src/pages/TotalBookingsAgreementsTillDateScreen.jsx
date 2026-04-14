@@ -249,15 +249,27 @@ const TotalBookingsAgreementsTillDateScreen = () => {
           />
         </View>
 
-        {filteredfollowUps?.map((visit, i) => (
-          <SiteCard
-            key={visit.id || i}
-            data={visit}
-            setShowRemarks={setShowRemarks}
-            setRemarksText={setRemarksText}
-            navigation={navigation}
-          />
-        ))}
+          {isLoading ? (
+                <Text style={{ color: '#fff', textAlign: 'center', marginTop: 20 }}>
+                  Loading...
+                </Text>
+              ) : filteredfollowUps?.length > 0 ? (
+                filteredfollowUps?.map((visit, i) => (
+                  <SiteCard
+                    key={visit.id || i}
+                    data={visit}
+                    setShowRemarks={setShowRemarks}
+                    setRemarksText={setRemarksText}
+                    navigation={navigation}
+                  />
+                ))
+              ) : (
+                <Text
+                  style={{ textAlign: 'center', marginTop: 20, color: '#ffffff' }}
+                >
+                  No data found
+                </Text>
+              )}
       </ScrollView>
   {/* ✅ REMARKS MODAL */}
       {showRemarks && (

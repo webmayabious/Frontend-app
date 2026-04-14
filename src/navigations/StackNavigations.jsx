@@ -16,6 +16,9 @@ import TotalBookingsAgreementsTillDateScreen from '../pages/TotalBookingsAgreeme
 import TotalBookingsAgreementsPerMonth from '../pages/TotalBookingsAgreementsPerMonth'
 import AssignRM from "../pages/AssignRM";
 import ChangeRM from "../pages/ChangeRM";
+import BookingDetailScreen from "../pages/BookingDetailScreen";
+import LeadsassignedScreen from "../pages/LeadsassignedScreen";
+import Rmform from "../pages/Rmform";
 const Stack = createNativeStackNavigator();
 export default function StackNavigations() {
   return (
@@ -83,6 +86,18 @@ export default function StackNavigations() {
           <Stack.Screen
           name="ChangeRM"
           component={ChangeRM}
+        />
+           <Stack.Screen
+          name="BookingDetailScreen"
+          component={BookingDetailScreen}
+        />
+           <Stack.Screen
+          name="LeadsassignedScreen"
+          component={LeadsassignedScreen}
+        />
+           <Stack.Screen
+          name="Rmform"
+          component={Rmform}
         />
       </Stack.Navigator>
     </NavigationContainer>

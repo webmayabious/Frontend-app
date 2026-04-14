@@ -1,146 +1,215 @@
-import React, { useState, useRef } from 'react';
+// FollowUpsScreen.js
+import React, { useRef, useState } from 'react';
 import {
   View,
   Text,
-  ActivityIndicator,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
   TextInput,
   StatusBar,
   Platform,
-  Linking,
   Alert,
+  Linking,
 } from 'react-native';
-import { useQuery } from '@tanstack/react-query';
-import api from '../api/AxiosInstance';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import Header from '../Layout/Header';
 import BottomNav from '../navigations/BottomNav';
+import { useNavigation } from '@react-navigation/native';
+import { useQuery } from '@tanstack/react-query';
+import api from '../api/AxiosInstance';
 
 const STATUSBAR_HEIGHT =
   Platform.OS === 'android' ? StatusBar.currentHeight : 44;
-
 /* ================= CALL ================= */
-const makeCall = phone => {
-  if (!phone) return;
-  Alert.alert('Call', `Call ${phone}?`, [
+const makeCall = phoneNumber => {
+  if (!phoneNumber) return;
+  Alert.alert('Call', `Do you want to call ${phoneNumber}?`, [
     { text: 'Cancel', style: 'cancel' },
-    { text: 'Call', onPress: () => Linking.openURL(`tel:${phone}`) },
+    { text: 'Call', onPress: () => Linking.openURL(`tel:${phoneNumber}`) },
   ]);
 };
+// ✅ CARD
+const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
+  <View style={styles.card}>
+    {/* Header */}
+    <View style={styles.cardHeader}>
+      <View style={styles.nameRow}>
+        <Text style={styles.name}>{data?.name}</Text>
 
-/* ================= CARD ================= */
-const LeadCard = ({ item }) => {
-  return (
-    <View style={styles.card}>
-      {/* HEADER */}
-      <View style={styles.cardHeader}>
-        <View style={styles.nameRow}>
-          <Text style={styles.name}>{item?.name || 'N/A'}</Text>
-
-          <View
-            style={[
-              styles.activeBadge,
-              {
-                backgroundColor: item?.active == 1 ? '#4caf50' : '#f44336',
-              },
-            ]}
-          >
-            <Text style={styles.activeText}>
-              {item?.active == 1 ? 'Active' : 'Inactive'}
-            </Text>
-          </View>
+        <View
+          style={[
+            styles.activeBadge,
+            {
+              backgroundColor: data?.active === '1' ? '#4caf50' : '#f44336',
+            },
+          ]}
+        >
+          <Text style={styles.activeText}>
+            {data?.active === '1' ? 'Active' : 'Inactive'}
+          </Text>
         </View>
       </View>
 
-      {/* PHONE + EMAIL */}
-      <View style={styles.rowBetween}>
-        <TouchableOpacity onPress={() => makeCall(item?.phone)}>
-          <Text style={styles.label}>
-            Phone: <Text style={styles.value}>{item?.phone || 'N/A'}</Text>
-          </Text>
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          flexShrink: 0,
+        }}
+      >
+        {/* ✅ REMARKS BUTTON */}
+        <TouchableOpacity
+          style={styles.remarksBtn}
+          onPress={() => {
+            setRemarksText(data?.remarks || 'No remarks available');
+            setShowRemarks(true);
+          }}
+        >
+          <Text style={styles.remarksText}>Remarks</Text>
         </TouchableOpacity>
 
-        <Text style={styles.label}>
-          Email: <Text style={styles.value}>{item?.email || 'N/A'}</Text>
-        </Text>
-      </View>
-
-      {/* ADDRESS */}
-      <Text style={styles.label}>
-        Address: <Text style={styles.value}>{item?.address || 'N/A'}</Text>
-      </Text>
-
-      {/* FOOTER */}
-      <View style={styles.cardFooter}>
-        <Text style={styles.completed}>Uploaded Today</Text>
+        <Icon
+          name="edit"
+          size={18}
+          color="#00e5ff"
+          style={{ marginLeft: 8 }}
+          onPress={() =>
+            navigation.navigate('MeetingsEdit', {
+              id: data?.id,
+            })
+          }
+        />
       </View>
     </View>
-  );
-};
 
-/* ================= MAIN ================= */
+    {/* Info */}
+    <Text style={styles.location}>
+      {data?.propertyproject?.project_name} | {data?.propertylocation?.name}
+    </Text>
+    <View style={styles.rowBetween}>
+      <TouchableOpacity onPress={() => makeCall(data?.propertylead?.phone)}>
+        <Text style={styles.label}>
+          Phone: <Text style={styles.value}>{data?.phone || 'N/A'}</Text>
+        </Text>
+      </TouchableOpacity>
+      <Text style={styles.label}>
+        Email: <Text style={styles.value}>{data?.email || 'N/A'}</Text>
+      </Text>
+    </View>
+    <View style={styles.rowBetween}>
+      <Text style={styles.label}>
+        <Text style={styles.label}>
+          Date_Of_Birth:
+          <Text style={styles.value}> {data?.date_of_birth}</Text>
+        </Text>
+      </Text>
+
+      <Text style={styles.label}>
+        RM:{' '}
+        <Text style={styles.value}>
+          {data?.relationshipManager
+            ? `${data.relationshipManager.usr_fname} ${data.relationshipManager.usr_lname}`
+            : 'N/A'}
+        </Text>
+      </Text>
+    </View>
+
+    <Text style={{ color: '#fb9e08', fontSize: 12, marginTop: 4 }}>
+      Lead Source:{' '}
+      <Text style={styles.value}>{data?.mrreference?.mrf_name}</Text>
+    </Text>
+
+    {/* Footer */}
+    <View style={styles.cardFooter}>
+      <TouchableOpacity
+        style={styles.button}
+        onPress={() =>
+          navigation.navigate('AllInteractionsScreen', {
+            id: data?.property_lead_id,
+          })
+        }
+      >
+        <Text style={styles.buttonText}>View Interaction</Text>
+      </TouchableOpacity>
+
+      <Text style={styles.completed}>
+        {data?.propertycallstatus?.name || 'N/A'}
+      </Text>
+    </View>
+  </View>
+);
+
+// ✅ MAIN SCREEN
 const UploadedLeads = () => {
-  const scrollRef = useRef();
+  const navigation = useNavigation();
+
+  const [showRemarks, setShowRemarks] = useState(false);
+  const [remarksText, setRemarksText] = useState('');
   const [searchText, setSearchText] = useState('');
-  const [showTopBtn, setShowTopBtn] = useState(false);
+  const { data: uploadleads,isLoading } = useQuery({
+    queryKey: ['Uploadleads'],
+    queryFn: async () => {
+      const res = await api.get('api/pm/getLeadsUploadedToday');
+      console.log('res site visite', res.data.data);
 
- const { data, isLoading } = useQuery({
-  queryKey: ['UploadedLeads'],
-  queryFn: async () => {
-    const res = await api.get('/api/pm/getLeadsUploadedToday');
-    return res.data; 
-  },
-});
-
-  const leads = data?.data || [];
-
-  /* ================= FILTER ================= */
-  const filteredLeads = leads.filter(item => {
-    const search = searchText.toLowerCase();
-    return (
-      item?.name?.toLowerCase().includes(search) ||
-      item?.phone?.includes(search) ||
-      item?.email?.toLowerCase().includes(search)
-    );
+      return res.data.data;
+    },
   });
 
-  if (isLoading) {
+  // const siteVisits = data?.todays_siteVisit || [];
+  const filteredSiteVisits = uploadleads?.filter(item => {
+    const name = item?.name?.toLowerCase() || '';
+    const phone = item?.phone || '';
+    const email = item?.email?.toLowerCase() || '';
+
+    const search = searchText.toLowerCase();
+
     return (
-      <View style={styles.loader}>
-        <ActivityIndicator size="large" color="#00acc1" />
-      </View>
+      name.includes(search) || phone.includes(search) || email.includes(search)
     );
-  }
+  });
+  const scrollRef = useRef();
+  const [showTopBtn, setShowTopBtn] = useState(false);
 
   return (
     <View style={styles.container}>
-      <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
+      <StatusBar
+        translucent
+        backgroundColor="transparent"
+        barStyle="light-content"
+      />
 
       <Header />
 
-      {/* TOP BAR */}
+      {/* Top Bar */}
       <View style={styles.topBarContainer}>
         <View style={styles.topBar}>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Icon name="upload-file" size={18} color="#cfd8dc" />
-            <Text style={styles.screenTitle}>Uploaded Leads</Text>
+            <Icon name="event-note" size={18} color="#cfd8dc" />
+            <Text style={styles.screenTitle}>Today's Uploaded Leads</Text>
           </View>
+
+          <TouchableOpacity
+            style={styles.backBtn}
+            onPress={() => navigation.navigate('Dashboard')}
+          >
+            <Text style={styles.backText}>Back</Text>
+          </TouchableOpacity>
         </View>
       </View>
 
-      {/* LIST */}
+      {/* List */}
       <ScrollView
         ref={scrollRef}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 120 }}
         onScroll={e => {
-          setShowTopBtn(e.nativeEvent.contentOffset.y > 200);
+          const y = e.nativeEvent.contentOffset.y;
+          setShowTopBtn(y > 200);
         }}
         scrollEventThrottle={16}
       >
-        {/* SEARCH */}
+        {/* Search */}
         <View style={styles.searchBox}>
           <Icon name="search" size={18} color="#aaa" />
           <TextInput
@@ -152,17 +221,54 @@ const UploadedLeads = () => {
           />
         </View>
 
-        {/* CARDS */}
-        {filteredLeads.length > 0 ? (
-          filteredLeads.map((item, i) => (
-            <LeadCard key={item.id || i} item={item} />
+        {/* Cards */}
+         {isLoading ? (
+                  <Text style={{ color: '#fff', textAlign: 'center', marginTop: 20 }}>
+                    Loading...
+                  </Text>
+                ) :
+        filteredSiteVisits?.length > 0 ? (
+          filteredSiteVisits?.map((visit, i) => (
+            <SiteCard
+              key={visit.id || i}
+              data={visit}
+              navigation={navigation}
+              setShowRemarks={setShowRemarks}
+              setRemarksText={setRemarksText}
+            />
           ))
         ) : (
-          <Text style={styles.empty}>No leads found</Text>
+          <Text
+            style={{ textAlign: 'center', marginTop: 20, color: '#ffffff' }}
+          >
+            No data found
+          </Text>
         )}
       </ScrollView>
 
-      {/* SCROLL TOP */}
+      {/* ✅ REMARKS MODAL */}
+      {showRemarks && (
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.checkIcon}>
+              <Icon name="check-circle" size={32} color="#00acc1" />
+            </View>
+
+            <Text style={styles.modalTitle}>Latest Remarks</Text>
+
+            <Text style={styles.modalText}>{remarksText}</Text>
+
+            <TouchableOpacity
+              style={styles.modalCloseBtn}
+              onPress={() => setShowRemarks(false)}
+            >
+              <Text style={styles.modalCloseText}>OK</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
+      {/* Scroll Top */}
       {showTopBtn && (
         <TouchableOpacity
           style={styles.topButton}
@@ -179,10 +285,9 @@ const UploadedLeads = () => {
 
 export default UploadedLeads;
 
-/* ================= STYLES ================= */
+// ✅ STYLES (same as yours)
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#070c4d' },
-  loader: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 
   topBarContainer: { paddingHorizontal: 15, marginTop: 10 },
 
@@ -196,7 +301,21 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
 
-  screenTitle: { color: '#cfd8dc', fontSize: 13, marginLeft: 6 },
+  screenTitle: {
+    color: '#cfd8dc',
+    fontSize: 13,
+    marginLeft: 6,
+  },
+
+  backBtn: {
+    borderWidth: 1,
+    borderColor: '#888',
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+  },
+
+  backText: { color: '#fff', fontSize: 12 },
 
   searchBox: {
     flexDirection: 'row',
@@ -222,17 +341,13 @@ const styles = StyleSheet.create({
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-  },
-
-  nameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
+    alignItems: 'flex-start',
   },
 
   name: { color: '#fff', fontWeight: 'bold' },
 
   activeBadge: {
+    backgroundColor: '#4caf50',
     borderRadius: 10,
     paddingHorizontal: 6,
     marginLeft: 6,
@@ -240,24 +355,65 @@ const styles = StyleSheet.create({
 
   activeText: { color: '#fff', fontSize: 10 },
 
+  remarksBtn: {
+    backgroundColor: '#00acc1',
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    maxWidth: 80,
+  },
+
+  remarksText: { color: '#fff', fontSize: 10 },
+
+  location: {
+    color: '#00e5ff',
+    marginTop: 5,
+    flexWrap: 'wrap',
+    lineHeight: 16,
+  },
+
   rowBetween: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginTop: 5,
+    gap: 6,
   },
 
-  label: { color: '#FFB85D', fontSize: 12 },
-
-  value: { color: '#fff' },
+  label: {
+    color: '#FFB85D',
+    fontSize: 12,
+    flex: 1,
+    flexWrap: 'wrap',
+    paddingTop: 2,
+  },
+  value: {
+    color: '#fff',
+    flexShrink: 1,
+  },
 
   cardFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginTop: 10,
-    alignItems: 'flex-end',
+    gap: 6,
   },
 
-  completed: { color: '#aaa', fontSize: 12 },
+  button: {
+    backgroundColor: '#00acc1',
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    flexShrink: 1,
+  },
 
-  empty: { color: '#aaa', textAlign: 'center', marginTop: 20 },
+  buttonText: { color: '#fff', fontSize: 12 },
+  completed: {
+    color: '#aaa',
+    fontSize: 12,
+    flexShrink: 1,
+    textAlign: 'right',
+  },
 
   topButton: {
     position: 'absolute',
@@ -269,5 +425,68 @@ const styles = StyleSheet.create({
     borderRadius: 25,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+
+  modalOverlay: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  modalCard: {
+    width: '85%',
+    backgroundColor: '#2f2f8f',
+    borderRadius: 12,
+    padding: 20,
+    alignItems: 'center',
+  },
+
+  checkIcon: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#e6f7ff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+
+  modalTitle: {
+    color: '#00e5ff',
+    fontSize: 18,
+    marginBottom: 10,
+  },
+
+  modalText: {
+    color: '#fff',
+    textAlign: 'center',
+    marginBottom: 15,
+  },
+
+  modalCloseBtn: {
+    backgroundColor: '#00acc1',
+    paddingHorizontal: 20,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+
+  modalCloseText: {
+    color: '#fff',
+    fontWeight: '600',
+  },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    flexWrap: 'wrap',
+  },
+
+  name: {
+    color: '#fff',
+    fontWeight: 'bold',
+    flexShrink: 1,
   },
 });
