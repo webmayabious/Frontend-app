@@ -65,7 +65,7 @@ const Header = () => {
 
       {/* Left Section */}
       <View style={styles.leftSection}>
-        <Icon name="menu" size={24} color="#fff" />
+        {/* <Icon name="menu" size={24} color="#fff" /> */}
         <Image
           source={require("../asset/image/logo/mokhsLogo.png")}
           style={styles.logoImage}

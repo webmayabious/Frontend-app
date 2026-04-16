@@ -747,7 +747,11 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: '#ffffff20',
   },
   filterText: { color: '#fff', fontSize: 12, fontWeight: '500' },
-  searchRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8, gap: 8 },
+  searchRow: {
+  width: '100%',
+  paddingHorizontal:0,
+  marginBottom: 8,
+},
  searchBox: {
   flexDirection: 'row',
   alignItems: 'center',
@@ -756,7 +760,6 @@ const styles = StyleSheet.create({
   borderRadius: 20,
   paddingHorizontal: 12,
   height: 40,
-
   // iOS fix
   backgroundColor: '#ffffff08',
 },

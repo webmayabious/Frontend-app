@@ -585,34 +585,42 @@ const AssignRM = () => {
           />
         </View>
 
-        <View style={styles.selectAllRow}>
-          <TouchableOpacity
-            style={styles.selectAllLeft}
-            onPress={toggleSelectAll}
-          >
-            <View
-              style={[styles.checkbox, isAllSelected && styles.checkboxChecked]}
-            >
-              {isAllSelected && <Icon name="check" size={12} color="#fff" />}
-            </View>
-            <Text style={styles.selectAllText}>
-              {isAllSelected ? 'Deselect All' : 'Select All'}
-            </Text>
-            {selected.length > 0 && (
-              <View style={styles.selectedBadge}>
-                <Text style={styles.selectedBadgeText}>
-                  {selected.length} selected
-                </Text>
-              </View>
-            )}
-          </TouchableOpacity>
+      <View style={styles.selectAllRow}>
 
-          <TouchableOpacity style={styles.filterBtn} onPress={openFilterModal}>
-            <Icon name="filter-list" size={14} color="#fff" />
-            <Text style={styles.filterText}>By Details</Text>
-            <Icon name="keyboard-arrow-down" size={14} color="#fff" />
-          </TouchableOpacity>
+  {/* LEFT SIDE */}
+  <View style={styles.selectAllLeft}>
+    <TouchableOpacity
+      style={styles.selectAllLeft}
+      onPress={toggleSelectAll}
+    >
+      <View
+        style={[styles.checkbox, isAllSelected && styles.checkboxChecked]}
+      >
+        {isAllSelected && <Icon name="check" size={12} color="#fff" />}
+      </View>
+
+      <Text style={styles.selectAllText}>
+        {isAllSelected ? 'Deselect All' : 'Select All'}
+      </Text>
+
+      {selected.length > 0 && (
+        <View style={styles.selectedBadge}>
+          <Text style={styles.selectedBadgeText}>
+            {selected.length} selected
+          </Text>
         </View>
+      )}
+    </TouchableOpacity>
+  </View>
+
+  {/* RIGHT SIDE (FIXED) */}
+  <TouchableOpacity style={styles.filterBtn} onPress={openFilterModal}>
+    <Icon name="filter-list" size={14} color="#fff" />
+    <Text style={styles.filterText}>By Details</Text>
+    <Icon name="keyboard-arrow-down" size={14} color="#fff" />
+  </TouchableOpacity>
+
+</View>
         {isLoading ? (
           <Text style={{ color: '#fff', textAlign: 'center', marginTop: 20 }}>
             Loading...
@@ -1107,6 +1115,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     flex: 1,
     height: 38,
+    marginBottom:10
   },
   input: { color: '#fff', marginLeft: 5, flex: 1, fontSize: 13 },
   selectAllRow: {
@@ -1122,7 +1131,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 4,
   },
-  selectAllLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  selectAllLeft: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  flex: 1,          // 👈 important
+  flexShrink: 1,    // 👈 prevents overflow pushing right side
+  gap: 8,
+},
+
   selectAllText: { color: '#fff', fontSize: 13, fontWeight: '500' },
   selectedBadge: {
     backgroundColor: '#00cfff22',
@@ -1133,11 +1149,18 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   selectedBadgeText: { color: '#00cfff', fontSize: 11, fontWeight: '500' },
-  filterBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#3a3f7a', marginTop: '10',
-    paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20,
-    borderWidth: 1, borderColor: '#ffffff20',
-  },
+ filterBtn: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 5,
+  backgroundColor: '#3a3f7a',
+  paddingHorizontal: 12,
+  paddingVertical: 6,
+  borderRadius: 20,
+  borderWidth: 1,
+  borderColor: '#ffffff20',
+  flexShrink: 0, // 👈 keeps it fixed right
+},
   filterText: { color: '#fff', fontSize: 12, fontWeight: '500' },
  card: {
   backgroundColor: '#1e2260',
