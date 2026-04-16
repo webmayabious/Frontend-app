@@ -18,7 +18,7 @@ import BottomNav from '../navigations/BottomNav';
 import { useNavigation } from '@react-navigation/native';
 import api from '../api/AxiosInstance';
 import { useQuery } from '@tanstack/react-query';
-import { Dropdown } from 'react-native-element-dropdown';
+
 const STATUSBAR_HEIGHT =
   Platform.OS === 'android' ? StatusBar.currentHeight : 44;
 const makeCall = phoneNumber => {
@@ -27,44 +27,6 @@ const makeCall = phoneNumber => {
     { text: 'Cancel', style: 'cancel' },
     { text: 'Call', onPress: () => Linking.openURL(`tel:${phoneNumber}`) },
   ]);
-};
-const DropdownField = ({ label, data, placeholder, value, onChange }) => {
-  const [isFocus, setIsFocus] = useState(false);
-  return (
-    <View style={styles.inputWrapper}>
-      <Text style={styles.label}>{label}</Text>
-      <Dropdown
-        style={[
-          styles.dropdown,
-          isFocus && { borderColor: '#00e5ff', borderWidth: 1.5 },
-        ]}
-        containerStyle={styles.dropdownContainer}
-        placeholderStyle={styles.placeholderStyle}
-        selectedTextStyle={styles.selectedTextStyle}
-        itemTextStyle={{ color: '#0b0b0b', fontWeight: '500' }}
-        activeColor="#e6f7ff"
-        data={data || []}
-        labelField="label"
-        valueField="value"
-        placeholder={placeholder}
-        value={value}
-        itemContainerStyle={styles.itemContainer}
-        onFocus={() => setIsFocus(true)}
-        onBlur={() => setIsFocus(false)}
-        onChange={item => {
-          setIsFocus(false);
-          onChange && onChange(item.value);
-        }}
-        renderRightIcon={() => (
-          <Icon
-            name={isFocus ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
-            size={20}
-            color="#00e5ff"
-          />
-        )}
-      />
-    </View>
-  );
 };
 const FollowCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
   <View style={styles.card}>
@@ -182,33 +144,11 @@ const LeadsassignedScreen = () => {
   const [showRemarks, setShowRemarks] = useState(false);
   const [remarksText, setRemarksText] = useState('');
   const [searchText, setSearchText] = useState('');
-  const [showFilterModal, setShowFilterModal] = useState(false);
-  const [filters, setFilters] = useState({
-    company_id: null,
-    rm_id: null,
-    fromDate: null,
-    toDate: null,
-    project: null,
-    location: null,
-    active: null,
-  });
-  const [appliedFilters, setAppliedFilters] = useState();
   /* ================= API CALL ================= */
   const { data: leadassigned, isLoading } = useQuery({
-    queryKey: ['Leads Assigned', appliedFilters],
+    queryKey: ['Leads Assigned'],
     queryFn: async () => {
-      const res = await api.get('/api/pm/getLeadAssignedToday', {
-        params: {
-          search: searchText || undefined,
-          company_id: filters.company_id || undefined,
-          rm_id: filters.rm_id || undefined,
-          fromDate: filters.fromDate || undefined,
-          toDate: filters.toDate || undefined,
-          project: filters.project || undefined,
-          location: filters.location || undefined,
-          active: filters.active || undefined,
-        },
-      });
+      const res = await api.get('/api/pm/getLeadAssignedToday');
       return res.data.data;
     },
   });
@@ -230,76 +170,6 @@ const LeadsassignedScreen = () => {
 
   const [showTopBtn, setShowTopBtn] = useState(false);
   const scrollRef = useRef();
-  const { data: AllProperty } = useQuery({
-    queryKey: ['AllProperty'],
-    queryFn: async () => {
-      const res = await api.get('/api/pm/getAllPropertyLocation');
-      return res.data.data;
-    },
-  });
-
-  // Fetch RMs
-  const { data: allRmList = [] } = useQuery({
-    queryKey: ['allRMList'],
-    queryFn: async () => {
-      const res = await api.get('/api/pm/getAllRM');
-      return res?.data?.data;
-    },
-  });
-
-  // Fetch Projects
-  const { data: projectList = [] } = useQuery({
-    queryKey: ['project'],
-    queryFn: async () => {
-      const res = await api.get('/api/pm/getAllPropertyProjects');
-      return res.data.data || [];
-    },
-  });
-
-  /* ================= DATA MAPPING ================= */
-  const Property = AllProperty?.map(item => ({
-    label: item.name,
-    value: item.id,
-  }));
-  const Rm = allRmList?.map(item => ({ label: item.name, value: item.id }));
-  const projectOptions = projectList?.map(item => ({
-    label: item.project_name,
-    value: item.id,
-  }));
-
-  const LeadStatus = [
-    { label: 'Active', value: '1' },
-    { label: 'Inactive', value: '2' },
-    // { label: 'Site Visit', value: '3' },
-    // { label: 'Meeting Done', value: '4' },
-    // { label: 'Booking Done', value: '5' },
-  ];
-
-  /* ================= HANDLERS ================= */
-  const onChange = (key, value) => {
-    setFilters(prev => ({ ...prev, [key]: value }));
-  };
-
-  const applyFilter = () => {
-    setAppliedFilters(filters);
-    setShowFilterModal(false);
-  };
-
-  const resetFilters = () => {
-    const cleared = {
-      company_id: null,
-      rm_id: null,
-      fromDate: null,
-      toDate: null,
-      project: null,
-      location: null,
-      active: null,
-    };
-
-    setFilters(cleared);
-    setAppliedFilters(cleared);
-    setShowFilterModal(false);
-  };
 
   const scrollToTop = () => {
     scrollRef.current?.scrollTo({ y: 0, animated: true });
@@ -327,15 +197,6 @@ const LeadsassignedScreen = () => {
 
           {/* Right */}
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <TouchableOpacity
-              style={[
-                styles.backBtn,
-                { marginRight: 8, borderColor: '#00e5ff' },
-              ]}
-              onPress={() => setShowFilterModal(true)}
-            >
-              <Icon name="filter-alt" size={18} color="#00e5ff" />
-            </TouchableOpacity>
             <TouchableOpacity
               style={styles.backBtn}
               onPress={() => navigation.navigate('Dashboard')}
@@ -408,78 +269,6 @@ const LeadsassignedScreen = () => {
               onPress={() => setShowRemarks(false)}
             >
               <Text style={styles.modalCloseText}>OK</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
-      {/* ✅ FILTER MODAL */}
-      {showFilterModal && (
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Filter Leads</Text>
-
-            <ScrollView
-              style={{ width: '100%' }}
-              showsVerticalScrollIndicator={false}
-            >
-              <DropdownField
-                label="Property Location"
-                data={Property}
-                placeholder="Select"
-                value={filters.location}
-                onChange={value => onChange('location', value)}
-              />
-              <DropdownField
-                label="RM"
-                data={Rm}
-                placeholder="Select"
-                value={filters.rm_id}
-                onChange={value => onChange('rm_id', value)}
-              />
-
-              {/* Date Row */}
-              <View
-                style={{
-                  flexDirection: 'row',
-                  justifyContent: 'space-between',
-                  width: '100%',
-                }}
-              ></View>
-
-              <DropdownField
-                label="Project"
-                data={projectOptions}
-                placeholder="Select"
-                value={filters.project}
-                onChange={value => onChange('project', value)}
-              />
-              <DropdownField
-                label="Lead Status"
-                data={LeadStatus}
-                placeholder="Select"
-                value={filters.active}
-                onChange={value => onChange('active', value)}
-              />
-            </ScrollView>
-
-            <TouchableOpacity
-              style={styles.modalCloseBtn}
-              onPress={applyFilter}
-            >
-              <Text style={styles.modalCloseText}>Apply Filter</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity onPress={resetFilters} style={{ marginTop: 12 }}>
-              <Text style={{ color: '#ff5252', fontWeight: 'bold' }}>
-                Reset All
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={() => setShowFilterModal(false)}
-              style={{ marginTop: 15 }}
-            >
-              <Text style={{ color: '#fff' }}>Cancel</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -689,18 +478,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '600',
   },
-  inputWrapper: { width: '100%', marginBottom: 12 },
-  dropdown: {
-    height: 40,
-    backgroundColor: '#ffffff10',
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    borderWidth: 1,
-    borderColor: '#444',
-  },
-  dropdownContainer: { backgroundColor: '#fff', borderRadius: 8 },
-  placeholderStyle: { color: '#aaa', fontSize: 14 },
-  selectedTextStyle: { color: '#fff', fontSize: 14 },
   nameRow: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -99,18 +99,6 @@ const SiteCard = ({ data, navigation,setShowRemarks, setRemarksText }) => (
             })
           }
         /> */}
-           <Icon
-          name="visibility"
-          size={18}
-          color="#00e5ff"
-          style={{ marginLeft: 8 }}
-          onPress={() =>
-            navigation.navigate('BookingDetailScreen', {
-              id: data.id,
-              data:data
-            })
-          }
-        />
       </View>
     </View>
 
