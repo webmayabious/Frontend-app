@@ -10,11 +10,12 @@ const BottomNav = () => {
   const isAdmin = userRole?.includes('ADMIN');
   const isRM = userRole?.includes('RM');
   const isBusinessHead=userRole?.includes('BUSINESS HEAD')
+  const isCityHead=userRole?.includes('CITY HEAD')
   return (
     <SafeAreaView edges={['bottom']} style={styles.safeArea}>
       <View style={styles.bottomNav}>
         <NavItem icon="view-dashboard" label="Dashboard" screen="Dashboard" />
-         {(isAdmin || isBusinessHead)&&(
+         {(isAdmin || isBusinessHead || isCityHead)&&(
           <>
          
             <NavItem icon="account-switch" label="Change RM" screen="ChangeRM" />

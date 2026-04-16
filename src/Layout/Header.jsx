@@ -15,9 +15,10 @@ import { useSelector, useDispatch } from "react-redux";
 import Entypo from 'react-native-vector-icons/Entypo';
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import messaging from '@react-native-firebase/messaging';  // ✅ নতুন
-import socket from '../socket';                             // ✅ নতুন (path ঠিক করো)
-import api from '../api/AxiosInstance';                    // ✅ নতুন
+import messaging from '@react-native-firebase/messaging'; 
+import socket from '../socket';                           
+import api from '../api/AxiosInstance';                   
+
 
 const STATUSBAR_HEIGHT = Platform.OS === "android" ? StatusBar.currentHeight : 44;
 
@@ -30,13 +31,9 @@ const Header = () => {
 
   const handleLogout = async () => {
     try {
-      
       const fcmToken = await messaging().getToken();
       await api.post('/api/pm/auth/logout', { fcm_token: fcmToken });
-
-  
       await messaging().deleteToken();
-
       // ✅ Socket Disconnect
       if (socket.connected) {
         socket.disconnect();
@@ -49,7 +46,6 @@ const Header = () => {
 
       // ✅ Redux Clear
       dispatch({ type: 'LOGOUT' });
-
       setProfileModalVisible(false);
       navigation.replace('Login');
 
@@ -105,7 +101,6 @@ const Header = () => {
             onTouchEnd={(e) => e.stopPropagation()}
           >
             <View style={styles.arrow} />
-
             <Text style={styles.modalName}>
               {userInfo?.Fname || 'User'} {userInfo?.Lname || ''}
             </Text>

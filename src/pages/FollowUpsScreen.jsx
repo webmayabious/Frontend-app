@@ -1,5 +1,6 @@
 // FollowUpsScreen.js (Fixed - useNavigation inside component)
 import React, { useRef, useState } from 'react';
+import { Dropdown } from 'react-native-element-dropdown';
 import {
   View,
   Text,
@@ -140,17 +141,97 @@ const FollowCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
     </View>
   </View>
 );
+const DropdownField = ({ label, data, placeholder, value, onChange }) => {
+  const [isFocus, setIsFocus] = useState(false);
+  return (
+    <View style={styles.inputWrapper}>
+      <Text style={styles.label}>{label}</Text>
+      <Dropdown
+        style={[
+          styles.dropdown,
+          isFocus && { borderColor: '#00e5ff', borderWidth: 1.5 },
+        ]}
+        containerStyle={styles.dropdownContainer}
+        placeholderStyle={styles.placeholderStyle}
+        selectedTextStyle={styles.selectedTextStyle}
+        itemTextStyle={{ color: '#0b0b0b', fontWeight: '500' }}
+        activeColor="#e6f7ff"
+        data={data || []}
+        labelField="label"
+        valueField="value"
+        placeholder={placeholder}
+        value={value}
+        itemContainerStyle={styles.itemContainer}
+        onFocus={() => setIsFocus(true)}
+        onBlur={() => setIsFocus(false)}
+        onChange={item => {
+          setIsFocus(false);
+          onChange && onChange(item.value);
+        }}
+        renderRightIcon={() => (
+          <Icon
+            name={isFocus ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
+            size={20}
+            color="#00e5ff"
+          />
+        )}
+      />
+    </View>
+  );
+};
 
 const FollowUpsScreen = () => {
   const navigation = useNavigation();
   const [showRemarks, setShowRemarks] = useState(false);
   const [remarksText, setRemarksText] = useState('');
   const [searchText, setSearchText] = useState('');
+  const [showFilterModal, setShowFilterModal] = useState(false);
+  const [filters, setFilters] = useState({
+    company_id: null,
+    rm_id: null,
+    fromDate: null,
+    toDate: null,
+    project: null,
+    location: null,
+    active: null,
+  });
+  // Add these with your other useState hooks
+  const [showFromPicker, setShowFromPicker] = useState(false);
+  const [showToPicker, setShowToPicker] = useState(false);
+  const [appliedFilters, setAppliedFilters] = useState();
+  // Formatting helper: Converts Date object to 'YYYY-MM-DD' for API or 'DD-MM-YYYY' for UI
+  // const formatDate = date => {
+  //   if (!date) return '';
+  //   const d = new Date(date);
+  //   const day = String(d.getDate()).padStart(2, '0');
+  //   const month = String(d.getMonth() + 1).padStart(2, '0');
+  //   const year = d.getFullYear();
+  //   return `${year}-${month}-${day}`; // Using YYYY-MM-DD for backend compatibility
+  // };
+
+  // const onDateChange = (event, selectedDate, key) => {
+  //   // Hide picker
+  //   key === 'fromDate' ? setShowFromPicker(false) : setShowToPicker(false);
+
+  //   if (selectedDate) {
+  //     onChange(key, formatDate(selectedDate));
+  //   }
+  // };
   /* ================= API CALL ================= */
   const { data, isLoading } = useQuery({
-    queryKey: ['TodaysFollowUpsandMeetings'],
+    queryKey: ['TodaysFollowUpsandMeetings',appliedFilters],
     queryFn: async () => {
-      const res = await api.get('/api/pm/followUpAndMeetingsData');
+      const res = await api.get('/api/pm/followUpAndMeetingsData', {
+        params: {
+          company_id: filters.company_id || undefined,
+          rm_id: filters.rm_id || undefined,
+          fromDate: filters.fromDate || undefined,
+          toDate: filters.toDate || undefined,
+          project: filters.project || undefined,
+          location: filters.location || undefined,
+          active: filters.active || undefined,
+        },
+      });
       return res.data.data;
     },
   });
@@ -169,7 +250,76 @@ const FollowUpsScreen = () => {
   });
   const meetings = data?.todays_meetings || [];
   // console.log('followUps', followUps);
+  const { data: AllProperty } = useQuery({
+    queryKey: ['AllProperty'],
+    queryFn: async () => {
+      const res = await api.get('/api/pm/getAllPropertyLocation');
+      return res.data.data;
+    },
+  });
 
+  // Fetch RMs
+  const { data: allRmList = [] } = useQuery({
+    queryKey: ['allRMList'],
+    queryFn: async () => {
+      const res = await api.get('/api/pm/getAllRM');
+      return res?.data?.data;
+    },
+  });
+
+  // Fetch Projects
+  const { data: projectList = [] } = useQuery({
+    queryKey: ['project'],
+    queryFn: async () => {
+      const res = await api.get('/api/pm/getAllPropertyProjects');
+      return res.data.data || [];
+    },
+  });
+
+  /* ================= DATA MAPPING ================= */
+  const Property = AllProperty?.map(item => ({
+    label: item.name,
+    value: item.id,
+  }));
+  const Rm = allRmList?.map(item => ({ label: item.name, value: item.id }));
+  const projectOptions = projectList?.map(item => ({
+    label: item.project_name,
+    value: item.id,
+  }));
+
+  const LeadStatus = [
+    { label: 'Active', value: '1' },
+    { label: 'Inactive', value: '2' },
+    // { label: 'Site Visit', value: '3' },
+    // { label: 'Meeting Done', value: '4' },
+    // { label: 'Booking Done', value: '5' },
+  ];
+
+  /* ================= HANDLERS ================= */
+  const onChange = (key, value) => {
+    setFilters(prev => ({ ...prev, [key]: value }));
+  };
+
+  const applyFilter = () => {
+    setAppliedFilters(filters);
+    setShowFilterModal(false);
+  };
+
+  const resetFilters = () => {
+    const cleared = {
+      company_id: null,
+      rm_id: null,
+      fromDate: null,
+      toDate: null,
+      project: null,
+      location: null,
+      active: null,
+    };
+
+    setFilters(cleared);
+    setAppliedFilters(cleared);
+    setShowFilterModal(false);
+  };
   const [showTopBtn, setShowTopBtn] = useState(false);
   const scrollRef = useRef();
 
@@ -199,6 +349,15 @@ const FollowUpsScreen = () => {
 
           {/* Right */}
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <TouchableOpacity
+              style={[
+                styles.backBtn,
+                { marginRight: 8, borderColor: '#00e5ff' },
+              ]}
+              onPress={() => setShowFilterModal(true)}
+            >
+              <Icon name="filter-alt" size={18} color="#00e5ff" />
+            </TouchableOpacity>
             <TouchableOpacity
               style={styles.backBtn}
               onPress={() => navigation.navigate('Dashboard')}
@@ -232,12 +391,11 @@ const FollowUpsScreen = () => {
         </View>
 
         {/* ✅ navigation prop pass করা হচ্ছে প্রতিটি card এ */}
-         {isLoading ? (
-                  <Text style={{ color: '#fff', textAlign: 'center', marginTop: 20 }}>
-                    Loading...
-                  </Text>
-                ) :
-        filteredfollowUps?.length > 0 ? (
+        {isLoading ? (
+          <Text style={{ color: '#fff', textAlign: 'center', marginTop: 20 }}>
+            Loading...
+          </Text>
+        ) : filteredfollowUps?.length > 0 ? (
           filteredfollowUps.map((visit, i) => (
             <FollowCard
               key={visit.id || i}
@@ -272,6 +430,118 @@ const FollowUpsScreen = () => {
               onPress={() => setShowRemarks(false)}
             >
               <Text style={styles.modalCloseText}>OK</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+          {/* ✅ FILTER MODAL */}
+      {showFilterModal && (
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Filter Leads</Text>
+
+            <ScrollView
+              style={{ width: '100%' }}
+              showsVerticalScrollIndicator={false}
+            >
+              <DropdownField
+                label="Property Location"
+                data={Property}
+                placeholder="Select"
+                value={filters.location}
+                onChange={value => onChange('location', value)}
+              />
+              <DropdownField
+                label="RM"
+                data={Rm}
+                placeholder="Select"
+                value={filters.rm_id}
+                onChange={value => onChange('rm_id', value)}
+              />
+
+              {/* Date Row */}
+              <View
+                style={{
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  width: '100%',
+                }}
+              >
+                {/* <View style={{ width: '48%' }}>
+                  <InputField
+                    label="From Date"
+                    placeholder="YYYY-MM-DD"
+                    icon="calendar-today"
+                    value={filters.fromDate}
+                    onPress={() => setShowFromPicker(true)}
+                  />
+                </View> */}
+                {/* <View style={{ width: '48%' }}>
+                  <InputField
+                    label="To Date"
+                    placeholder="YYYY-MM-DD"
+                    icon="calendar-today"
+                    value={filters.toDate}
+                    onPress={() => setShowToPicker(true)}
+                  />
+                </View> */}
+              </View>
+
+              <DropdownField
+                label="Project"
+                data={projectOptions}
+                placeholder="Select"
+                value={filters.project}
+                onChange={value => onChange('project', value)}
+              />
+              <DropdownField
+                label="Lead Status"
+                data={LeadStatus}
+                placeholder="Select"
+                value={filters.active}
+                onChange={value => onChange('active', value)}
+              />
+            </ScrollView>
+
+            {/* Pickers */}
+            {showFromPicker && (
+              <DateTimePicker
+                value={
+                  filters.fromDate ? new Date(filters.fromDate) : new Date()
+                }
+                mode="date"
+                display="default"
+                onChange={(e, d) => onDateChange(e, d, 'fromDate')}
+              />
+            )}
+
+            {showToPicker && (
+              <DateTimePicker
+                value={filters.toDate ? new Date(filters.toDate) : new Date()}
+                mode="date"
+                display="default"
+                onChange={(e, d) => onDateChange(e, d, 'toDate')}
+              />
+            )}
+
+            <TouchableOpacity
+              style={styles.modalCloseBtn}
+              onPress={applyFilter}
+            >
+              <Text style={styles.modalCloseText}>Apply Filter</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity onPress={resetFilters} style={{ marginTop: 12 }}>
+              <Text style={{ color: '#ff5252', fontWeight: 'bold' }}>
+                Reset All
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => setShowFilterModal(false)}
+              style={{ marginTop: 15 }}
+            >
+              <Text style={{ color: '#fff' }}>Cancel</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -493,4 +763,36 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     flexShrink: 1,
   },
+    field: {
+    marginBottom: 12,
+    width: '100%',
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffffff10',
+    borderWidth: 1,
+    borderColor: '#444',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    height: 40,
+  },
+  input: {
+    flex: 1,
+    color: '#fff',
+    fontSize: 13,
+    paddingVertical: 0,
+  },
+   inputWrapper: { width: '100%', marginBottom: 12 },
+  dropdown: {
+    height: 40,
+    backgroundColor: '#ffffff10',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    borderWidth: 1,
+    borderColor: '#444',
+  },
+  dropdownContainer: { backgroundColor: '#fff', borderRadius: 8 },
+  placeholderStyle: { color: '#aaa', fontSize: 14 },
+  selectedTextStyle: { color: '#fff', fontSize: 14 },
 });

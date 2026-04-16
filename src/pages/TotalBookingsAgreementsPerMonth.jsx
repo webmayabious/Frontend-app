@@ -109,7 +109,8 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
           style={{ marginLeft: 8 }}
           onPress={() =>
             navigation.navigate('BookingDetailScreen', {
-              id: data?.id,
+              id: data.id,
+              data:data
             })
           }
         />
