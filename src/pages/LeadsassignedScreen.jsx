@@ -1,4 +1,4 @@
-// FollowUpsScreen.js (Fixed - useNavigation inside component)
+// LeadsassignedScreen.js — iOS search fixed + filter modal improved
 import React, { useRef, useState } from 'react';
 import {
   View,
@@ -19,8 +19,10 @@ import { useNavigation } from '@react-navigation/native';
 import api from '../api/AxiosInstance';
 import { useQuery } from '@tanstack/react-query';
 import { Dropdown } from 'react-native-element-dropdown';
+
 const STATUSBAR_HEIGHT =
   Platform.OS === 'android' ? StatusBar.currentHeight : 44;
+
 const makeCall = phoneNumber => {
   if (!phoneNumber) return;
   Alert.alert('Call', `Do you want to call ${phoneNumber}?`, [
@@ -28,14 +30,15 @@ const makeCall = phoneNumber => {
     { text: 'Call', onPress: () => Linking.openURL(`tel:${phoneNumber}`) },
   ]);
 };
+
 const DropdownField = ({ label, data, placeholder, value, onChange }) => {
   const [isFocus, setIsFocus] = useState(false);
   return (
-    <View style={styles.inputWrapper}>
-      <Text style={styles.label}>{label}</Text>
+    <View style={styles.filterInputWrapper}>
+      <Text style={styles.filterLabel}>{label}</Text>
       <Dropdown
         style={[
-          styles.dropdown,
+          styles.filterDropdown,
           isFocus && { borderColor: '#00e5ff', borderWidth: 1.5 },
         ]}
         containerStyle={styles.dropdownContainer}
@@ -66,13 +69,12 @@ const DropdownField = ({ label, data, placeholder, value, onChange }) => {
     </View>
   );
 };
+
 const FollowCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
   <View style={styles.card}>
-    {/* Header */}
     <View style={styles.cardHeader}>
       <View style={styles.nameRow}>
         <Text style={styles.name}>{data?.name}</Text>
-
         <View
           style={[
             styles.activeBadge,
@@ -87,14 +89,7 @@ const FollowCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
         </View>
       </View>
 
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          flexShrink: 0,
-        }}
-      >
-        {/* ✅ REMARKS BUTTON */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', flexShrink: 0 }}>
         <TouchableOpacity
           style={styles.remarksBtn}
           onPress={() => {
@@ -111,19 +106,17 @@ const FollowCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
           color="#00e5ff"
           style={{ marginLeft: 8 }}
           onPress={() =>
-            navigation.navigate('MeetingsEdit', {
-              id: data?.id,
-            })
+            navigation.navigate('MeetingsEdit', { id: data?.id })
           }
         />
       </View>
     </View>
 
-    {/* Info */}
     <Text style={styles.location}>
       {data?.propertyproject?.project_name || 'N/A'} |{' '}
       {data?.propertylocation?.name || 'N/A'}
     </Text>
+
     <View style={styles.rowBetween}>
       <TouchableOpacity onPress={() => makeCall(data?.phone)}>
         <Text style={styles.label}>
@@ -134,14 +127,8 @@ const FollowCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
         Email: <Text style={styles.value}>{data?.email || 'N/A'}</Text>
       </Text>
     </View>
-    <View style={styles.rowBetween}>
-      {/* <Text style={styles.label}>
-        <Text style={styles.label}>
-          Site Visit Date:
-          <Text style={styles.value}> {data?.site_visit_date}</Text>
-        </Text>
-      </Text> */}
 
+    <View style={styles.rowBetween}>
       <Text style={styles.label}>
         RM:{' '}
         <Text style={styles.value}>
@@ -157,19 +144,15 @@ const FollowCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
       <Text style={styles.value}>{data?.mrreference?.mrf_name || 'N/A'}</Text>
     </Text>
 
-    {/* Footer */}
     <View style={styles.cardFooter}>
       <TouchableOpacity
         style={styles.button}
         onPress={() =>
-          navigation.navigate('AllInteractionsScreen', {
-            id: data?.id,
-          })
+          navigation.navigate('AllInteractionsScreen', { id: data?.id })
         }
       >
         <Text style={styles.buttonText}>View Interaction</Text>
       </TouchableOpacity>
-
       <Text style={styles.completed}>
         {data?.propertycallstatus?.name || 'N/A'}
       </Text>
@@ -193,7 +176,9 @@ const LeadsassignedScreen = () => {
     active: null,
   });
   const [appliedFilters, setAppliedFilters] = useState();
-  /* ================= API CALL ================= */
+  const [showTopBtn, setShowTopBtn] = useState(false);
+  const scrollRef = useRef();
+
   const { data: leadassigned, isLoading } = useQuery({
     queryKey: ['Leads Assigned', appliedFilters],
     queryFn: async () => {
@@ -213,23 +198,16 @@ const LeadsassignedScreen = () => {
     },
   });
 
-  //   const followUps = data?.todays_followUps || [];
   const filteredfollowUps = leadassigned?.filter(item => {
     const name = item?.name?.toLowerCase() || '';
     const phone = item?.phone || '';
     const email = item?.email?.toLowerCase() || '';
-
     const search = searchText.toLowerCase();
-
     return (
       name.includes(search) || phone.includes(search) || email.includes(search)
     );
   });
-  //   const meetings = data?.todays_meetings || [];
-  // console.log('followUps', followUps);
 
-  const [showTopBtn, setShowTopBtn] = useState(false);
-  const scrollRef = useRef();
   const { data: AllProperty } = useQuery({
     queryKey: ['AllProperty'],
     queryFn: async () => {
@@ -238,7 +216,6 @@ const LeadsassignedScreen = () => {
     },
   });
 
-  // Fetch RMs
   const { data: allRmList = [] } = useQuery({
     queryKey: ['allRMList'],
     queryFn: async () => {
@@ -247,7 +224,6 @@ const LeadsassignedScreen = () => {
     },
   });
 
-  // Fetch Projects
   const { data: projectList = [] } = useQuery({
     queryKey: ['project'],
     queryFn: async () => {
@@ -256,11 +232,7 @@ const LeadsassignedScreen = () => {
     },
   });
 
-  /* ================= DATA MAPPING ================= */
-  const Property = AllProperty?.map(item => ({
-    label: item.name,
-    value: item.id,
-  }));
+  const Property = AllProperty?.map(item => ({ label: item.name, value: item.id }));
   const Rm = allRmList?.map(item => ({ label: item.name, value: item.id }));
   const projectOptions = projectList?.map(item => ({
     label: item.project_name,
@@ -270,12 +242,8 @@ const LeadsassignedScreen = () => {
   const LeadStatus = [
     { label: 'Active', value: '1' },
     { label: 'Inactive', value: '2' },
-    // { label: 'Site Visit', value: '3' },
-    // { label: 'Meeting Done', value: '4' },
-    // { label: 'Booking Done', value: '5' },
   ];
 
-  /* ================= HANDLERS ================= */
   const onChange = (key, value) => {
     setFilters(prev => ({ ...prev, [key]: value }));
   };
@@ -287,15 +255,9 @@ const LeadsassignedScreen = () => {
 
   const resetFilters = () => {
     const cleared = {
-      company_id: null,
-      rm_id: null,
-      fromDate: null,
-      toDate: null,
-      project: null,
-      location: null,
-      active: null,
+      company_id: null, rm_id: null, fromDate: null,
+      toDate: null, project: null, location: null, active: null,
     };
-
     setFilters(cleared);
     setAppliedFilters(cleared);
     setShowFilterModal(false);
@@ -313,25 +275,17 @@ const LeadsassignedScreen = () => {
         barStyle="light-content"
       />
 
-      {/* Header */}
       <Header />
 
-      {/* Title Row */}
       <View style={styles.topBarContainer}>
         <View style={styles.topBar}>
-          {/* Left */}
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <Icon name="event-note" size={18} color="#cfd8dc" />
             <Text style={styles.screenTitle}>Today's All Assigned Leads</Text>
           </View>
-
-          {/* Right */}
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <TouchableOpacity
-              style={[
-                styles.backBtn,
-                { marginRight: 8, borderColor: '#00e5ff' },
-              ]}
+              style={[styles.backBtn, { marginRight: 8, borderColor: '#00e5ff' }]}
               onPress={() => setShowFilterModal(true)}
             >
               <Icon name="filter-alt" size={18} color="#00e5ff" />
@@ -346,7 +300,6 @@ const LeadsassignedScreen = () => {
         </View>
       </View>
 
-      {/* List */}
       <ScrollView
         ref={scrollRef}
         showsVerticalScrollIndicator={false}
@@ -356,7 +309,7 @@ const LeadsassignedScreen = () => {
         }}
         scrollEventThrottle={16}
       >
-        {/* Search */}
+        {/* ✅ iOS fixed search box */}
         <View style={styles.searchBox}>
           <Icon name="search" size={18} color="#aaa" />
           <TextInput
@@ -364,11 +317,13 @@ const LeadsassignedScreen = () => {
             placeholderTextColor="#aaa"
             value={searchText}
             onChangeText={setSearchText}
-            style={{ marginLeft: 8, color: '#fff', flex: 1 }}
+            style={styles.searchInput}
+            autoCapitalize="none"
+            autoCorrect={false}
+            clearButtonMode="while-editing"
           />
         </View>
 
-        {/* ✅ navigation prop pass করা হচ্ছে প্রতিটি card এ */}
         {isLoading ? (
           <Text style={{ color: '#fff', textAlign: 'center', marginTop: 20 }}>
             Loading...
@@ -384,25 +339,21 @@ const LeadsassignedScreen = () => {
             />
           ))
         ) : (
-          <Text
-            style={{ textAlign: 'center', marginTop: 20, color: '#ffffff' }}
-          >
+          <Text style={{ textAlign: 'center', marginTop: 20, color: '#ffffff' }}>
             No data found
           </Text>
         )}
       </ScrollView>
+
       {/* ✅ REMARKS MODAL */}
       {showRemarks && (
         <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
+          <View style={styles.remarksModalCard}>
             <View style={styles.checkIcon}>
               <Icon name="check-circle" size={32} color="#00acc1" />
             </View>
-
             <Text style={styles.modalTitle}>Latest Remarks</Text>
-
             <Text style={styles.modalText}>{remarksText}</Text>
-
             <TouchableOpacity
               style={styles.modalCloseBtn}
               onPress={() => setShowRemarks(false)}
@@ -412,11 +363,14 @@ const LeadsassignedScreen = () => {
           </View>
         </View>
       )}
-      {/* ✅ FILTER MODAL */}
+
+      {/* ✅ FILTER MODAL — improved */}
       {showFilterModal && (
         <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
+          <View style={styles.filterModalCard}>
+            <View style={styles.dragHandle} />
             <Text style={styles.modalTitle}>Filter Leads</Text>
+            <View style={styles.modalDivider} />
 
             <ScrollView
               style={{ width: '100%' }}
@@ -425,42 +379,34 @@ const LeadsassignedScreen = () => {
               <DropdownField
                 label="Property Location"
                 data={Property}
-                placeholder="Select"
+                placeholder="Select location"
                 value={filters.location}
                 onChange={value => onChange('location', value)}
               />
               <DropdownField
-                label="RM"
+                label="Relationship Manager"
                 data={Rm}
-                placeholder="Select"
+                placeholder="Select RM"
                 value={filters.rm_id}
                 onChange={value => onChange('rm_id', value)}
               />
-
-              {/* Date Row */}
-              <View
-                style={{
-                  flexDirection: 'row',
-                  justifyContent: 'space-between',
-                  width: '100%',
-                }}
-              ></View>
-
               <DropdownField
                 label="Project"
                 data={projectOptions}
-                placeholder="Select"
+                placeholder="Select project"
                 value={filters.project}
                 onChange={value => onChange('project', value)}
               />
               <DropdownField
                 label="Lead Status"
                 data={LeadStatus}
-                placeholder="Select"
+                placeholder="Select status"
                 value={filters.active}
                 onChange={value => onChange('active', value)}
               />
             </ScrollView>
+
+            <View style={styles.modalDivider} />
 
             <TouchableOpacity
               style={styles.modalCloseBtn}
@@ -469,28 +415,28 @@ const LeadsassignedScreen = () => {
               <Text style={styles.modalCloseText}>Apply Filter</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity onPress={resetFilters} style={{ marginTop: 12 }}>
-              <Text style={{ color: '#ff5252', fontWeight: 'bold' }}>
+            <TouchableOpacity onPress={resetFilters} style={{ marginTop: 14 }}>
+              <Text style={{ color: '#ff6b6b', fontWeight: 'bold', fontSize: 14 }}>
                 Reset All
               </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               onPress={() => setShowFilterModal(false)}
-              style={{ marginTop: 15 }}
+              style={{ marginTop: 12 }}
             >
-              <Text style={{ color: '#fff' }}>Cancel</Text>
+              <Text style={{ color: '#a0b4e8', fontSize: 13 }}>Cancel</Text>
             </TouchableOpacity>
           </View>
         </View>
       )}
+
       {showTopBtn && (
         <TouchableOpacity style={styles.topButton} onPress={scrollToTop}>
           <Icon name="keyboard-arrow-up" size={26} color="#fff" />
         </TouchableOpacity>
       )}
 
-      {/* Bottom Nav */}
       <BottomNav />
     </View>
   );
@@ -513,11 +459,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
 
-  screenTitle: {
-    color: '#cfd8dc',
-    fontSize: 13,
-    marginLeft: 6,
-  },
+  screenTitle: { color: '#cfd8dc', fontSize: 13, marginLeft: 6 },
 
   backBtn: {
     borderWidth: 1,
@@ -525,21 +467,36 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     paddingHorizontal: 10,
     paddingVertical: 3,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
 
   backText: { color: '#fff', fontSize: 12 },
 
+  /* ✅ iOS fixed search box */
   searchBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    margin: 15,
+    marginHorizontal: 15,
+    marginBottom: 12,
     borderWidth: 1,
     borderColor: '#444',
-    borderRadius: 20,
-    paddingHorizontal: 10,
-    marginTop: 0,
+    borderRadius: 22,
+    paddingHorizontal: 12,
+    paddingVertical: Platform.OS === 'ios' ? 10 : 0,
+    minHeight: Platform.OS === 'ios' ? 44 : 40,
+    backgroundColor: '#ffffff08',
+  },
+  searchInput: {
+    marginLeft: 8,
+    color: '#fff',
+    flex: 1,
+    fontSize: 14,
+    paddingVertical: 0,
+    height: Platform.OS === 'ios' ? undefined : 40,
   },
 
+  /* Cards */
   card: {
     marginHorizontal: 15,
     marginBottom: 12,
@@ -556,14 +513,16 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
 
-  name: { color: '#fff', fontWeight: 'bold' },
-
-  activeBadge: {
-    backgroundColor: '#4caf50',
-    borderRadius: 10,
-    paddingHorizontal: 6,
-    marginLeft: 6,
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    flexWrap: 'wrap',
   },
+
+  name: { color: '#fff', fontWeight: 'bold', flexShrink: 1 },
+
+  activeBadge: { borderRadius: 10, paddingHorizontal: 6, marginLeft: 6 },
 
   activeText: { color: '#fff', fontSize: 10 },
 
@@ -577,12 +536,7 @@ const styles = StyleSheet.create({
 
   remarksText: { color: '#fff', fontSize: 10 },
 
-  location: {
-    color: '#00e5ff',
-    marginTop: 5,
-    flexWrap: 'wrap',
-    lineHeight: 16,
-  },
+  location: { color: '#00e5ff', marginTop: 5, flexWrap: 'wrap', lineHeight: 16 },
 
   rowBetween: {
     flexDirection: 'row',
@@ -598,10 +552,8 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     paddingTop: 2,
   },
-  value: {
-    color: '#fff',
-    flexShrink: 1,
-  },
+
+  value: { color: '#fff', flexShrink: 1 },
 
   cardFooter: {
     flexDirection: 'row',
@@ -620,12 +572,8 @@ const styles = StyleSheet.create({
   },
 
   buttonText: { color: '#fff', fontSize: 12 },
-  completed: {
-    color: '#aaa',
-    fontSize: 12,
-    flexShrink: 1,
-    textAlign: 'right',
-  },
+
+  completed: { color: '#aaa', fontSize: 12, flexShrink: 1, textAlign: 'right' },
 
   topButton: {
     position: 'absolute',
@@ -639,19 +587,45 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 
+  /* Modals shared */
   modalOverlay: {
     position: 'absolute',
     width: '100%',
     height: '100%',
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: 'rgba(0,0,0,0.65)',
     justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+
+  modalTitle: {
+    color: '#00e5ff',
+    fontSize: 18,
+    marginBottom: 10,
+    fontWeight: 'bold',
+  },
+
+  modalText: { color: '#fff', textAlign: 'center', marginBottom: 15 },
+
+  modalCloseBtn: {
+    backgroundColor: '#00acc1',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 24,
+    marginTop: 6,
+    width: '100%',
     alignItems: 'center',
   },
 
-  modalCard: {
+  modalCloseText: { color: '#fff', fontWeight: '600', fontSize: 14 },
+
+  /* Remarks modal */
+  remarksModalCard: {
     width: '85%',
-    backgroundColor: '#2f2f8f',
-    borderRadius: 12,
+    backgroundColor: '#1a1f6b',
+    borderWidth: 1,
+    borderColor: '#3d45b0',
+    borderRadius: 16,
     padding: 20,
     alignItems: 'center',
   },
@@ -666,51 +640,53 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
 
-  modalTitle: {
-    color: '#00e5ff',
-    fontSize: 18,
-    marginBottom: 10,
-  },
-
-  modalText: {
-    color: '#fff',
-    textAlign: 'center',
-    marginBottom: 15,
-  },
-
-  modalCloseBtn: {
-    backgroundColor: '#00acc1',
-    paddingHorizontal: 20,
-    paddingVertical: 6,
-    borderRadius: 20,
-  },
-
-  modalCloseText: {
-    color: '#fff',
-    fontWeight: '600',
-  },
-  inputWrapper: { width: '100%', marginBottom: 12 },
-  dropdown: {
-    height: 40,
-    backgroundColor: '#ffffff10',
-    borderRadius: 8,
-    paddingHorizontal: 8,
+  /* ✅ Filter modal — improved colors */
+  filterModalCard: {
+    width: '88%',
+    backgroundColor: '#1a1f6b',
     borderWidth: 1,
-    borderColor: '#444',
-  },
-  dropdownContainer: { backgroundColor: '#fff', borderRadius: 8 },
-  placeholderStyle: { color: '#aaa', fontSize: 14 },
-  selectedTextStyle: { color: '#fff', fontSize: 14 },
-  nameRow: {
-    flexDirection: 'row',
+    borderColor: '#3d45b0',
+    borderRadius: 18,
+    padding: 20,
     alignItems: 'center',
-    flex: 1,
-    flexWrap: 'wrap',
+    maxHeight: '88%',
   },
 
-  name: {
-    color: '#fff',
-    fontWeight: 'bold',
-    flexShrink: 1,
+  dragHandle: {
+    width: 36,
+    height: 4,
+    backgroundColor: '#3d55cc',
+    borderRadius: 2,
+    marginBottom: 14,
   },
+
+  modalDivider: {
+    width: '100%',
+    height: 1,
+    backgroundColor: '#3d45b033',
+    marginVertical: 10,
+  },
+
+  /* Filter form fields */
+  filterInputWrapper: { width: '100%', marginBottom: 12 },
+
+  filterLabel: {
+    color: '#a0b4e8',
+    fontSize: 12,
+    marginBottom: 5,
+    fontWeight: '500',
+  },
+
+  filterDropdown: {
+    height: 40,
+    backgroundColor: '#ffffff12',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    borderWidth: 1,
+    borderColor: '#3d55cc',
+  },
+
+  dropdownContainer: { backgroundColor: '#fff', borderRadius: 8 },
+  placeholderStyle: { color: '#7a8fc4', fontSize: 13 },
+  selectedTextStyle: { color: '#fff', fontSize: 13 },
 });

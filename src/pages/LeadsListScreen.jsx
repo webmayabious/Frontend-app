@@ -1,4 +1,4 @@
-// FollowUpsScreen.js (Fixed - useNavigation inside component)
+// LeadsListScreen.js — Fixed iOS search + improved filter modal colors
 import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import { Dropdown } from 'react-native-element-dropdown'; // Added missing import for Dropdown
+import { Dropdown } from 'react-native-element-dropdown';
 import Header from '../Layout/Header';
 import BottomNav from '../navigations/BottomNav';
 import { useNavigation } from '@react-navigation/native';
@@ -24,7 +24,6 @@ import api from '../api/AxiosInstance';
 const STATUSBAR_HEIGHT =
   Platform.OS === 'android' ? StatusBar.currentHeight : 44;
 
-/* ================= CALL UTILITY ================= */
 const makeCall = phoneNumber => {
   if (!phoneNumber) return;
   Alert.alert('Call', `Do you want to call ${phoneNumber}?`, [
@@ -33,7 +32,6 @@ const makeCall = phoneNumber => {
   ]);
 };
 
-/* ================= COMPONENTS ================= */
 const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
   <View style={styles.card}>
     <View style={styles.cardHeader}>
@@ -44,36 +42,17 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
             styles.activeBadge,
             {
               backgroundColor:
-                data?.active === '1'
-                  ? '#4caf50' // Active
-                  : '#f44336'
-                  // ? '#f44336' // Inactive
-                  // : data?.active === '3'
-                  // ? '#2196f3' // Site Visit
-                  // : data?.active === '4'
-                  // ? '#ff9800' // Meeting Done
-                  // : '#9c27b0', // Booking Done
+                data?.active === '1' ? '#4caf50' : '#f44336',
             },
           ]}
         >
           <Text style={styles.activeText}>
-            {data?.active === '1'
-              ? 'Active'
-              : 'Inactive'
-              // ? 'Inactive'
-              // : data?.active === '3'
-              // ? 'Site Visit'
-              // : data?.active === '4'
-              // ? 'Meeting Done'
-              // : 'Booking Done'
-              }
+            {data?.active === '1' ? 'Active' : 'Inactive'}
           </Text>
         </View>
       </View>
 
-      <View
-        style={{ flexDirection: 'row', alignItems: 'center', flexShrink: 0 }}
-      >
+      <View style={{ flexDirection: 'row', alignItems: 'center', flexShrink: 0 }}>
         <TouchableOpacity
           style={styles.remarksBtn}
           onPress={() => {
@@ -92,11 +71,7 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
           size={18}
           color="#00e5ff"
           style={{ marginLeft: 8 }}
-          onPress={() =>
-            navigation.navigate('MeetingsEdit', {
-              id: data?.id,
-            })
-          }
+          onPress={() => navigation.navigate('MeetingsEdit', { id: data?.id })}
         />
       </View>
     </View>
@@ -120,11 +95,9 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
       <Text style={styles.label}>
         Site Visit Date:
         <Text style={styles.value}>
-          {' '}
-          {data?.propertyfeedbacks?.map(x => x?.site_visit_date).join(', ')}
+          {' '}{data?.propertyfeedbacks?.map(x => x?.site_visit_date).join(', ')}
         </Text>
       </Text>
-
       <Text style={styles.label}>
         RM:{' '}
         <Text style={styles.value}>
@@ -143,19 +116,13 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
     <View style={styles.cardFooter}>
       <TouchableOpacity
         style={styles.button}
-        onPress={() =>
-          navigation.navigate('AllInteractionsScreen', {
-            id: data?.id,
-          })
-        }
+        onPress={() => navigation.navigate('AllInteractionsScreen', { id: data?.id })}
       >
         <Text style={styles.buttonText}>View Interaction</Text>
       </TouchableOpacity>
 
       <Text style={styles.completed}>
-        {data?.propertyfeedbacks
-          ?.map(x => x.propertycallstatus?.name)
-          .join(', ') || 'N/A'}
+        {data?.propertyfeedbacks?.map(x => x.propertycallstatus?.name).join(', ') || 'N/A'}
       </Text>
     </View>
   </View>
@@ -164,11 +131,11 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
 const DropdownField = ({ label, data, placeholder, value, onChange }) => {
   const [isFocus, setIsFocus] = useState(false);
   return (
-    <View style={styles.inputWrapper}>
-      <Text style={styles.label}>{label}</Text>
+    <View style={styles.filterInputWrapper}>
+      <Text style={styles.filterLabel}>{label}</Text>
       <Dropdown
         style={[
-          styles.dropdown,
+          styles.filterDropdown,
           isFocus && { borderColor: '#00e5ff', borderWidth: 1.5 },
         ]}
         containerStyle={styles.dropdownContainer}
@@ -199,29 +166,28 @@ const DropdownField = ({ label, data, placeholder, value, onChange }) => {
     </View>
   );
 };
+
 const InputField = ({ label, placeholder, icon, value, onChange, onPress }) => {
   return (
     <View style={styles.field}>
-      <Text style={styles.label}>{label}</Text>
-
+      <Text style={styles.filterLabel}>{label}</Text>
       <TouchableOpacity activeOpacity={0.8} onPress={onPress}>
-        <View style={styles.inputContainer}>
+        <View style={styles.filterInputContainer}>
           <TextInput
             placeholder={placeholder}
-            placeholderTextColor="#8aa0c8"
-            style={styles.input}
+            placeholderTextColor="#7a8fc4"
+            style={styles.filterInput}
             value={value}
-            onChangeText={onChange} // <-- Use onChangeText for TextInput
-            editable={!onPress} // <-- Disable typing if onPress is used (like for date picker)
+            onChangeText={onChange}
+            editable={!onPress}
           />
-
           {icon && <Icon name={icon} size={18} color="#00bcd4" />}
         </View>
       </TouchableOpacity>
     </View>
   );
 };
-/* ================= MAIN SCREEN ================= */
+
 const LeadsListScreen = () => {
   const navigation = useNavigation();
   const scrollRef = useRef();
@@ -241,36 +207,27 @@ const LeadsListScreen = () => {
     location: null,
     active: null,
   });
-  // Add these with your other useState hooks
   const [showFromPicker, setShowFromPicker] = useState(false);
   const [showToPicker, setShowToPicker] = useState(false);
   const [appliedFilters, setAppliedFilters] = useState();
-  // Formatting helper: Converts Date object to 'YYYY-MM-DD' for API or 'DD-MM-YYYY' for UI
+
   const formatDate = date => {
     if (!date) return '';
     const d = new Date(date);
     const day = String(d.getDate()).padStart(2, '0');
     const month = String(d.getMonth() + 1).padStart(2, '0');
     const year = d.getFullYear();
-    return `${year}-${month}-${day}`; // Using YYYY-MM-DD for backend compatibility
+    return `${year}-${month}-${day}`;
   };
 
   const onDateChange = (event, selectedDate, key) => {
-    // Hide picker
     key === 'fromDate' ? setShowFromPicker(false) : setShowToPicker(false);
-
     if (selectedDate) {
       onChange(key, formatDate(selectedDate));
     }
   };
-  /* ================= API CALLS ================= */
 
-  // Main Leads Query - Reacts to filters and searchText
-  const {
-    data: Lead,
-    isLoading,
-    refetch: leadrefetch,
-  } = useQuery({
+  const { data: Lead, isLoading, refetch: leadrefetch } = useQuery({
     queryKey: ['AllPropertyLeads', appliedFilters, searchText],
     queryFn: async () => {
       const res = await api.get('/api/pm/getAllPropertyLeads', {
@@ -288,10 +245,11 @@ const LeadsListScreen = () => {
       return res.data.data;
     },
   });
+
   useEffect(() => {
     leadrefetch();
   }, [searchText]);
-  // Fetch Locations
+
   const { data: AllProperty } = useQuery({
     queryKey: ['AllProperty'],
     queryFn: async () => {
@@ -300,7 +258,6 @@ const LeadsListScreen = () => {
     },
   });
 
-  // Fetch RMs
   const { data: allRmList = [] } = useQuery({
     queryKey: ['allRMList'],
     queryFn: async () => {
@@ -309,7 +266,6 @@ const LeadsListScreen = () => {
     },
   });
 
-  // Fetch Projects
   const { data: projectList = [] } = useQuery({
     queryKey: ['project'],
     queryFn: async () => {
@@ -318,11 +274,7 @@ const LeadsListScreen = () => {
     },
   });
 
-  /* ================= DATA MAPPING ================= */
-  const Property = AllProperty?.map(item => ({
-    label: item.name,
-    value: item.id,
-  }));
+  const Property = AllProperty?.map(item => ({ label: item.name, value: item.id }));
   const Rm = allRmList?.map(item => ({ label: item.name, value: item.id }));
   const projectOptions = projectList?.map(item => ({
     label: item.project_name,
@@ -332,12 +284,8 @@ const LeadsListScreen = () => {
   const LeadStatus = [
     { label: 'Active', value: '1' },
     { label: 'Inactive', value: '2' },
-    // { label: 'Site Visit', value: '3' },
-    // { label: 'Meeting Done', value: '4' },
-    // { label: 'Booking Done', value: '5' },
   ];
 
-  /* ================= HANDLERS ================= */
   const onChange = (key, value) => {
     setFilters(prev => ({ ...prev, [key]: value }));
   };
@@ -349,15 +297,9 @@ const LeadsListScreen = () => {
 
   const resetFilters = () => {
     const cleared = {
-      company_id: null,
-      rm_id: null,
-      fromDate: null,
-      toDate: null,
-      project: null,
-      location: null,
-      active: null,
+      company_id: null, rm_id: null, fromDate: null,
+      toDate: null, project: null, location: null, active: null,
     };
-
     setFilters(cleared);
     setAppliedFilters(cleared);
     setShowFilterModal(false);
@@ -369,32 +311,22 @@ const LeadsListScreen = () => {
 
   return (
     <View style={styles.container}>
-      <StatusBar
-        translucent
-        backgroundColor="transparent"
-        barStyle="light-content"
-      />
+      <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
       <Header />
 
-      {/* Title Row */}
       <View style={styles.topBarContainer}>
         <View style={styles.topBar}>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <Icon name="event-note" size={18} color="#cfd8dc" />
             <Text style={styles.screenTitle}>Leads List</Text>
           </View>
-
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <TouchableOpacity
-              style={[
-                styles.backBtn,
-                { marginRight: 8, borderColor: '#00e5ff' },
-              ]}
+              style={[styles.backBtn, { marginRight: 8, borderColor: '#00e5ff' }]}
               onPress={() => setShowFilterModal(true)}
             >
               <Icon name="filter-alt" size={18} color="#00e5ff" />
             </TouchableOpacity>
-
             <TouchableOpacity
               style={styles.backBtn}
               onPress={() => navigation.navigate('Dashboard')}
@@ -414,6 +346,7 @@ const LeadsListScreen = () => {
         }}
         scrollEventThrottle={16}
       >
+        {/* ✅ FIXED SEARCH BOX — iOS compatible */}
         <View style={styles.searchBox}>
           <Icon name="search" size={18} color="#aaa" />
           <TextInput
@@ -421,7 +354,10 @@ const LeadsListScreen = () => {
             placeholderTextColor="#aaa"
             value={searchText}
             onChangeText={setSearchText}
-            style={{ marginLeft: 8, color: '#fff', flex: 1 }}
+            style={styles.searchInput}
+            autoCapitalize="none"
+            autoCorrect={false}
+            clearButtonMode="while-editing" // iOS only — shows × button
           />
         </View>
 
@@ -449,7 +385,7 @@ const LeadsListScreen = () => {
       {/* ✅ REMARKS MODAL */}
       {showRemarks && (
         <View style={styles.modalOverlay}>
-          <div style={styles.modalCard}>
+          <View style={styles.remarksModalCard}>
             <View style={styles.checkIcon}>
               <Icon name="check-circle" size={32} color="#00acc1" />
             </View>
@@ -461,15 +397,20 @@ const LeadsListScreen = () => {
             >
               <Text style={styles.modalCloseText}>OK</Text>
             </TouchableOpacity>
-          </div>
+          </View>
         </View>
       )}
 
-      {/* ✅ FILTER MODAL */}
+      {/* ✅ FILTER MODAL — improved colors */}
       {showFilterModal && (
         <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
+          <View style={styles.filterModalCard}>
+
+            {/* drag handle */}
+            <View style={styles.dragHandle} />
+
             <Text style={styles.modalTitle}>Filter Leads</Text>
+            <View style={styles.modalDivider} />
 
             <ScrollView
               style={{ width: '100%' }}
@@ -478,26 +419,19 @@ const LeadsListScreen = () => {
               <DropdownField
                 label="Property Location"
                 data={Property}
-                placeholder="Select"
+                placeholder="Select location"
                 value={filters.location}
                 onChange={value => onChange('location', value)}
               />
               <DropdownField
-                label="RM"
+                label="Relationship Manager"
                 data={Rm}
-                placeholder="Select"
+                placeholder="Select RM"
                 value={filters.rm_id}
                 onChange={value => onChange('rm_id', value)}
               />
 
-              {/* Date Row */}
-              <View
-                style={{
-                  flexDirection: 'row',
-                  justifyContent: 'space-between',
-                  width: '100%',
-                }}
-              >
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', width: '100%' }}>
                 <View style={{ width: '48%' }}>
                   <InputField
                     label="From Date"
@@ -521,31 +455,27 @@ const LeadsListScreen = () => {
               <DropdownField
                 label="Project"
                 data={projectOptions}
-                placeholder="Select"
+                placeholder="Select project"
                 value={filters.project}
                 onChange={value => onChange('project', value)}
               />
               <DropdownField
                 label="Lead Status"
                 data={LeadStatus}
-                placeholder="Select"
+                placeholder="Select status"
                 value={filters.active}
                 onChange={value => onChange('active', value)}
               />
             </ScrollView>
 
-            {/* Pickers */}
             {showFromPicker && (
               <DateTimePicker
-                value={
-                  filters.fromDate ? new Date(filters.fromDate) : new Date()
-                }
+                value={filters.fromDate ? new Date(filters.fromDate) : new Date()}
                 mode="date"
                 display="default"
                 onChange={(e, d) => onDateChange(e, d, 'fromDate')}
               />
             )}
-
             {showToPicker && (
               <DateTimePicker
                 value={filters.toDate ? new Date(filters.toDate) : new Date()}
@@ -555,24 +485,20 @@ const LeadsListScreen = () => {
               />
             )}
 
-            <TouchableOpacity
-              style={styles.modalCloseBtn}
-              onPress={applyFilter}
-            >
+            <View style={styles.modalDivider} />
+
+            <TouchableOpacity style={styles.modalCloseBtn} onPress={applyFilter}>
               <Text style={styles.modalCloseText}>Apply Filter</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity onPress={resetFilters} style={{ marginTop: 12 }}>
-              <Text style={{ color: '#ff5252', fontWeight: 'bold' }}>
+            <TouchableOpacity onPress={resetFilters} style={{ marginTop: 14 }}>
+              <Text style={{ color: '#ff6b6b', fontWeight: 'bold', fontSize: 14 }}>
                 Reset All
               </Text>
             </TouchableOpacity>
 
-            <TouchableOpacity
-              onPress={() => setShowFilterModal(false)}
-              style={{ marginTop: 15 }}
-            >
-              <Text style={{ color: '#fff' }}>Cancel</Text>
+            <TouchableOpacity onPress={() => setShowFilterModal(false)} style={{ marginTop: 12 }}>
+              <Text style={{ color: '#a0b4e8', fontSize: 13 }}>Cancel</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -613,38 +539,32 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-  // Add these inside your styles object
-  field: {
-    marginBottom: 12,
-    width: '100%',
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#ffffff10',
-    borderWidth: 1,
-    borderColor: '#444',
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    height: 40,
-  },
-  input: {
-    flex: 1,
-    color: '#fff',
-    fontSize: 13,
-    paddingVertical: 0,
-  },
   backText: { color: '#fff', fontSize: 12 },
+
+  /* ✅ FIXED search box for iOS */
   searchBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    margin: 15,
+    marginHorizontal: 15,
+    marginBottom: 12,
     borderWidth: 1,
     borderColor: '#444',
-    borderRadius: 20,
-    paddingHorizontal: 10,
-    marginTop: 0,
+    borderRadius: 22,
+    paddingHorizontal: 12,
+    paddingVertical: Platform.OS === 'ios' ? 10 : 0,
+    minHeight: Platform.OS === 'ios' ? 44 : 40,
+    backgroundColor: '#ffffff08',
   },
+  searchInput: {
+    marginLeft: 8,
+    color: '#fff',
+    flex: 1,
+    fontSize: 14,
+    paddingVertical: 0,
+    height: Platform.OS === 'ios' ? undefined : 40,
+  },
+
+  /* Cards */
   card: {
     marginHorizontal: 15,
     marginBottom: 12,
@@ -659,12 +579,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'flex-start',
   },
-  nameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    flexWrap: 'wrap',
-  },
+  nameRow: { flexDirection: 'row', alignItems: 'center', flex: 1, flexWrap: 'wrap' },
   name: { color: '#fff', fontWeight: 'bold', flexShrink: 1 },
   activeBadge: { borderRadius: 10, paddingHorizontal: 6, marginLeft: 6 },
   activeText: { color: '#fff', fontSize: 10 },
@@ -676,25 +591,9 @@ const styles = StyleSheet.create({
     maxWidth: 80,
   },
   remarksText: { color: '#fff', fontSize: 10 },
-  location: {
-    color: '#00e5ff',
-    marginTop: 5,
-    flexWrap: 'wrap',
-    lineHeight: 16,
-  },
-  rowBetween: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 5,
-    gap: 6,
-  },
-  label: {
-    color: '#FFB85D',
-    fontSize: 12,
-    flex: 1,
-    flexWrap: 'wrap',
-    paddingTop: 2,
-  },
+  location: { color: '#00e5ff', marginTop: 5, flexWrap: 'wrap', lineHeight: 16 },
+  rowBetween: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 5, gap: 6 },
+  label: { color: '#FFB85D', fontSize: 12, flex: 1, flexWrap: 'wrap', paddingTop: 2 },
   value: { color: '#fff', flexShrink: 1 },
   cardFooter: {
     flexDirection: 'row',
@@ -723,19 +622,25 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+
+  /* Modals */
   modalOverlay: {
     position: 'absolute',
     width: '100%',
     height: '100%',
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: 'rgba(0,0,0,0.65)',
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 1000,
   },
-  modalCard: {
+
+  /* Remarks modal */
+  remarksModalCard: {
     width: '85%',
-    backgroundColor: '#2f2f8f',
-    borderRadius: 12,
+    backgroundColor: '#1a1f6b',
+    borderWidth: 1,
+    borderColor: '#3d45b0',
+    borderRadius: 16,
     padding: 20,
     alignItems: 'center',
   },
@@ -748,6 +653,31 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 10,
   },
+
+  /* ✅ IMPROVED Filter modal */
+  filterModalCard: {
+    width: '88%',
+    backgroundColor: '#1a1f6b',       // deep navy base
+    borderWidth: 1,
+    borderColor: '#3d45b0',            // soft blue border
+    borderRadius: 18,
+    padding: 20,
+    alignItems: 'center',
+    maxHeight: '88%',
+  },
+  dragHandle: {
+    width: 36,
+    height: 4,
+    backgroundColor: '#3d55cc',
+    borderRadius: 2,
+    marginBottom: 14,
+  },
+  modalDivider: {
+    width: '100%',
+    height: 1,
+    backgroundColor: '#3d45b033',
+    marginVertical: 10,
+  },
   modalTitle: {
     color: '#00e5ff',
     fontSize: 18,
@@ -758,21 +688,50 @@ const styles = StyleSheet.create({
   modalCloseBtn: {
     backgroundColor: '#00acc1',
     paddingHorizontal: 20,
-    paddingVertical: 8,
-    borderRadius: 20,
-    marginTop: 10,
+    paddingVertical: 10,
+    borderRadius: 24,
+    marginTop: 6,
+    width: '100%',
+    alignItems: 'center',
   },
-  modalCloseText: { color: '#fff', fontWeight: '600' },
-  inputWrapper: { width: '100%', marginBottom: 12 },
-  dropdown: {
+  modalCloseText: { color: '#fff', fontWeight: '600', fontSize: 14 },
+
+  /* ✅ Filter form fields */
+  filterInputWrapper: { width: '100%', marginBottom: 12 },
+  filterLabel: {
+    color: '#a0b4e8',    // muted blue-white — better contrast on dark bg
+    fontSize: 12,
+    marginBottom: 5,
+    fontWeight: '500',
+  },
+  filterDropdown: {
     height: 40,
-    backgroundColor: '#ffffff10',
+    backgroundColor: '#ffffff12',
     borderRadius: 8,
-    paddingHorizontal: 8,
+    paddingHorizontal: 10,
     borderWidth: 1,
-    borderColor: '#444',
+    borderColor: '#3d55cc',
   },
   dropdownContainer: { backgroundColor: '#fff', borderRadius: 8 },
-  placeholderStyle: { color: '#aaa', fontSize: 14 },
-  selectedTextStyle: { color: '#fff', fontSize: 14 },
+  placeholderStyle: { color: '#7a8fc4', fontSize: 13 },
+  selectedTextStyle: { color: '#fff', fontSize: 13 },
+
+  /* Date input fields */
+  field: { marginBottom: 12, width: '100%' },
+  filterInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffffff12',
+    borderWidth: 1,
+    borderColor: '#3d55cc',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    height: 40,
+  },
+  filterInput: {
+    flex: 1,
+    color: '#fff',
+    fontSize: 13,
+    paddingVertical: 0,
+  },
 });

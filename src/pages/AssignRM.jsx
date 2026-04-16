@@ -11,7 +11,10 @@ import {
   Alert,
   Animated,
   Dimensions,
+  StatusBar,
+  KeyboardAvoidingView
 } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { Dropdown } from 'react-native-element-dropdown';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -25,6 +28,7 @@ import RNFS from 'react-native-fs';
 import notifee, { AndroidImportance } from '@notifee/react-native';
 import { useSelector } from 'react-redux';
 import { PermissionsAndroid, Platform, NativeModules } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 const screenHeight = Dimensions.get('window').height;
 const DropdownField = ({ label, data, placeholder, value, onChange }) => {
   const [isFocus, setIsFocus] = React.useState(false);
@@ -32,7 +36,6 @@ const DropdownField = ({ label, data, placeholder, value, onChange }) => {
   return (
     <View style={styles.inputWrapper}>
       <Text style={styles.label}>{label}</Text>
-
       <Dropdown
         style={[
           styles.dropdown,
@@ -80,14 +83,20 @@ const InputField = ({ label, placeholder, icon, value, onChange, onPress }) => {
             value={value}
             onChangeText={onChange}
             editable={!onPress}
+            pointerEvents={onPress ? 'none' : 'auto'}
           />
-          {icon && <Icon name={icon} size={18} color="#00bcd4" />}
+          {icon && (
+            <TouchableOpacity onPress={onPress}>
+              <Icon name={icon} size={18} color="#00bcd4" />
+            </TouchableOpacity>
+          )}
         </View>
       </TouchableOpacity>
     </View>
   );
 };
 const AssignRM = () => {
+  const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const [selected, setSelected] = useState([]);
   const [showModal, setShowModal] = useState(false);
@@ -130,7 +139,7 @@ const AssignRM = () => {
     Animated.spring(filterAnim, {
       toValue: 0,
       useNativeDriver: true,
-      bounciness: 4,
+      damping: 15,
     }).start();
   };
 
@@ -497,10 +506,15 @@ const AssignRM = () => {
     ]);
   };
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['left', 'right',]}>
+       <KeyboardAvoidingView
+    style={{ flex: 1 }}
+    behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+  >
+      <StatusBar barStyle="light-content" />
       <Header />
 
-      <View style={styles.topBarContainer}>
+      <View style={[styles.topBarContainer, { paddingTop: 10 }]}>
         <View style={styles.topBar}>
           <View style={styles.titleRow}>
             <MaterialCommunityIcons
@@ -533,7 +547,7 @@ const AssignRM = () => {
             setShowModal(true);
           }}
         >
-          <Text style={styles.btnText}>Assign RM</Text>
+        <Text style={styles.btnText}>Assign RM</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.btn}
@@ -556,7 +570,8 @@ const AssignRM = () => {
       </View>
 
       <ScrollView
-        contentContainerStyle={{ paddingHorizontal: 12, paddingBottom: 12 }}
+        contentContainerStyle={{ paddingHorizontal: 12, paddingBottom: 10, paddingBottom: insets.bottom + 80 }}
+        keyboardShouldPersistTaps="handled" 
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.searchBox}>
@@ -933,7 +948,13 @@ const AssignRM = () => {
                 value={filters.location}
                 onChange={value => onChange('location', value)}
               />
-
+                <Text style={styles.filterLabel}>Project</Text>
+              <DropdownField
+                data={projectOptions}
+                placeholder="Select project"
+                value={filters.project}
+                onChange={value => onChange('project', value)}
+              />
               <Text style={styles.filterLabel}>Date Range</Text>
               <View style={styles.dateRow}>
                 <View style={styles.dateField}>
@@ -959,13 +980,7 @@ const AssignRM = () => {
                 </View>
               </View>
 
-              <Text style={styles.filterLabel}>Project</Text>
-              <DropdownField
-                data={projectOptions}
-                placeholder="Select project"
-                value={filters.project}
-                onChange={value => onChange('project', value)}
-              />
+             
             </ScrollView>
 
             {showFromPicker && (
@@ -1011,7 +1026,8 @@ const AssignRM = () => {
           </Animated.View>
         </View>
       )}
-      <BottomNav />
+      <BottomNav style={{ paddingBottom: insets.bottom }} />
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };
@@ -1117,20 +1133,27 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   selectedBadgeText: { color: '#00cfff', fontSize: 11, fontWeight: '500' },
- filterBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#3a3f7a', marginTop:'10',
+  filterBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#3a3f7a', marginTop: '10',
     paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20,
     borderWidth: 1, borderColor: '#ffffff20',
   },
   filterText: { color: '#fff', fontSize: 12, fontWeight: '500' },
-  card: {
-    backgroundColor: '#1e2260',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 10,
-    borderWidth: 0.3,
-    borderColor: '#FFFF',
-  },
+ card: {
+  backgroundColor: '#1e2260',
+  borderRadius: 12,
+  padding: 12,
+  marginBottom: 10,
+
+  // iOS shadow
+  shadowColor: '#000',
+  shadowOpacity: 0.25,
+  shadowRadius: 6,
+  shadowOffset: { width: 0, height: 3 },
+
+  // Android
+  elevation: 4,
+},
   cardSelected: { borderColor: '#00cfff55', backgroundColor: '#1a2a6a' },
   cardTop: {
     flexDirection: 'row',
@@ -1180,25 +1203,28 @@ const styles = StyleSheet.create({
   refValue: { color: '#fff', fontSize: 11 },
 
   // MODAL
-  modalOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.65)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContainer: {
-    width: '88%',
-    backgroundColor: '#1e2260',
-    borderRadius: 14,
-    padding: 18,
-    maxHeight: '75%',
-    borderWidth: 1,
-    borderColor: '#ffffff15',
-  },
+modalOverlay: {
+  flex: 1,
+  backgroundColor: 'rgba(0,0,0,0.6)',
+  justifyContent: 'center',
+  alignItems: 'center',
+  paddingHorizontal: 16,
+},
+modalContainer: {
+  width: '90%',
+  maxWidth: 420,
+  backgroundColor: '#1e2260',
+  borderRadius: 20,
+  padding: 16,
+  // iOS shadow
+  shadowColor: '#000',
+  shadowOpacity: 0.25,
+  shadowRadius: 10,
+  shadowOffset: { width: 0, height: 4 },
+
+  // Android
+  elevation: 8,
+},
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',

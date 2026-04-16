@@ -457,116 +457,71 @@ const FollowUpsScreen = () => {
       )}
           {/* ✅ FILTER MODAL */}
       {showFilterModal && (
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Filter Leads</Text>
+  <View style={styles.modalOverlay}>
+    <View style={styles.filterModalCard}>
+      <View style={styles.dragHandle} />
+      <Text style={styles.modalTitle}>Filter Leads</Text>
+      <View style={styles.modalDivider} />
 
-            <ScrollView
-              style={{ width: '100%' }}
-              showsVerticalScrollIndicator={false}
-            >
-              <DropdownField
-                label="Property Location"
-                data={Property}
-                placeholder="Select"
-                value={filters.location}
-                onChange={value => onChange('location', value)}
-              />
-              <DropdownField
-                label="RM"
-                data={Rm}
-                placeholder="Select"
-                value={filters.rm_id}
-                onChange={value => onChange('rm_id', value)}
-              />
+      <ScrollView
+        style={{ width: '100%' }}
+        showsVerticalScrollIndicator={false}
+      >
+        <DropdownField
+          label="Property Location"
+          data={Property}
+          placeholder="Select location"
+          value={filters.location}
+          onChange={value => onChange('location', value)}
+        />
 
-              {/* Date Row */}
-              <View
-                style={{
-                  flexDirection: 'row',
-                  justifyContent: 'space-between',
-                  width: '100%',
-                }}
-              >
-                {/* <View style={{ width: '48%' }}>
-                  <InputField
-                    label="From Date"
-                    placeholder="YYYY-MM-DD"
-                    icon="calendar-today"
-                    value={filters.fromDate}
-                    onPress={() => setShowFromPicker(true)}
-                  />
-                </View> */}
-                {/* <View style={{ width: '48%' }}>
-                  <InputField
-                    label="To Date"
-                    placeholder="YYYY-MM-DD"
-                    icon="calendar-today"
-                    value={filters.toDate}
-                    onPress={() => setShowToPicker(true)}
-                  />
-                </View> */}
-              </View>
+        <DropdownField
+          label="Relationship Manager"
+          data={Rm}
+          placeholder="Select RM"
+          value={filters.rm_id}
+          onChange={value => onChange('rm_id', value)}
+        />
 
-              <DropdownField
-                label="Project"
-                data={projectOptions}
-                placeholder="Select"
-                value={filters.project}
-                onChange={value => onChange('project', value)}
-              />
-              <DropdownField
-                label="Lead Status"
-                data={LeadStatus}
-                placeholder="Select"
-                value={filters.status}
-                onChange={value => onChange('status', value)}
-              />
-            </ScrollView>
+        <DropdownField
+          label="Project"
+          data={projectOptions}
+          placeholder="Select project"
+          value={filters.project}
+          onChange={value => onChange('project', value)}
+        />
 
-            {/* Pickers */}
-            {showFromPicker && (
-              <DateTimePicker
-                value={
-                  filters.fromDate ? new Date(filters.fromDate) : new Date()
-                }
-                mode="date"
-                display="default"
-                onChange={(e, d) => onDateChange(e, d, 'fromDate')}
-              />
-            )}
+        <DropdownField
+          label="Lead Status"
+          data={LeadStatus}
+          placeholder="Select status"
+          value={filters.status}
+          onChange={value => onChange('status', value)}
+        />
+      </ScrollView>
 
-            {showToPicker && (
-              <DateTimePicker
-                value={filters.toDate ? new Date(filters.toDate) : new Date()}
-                mode="date"
-                display="default"
-                onChange={(e, d) => onDateChange(e, d, 'toDate')}
-              />
-            )}
+      <View style={styles.modalDivider} />
 
-            <TouchableOpacity
-              style={styles.modalCloseBtn}
-              onPress={applyFilter}
-            >
-              <Text style={styles.modalCloseText}>Apply Filter</Text>
-            </TouchableOpacity>
+      <TouchableOpacity
+        style={styles.modalCloseBtn}
+        onPress={applyFilter}
+      >
+        <Text style={styles.modalCloseText}>Apply Filter</Text>
+      </TouchableOpacity>
 
-            <TouchableOpacity onPress={resetFilters} style={{ marginTop: 12 }}>
-              <Text style={{ color: '#ff5252', fontWeight: 'bold' }}>
-                Reset All
-              </Text>
-            </TouchableOpacity>
+      <TouchableOpacity onPress={resetFilters} style={{ marginTop: 14 }}>
+        <Text style={styles.resetText}>Reset All</Text>
+      </TouchableOpacity>
 
-            <TouchableOpacity
-              onPress={() => setShowFilterModal(false)}
-              style={{ marginTop: 15 }}
-            >
-              <Text style={{ color: '#fff' }}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
+      <TouchableOpacity
+        onPress={() => setShowFilterModal(false)}
+        style={{ marginTop: 12 }}
+      >
+        <Text style={styles.cancelText}>Cancel</Text>
+      </TouchableOpacity>
+    </View>
+  </View>
+)}
       {showTopBtn && (
         <TouchableOpacity style={styles.topButton} onPress={scrollToTop}>
           <Icon name="keyboard-arrow-up" size={26} color="#fff" />
@@ -675,11 +630,14 @@ const styles = StyleSheet.create({
   },
 
   label: {
-    color: '#FFB85D',
+    color: '#eae8e5df',
     fontSize: 12,
     flex: 1,
     flexWrap: 'wrap',
     paddingTop: 2,
+    paddingBottom:5,
+    fontStyle: 'italic',
+    fontWeight: '500',
   },
   value: {
     color: '#fff',
@@ -731,6 +689,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 
+  modalOverlay: {
+  position: 'absolute',
+  width: '100%',
+  height: '100%',
+  backgroundColor: 'rgba(0,0,0,0.65)',
+  justifyContent: 'center',
+  alignItems: 'center',
+  zIndex: 1000,
+},
   modalCard: {
     width: '85%',
     backgroundColor: '#2f2f8f',
@@ -749,11 +716,12 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
 
-  modalTitle: {
-    color: '#00e5ff',
-    fontSize: 18,
-    marginBottom: 10,
-  },
+modalTitle: {
+  color: '#00e5ff',
+  fontSize: 18,
+  marginBottom: 10,
+  fontWeight: 'bold',
+},
 
   modalText: {
     color: '#fff',
@@ -761,17 +729,21 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
 
-  modalCloseBtn: {
-    backgroundColor: '#00acc1',
-    paddingHorizontal: 20,
-    paddingVertical: 6,
-    borderRadius: 20,
-  },
+ modalCloseBtn: {
+  backgroundColor: '#00acc1',
+  paddingHorizontal: 20,
+  paddingVertical: 10,
+  borderRadius: 24,
+  marginTop: 6,
+  width: '100%',
+  alignItems: 'center',
+},
 
-  modalCloseText: {
-    color: '#fff',
-    fontWeight: '600',
-  },
+ modalCloseText: {
+  color: '#fff',
+  fontWeight: '600',
+  fontSize: 14,
+},
   nameRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -816,4 +788,37 @@ const styles = StyleSheet.create({
   dropdownContainer: { backgroundColor: '#fff', borderRadius: 8 },
   placeholderStyle: { color: '#aaa', fontSize: 14 },
   selectedTextStyle: { color: '#fff', fontSize: 14 },
+  filterModalCard: {
+  width: '88%',
+  backgroundColor: '#1a1f6b',
+  borderWidth: 1,
+  borderColor: '#3d45b0',
+  borderRadius: 18,
+  padding: 20,
+  alignItems: 'center',
+  maxHeight: '88%',
+},
+dragHandle: {
+  width: 36,
+  height: 4,
+  backgroundColor: '#3d55cc',
+  borderRadius: 2,
+  marginBottom: 14,
+},
+modalDivider: {
+  width: '100%',
+  height: 1,
+  backgroundColor: '#3d45b033',
+  marginVertical: 10,
+},
+resetText: {
+  color: '#ff6b6b',
+  fontWeight: 'bold',
+  fontSize: 14,
+},
+
+cancelText: {
+  color: '#a0b4e8',
+  fontSize: 13,
+},
 });

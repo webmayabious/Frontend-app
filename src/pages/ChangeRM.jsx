@@ -11,7 +11,10 @@ import {
   Linking,
   Animated,
   Dimensions,
+  StatusBar,
+  Platform,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import BottomNav from '../navigations/BottomNav';
@@ -28,6 +31,7 @@ const screenHeight = Dimensions.get('window').height;
 const DropdownField = ({ label, data, placeholder, value, onChange }) => {
   const [isFocus, setIsFocus] = useState(false);
   return (
+
     <View style={styles.inputWrapper}>
       {label ? <Text style={styles.label}>{label}</Text> : null}
       <Dropdown
@@ -97,7 +101,7 @@ const makeCall = phoneNumber => {
 /* ================= MAIN COMPONENT ================= */
 const ChangeRM = () => {
   const navigation = useNavigation();
-
+  const insets = useSafeAreaInsets();
   const [showrmModal, setShowrmModal] = useState(false);
   const [rms, setrms] = useState(null);
   const [selected, setSelected] = useState([]);
@@ -168,7 +172,7 @@ const ChangeRM = () => {
   const Rm = allRmList?.map(item => ({ label: item.name, value: item.id }));
 
   /* ================= LEADS ================= */
-  const { data: Lead = [], refetch: leadrefetch ,isLoading} = useQuery({
+  const { data: Lead = [], refetch: leadrefetch, isLoading } = useQuery({
     queryKey: ['AllPropertyLeads', appliedFilters, searchText],
     queryFn: async () => {
       try {
@@ -293,11 +297,21 @@ const ChangeRM = () => {
 
   /* ================= RENDER ================= */
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['left', 'right']}>
+      <StatusBar
+        barStyle="light-content"
+        translucent={true}
+        backgroundColor="transparent"
+      />
       <Header />
 
       {/* ── TOP BAR ── */}
-      <View style={styles.topBarContainer}>
+      <View
+        style={[
+          styles.topBarContainer,
+          { paddingTop: Platform.OS === 'ios' ? insets.top : 10 },
+        ]}
+      >
         <View style={styles.topBar}>
           <View style={styles.topBarLeft}>
             <MaterialCommunityIcons name="account-switch" size={18} color="#00cfff" />
@@ -373,104 +387,104 @@ const ChangeRM = () => {
         </View>
 
         {/* Lead Cards */}
-         {isLoading ? (
-                  <Text style={{ color: '#fff', textAlign: 'center', marginTop: 20 }}>
-                    Loading...
-                  </Text>
-                ) :
-        Lead.length === 0 ? (
-          <Text style={styles.emptyText}>No leads found</Text>
-        ) : (
-          Lead.map(item => {
-            const isChecked = selected.includes(item.id);
-            return (
-              <View
-                key={item.id}
-                style={[styles.card, isChecked && styles.cardSelected]}
-              >
-                <View style={styles.cardTop}>
-                  <View style={styles.nameRow}>
-                    <TouchableOpacity
-                      onPress={() => toggleSelect(item.id)}
-                      style={[styles.checkbox, isChecked && styles.checkboxChecked]}
-                    >
-                      {isChecked && <Icon name="check" size={11} color="#fff" />}
-                    </TouchableOpacity>
-
-                    <Text style={styles.name}>{item?.name || 'N/A'}</Text>
-
-                    <View
-                      style={[
-                        styles.statusBadge,
-                        {
-                          backgroundColor:
-                            item?.active === '1' ? '#4caf50' : '#f44336',
-                        },
-                      ]}
-                    >
-                      <Text style={styles.statusText}>
-                        {item?.active === '1' ? 'Active' : 'Inactive'}
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-
-                <View style={styles.divider} />
-
-                <View style={styles.cardBody}>
-                  <View style={styles.leftCol}>
-                    <View style={styles.infoRow}>
-                      <Icon name="call" size={12} color="#00cfff" />
-                      <Text
-                        style={styles.infoText}
-                        onPress={() => makeCall(item?.phone)}
+        {isLoading ? (
+          <Text style={{ color: '#fff', textAlign: 'center', marginTop: 20 }}>
+            Loading...
+          </Text>
+        ) :
+          Lead.length === 0 ? (
+            <Text style={styles.emptyText}>No leads found</Text>
+          ) : (
+            Lead.map(item => {
+              const isChecked = selected.includes(item.id);
+              return (
+                <View
+                  key={item.id}
+                  style={[styles.card, isChecked && styles.cardSelected]}
+                >
+                  <View style={styles.cardTop}>
+                    <View style={styles.nameRow}>
+                      <TouchableOpacity
+                        onPress={() => toggleSelect(item.id)}
+                        style={[styles.checkbox, isChecked && styles.checkboxChecked]}
                       >
-                        {item?.phone || 'N/A'}
-                      </Text>
-                    </View>
-                    <View style={styles.infoRow}>
-                      <MaterialCommunityIcons
-                        name="file-document-outline"
-                        size={12}
-                        color="#00cfff"
-                      />
-                      <Text style={styles.infoText}>
-                        {item?.company?.com_name || 'N/A'}
-                      </Text>
-                    </View>
-                    <View style={styles.infoRow}>
-                      <Icon name="email" size={12} color="#00cfff" />
-                      <Text style={styles.infoText}>{item?.email || 'N/A'}</Text>
+                        {isChecked && <Icon name="check" size={11} color="#fff" />}
+                      </TouchableOpacity>
+
+                      <Text style={styles.name}>{item?.name || 'N/A'}</Text>
+
+                      <View
+                        style={[
+                          styles.statusBadge,
+                          {
+                            backgroundColor:
+                              item?.active === '1' ? '#4caf50' : '#f44336',
+                          },
+                        ]}
+                      >
+                        <Text style={styles.statusText}>
+                          {item?.active === '1' ? 'Active' : 'Inactive'}
+                        </Text>
+                      </View>
                     </View>
                   </View>
 
-                  <View style={styles.rightCol}>
-                    <View style={styles.infoRow}>
-                      <Text style={styles.rmLabelCard}>RM: </Text>
-                      <Text style={styles.rmValue}>
-                        {item?.relationshipManager
-                          ? `${item.relationshipManager.usr_fname} ${item.relationshipManager.usr_lname}`
-                          : 'N/A'}
-                      </Text>
+                  <View style={styles.divider} />
+
+                  <View style={styles.cardBody}>
+                    <View style={styles.leftCol}>
+                      <View style={styles.infoRow}>
+                        <Icon name="call" size={12} color="#00cfff" />
+                        <Text
+                          style={styles.infoText}
+                          onPress={() => makeCall(item?.phone)}
+                        >
+                          {item?.phone || 'N/A'}
+                        </Text>
+                      </View>
+                      <View style={styles.infoRow}>
+                        <MaterialCommunityIcons
+                          name="file-document-outline"
+                          size={12}
+                          color="#00cfff"
+                        />
+                        <Text style={styles.infoText}>
+                          {item?.company?.com_name || 'N/A'}
+                        </Text>
+                      </View>
+                      <View style={styles.infoRow}>
+                        <Icon name="email" size={12} color="#00cfff" />
+                        <Text style={styles.infoText}>{item?.email || 'N/A'}</Text>
+                      </View>
                     </View>
-                    <View style={styles.infoRow}>
-                      <Icon name="location-on" size={12} color="#f4c542" />
-                      <Text style={styles.infoText}>
-                        {item?.propertylocation?.name || 'N/A'}
-                      </Text>
-                    </View>
-                    <View style={styles.infoRow}>
-                      <Text style={styles.refLabel}>Reference: </Text>
-                      <Text style={styles.refValue}>
-                        {item?.mrreference?.mrf_name || 'N/A'}
-                      </Text>
+
+                    <View style={styles.rightCol}>
+                      <View style={styles.infoRow}>
+                        <Text style={styles.rmLabelCard}>RM: </Text>
+                        <Text style={styles.rmValue}>
+                          {item?.relationshipManager
+                            ? `${item.relationshipManager.usr_fname} ${item.relationshipManager.usr_lname}`
+                            : 'N/A'}
+                        </Text>
+                      </View>
+                      <View style={styles.infoRow}>
+                        <Icon name="location-on" size={12} color="#f4c542" />
+                        <Text style={styles.infoText}>
+                          {item?.propertylocation?.name || 'N/A'}
+                        </Text>
+                      </View>
+                      <View style={styles.infoRow}>
+                        <Text style={styles.refLabel}>Reference: </Text>
+                        <Text style={styles.refValue}>
+                          {item?.mrreference?.mrf_name || 'N/A'}
+                        </Text>
+                      </View>
                     </View>
                   </View>
                 </View>
-              </View>
-            );
-          })
-        )}
+              );
+            })
+          )}
       </ScrollView>
 
       {/* ── CHANGE RM MODAL (center) ── */}
@@ -706,7 +720,10 @@ export default ChangeRM;
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0b0f4a' },
-  topBarContainer: { paddingHorizontal: 12, marginTop: 10, marginBottom: 8 },
+  topBarContainer: {
+    paddingHorizontal: 12,
+    marginBottom: 8,
+  },
   topBar: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     backgroundColor: '#ffffff10', paddingVertical: 8, paddingHorizontal: 14, borderRadius: 20,
@@ -731,11 +748,28 @@ const styles = StyleSheet.create({
   },
   filterText: { color: '#fff', fontSize: 12, fontWeight: '500' },
   searchRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8, gap: 8 },
-  searchBox: {
-    flexDirection: 'row', alignItems: 'center', borderWidth: 1,
-    borderColor: '#555', borderRadius: 20, paddingHorizontal: 10, height: 36, flex: 1,
-  },
-  searchInput: { color: '#fff', marginLeft: 5, fontSize: 12, flex: 1 },
+ searchBox: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  borderWidth: 1,
+  borderColor: '#555',
+  borderRadius: 20,
+  paddingHorizontal: 12,
+  height: 40,
+
+  // iOS fix
+  backgroundColor: '#ffffff08',
+},
+  searchInput: {
+  color: '#fff',
+  marginLeft: 6,
+  fontSize: 13,
+  flex: 1,
+
+  // 🔥 iOS specific fix
+  paddingVertical: Platform.OS === 'ios' ? 0 : 0,
+  textAlignVertical: 'center',
+},
   selectAllRow: {
     flexDirection: 'row', alignItems: 'center',
     justifyContent: 'space-between', paddingHorizontal: 13, marginBottom: 8,
@@ -782,7 +816,7 @@ const styles = StyleSheet.create({
     alignItems: 'center', zIndex: 1000
   },
   modalContainer: {
-    width: '88%', backgroundColor: '#1e2260', borderRadius: 14,
+    width: '90%', backgroundColor: '#1e2260', borderRadius: 14,
     padding: 18, maxHeight: '75%', borderWidth: 1, borderColor: '#ffffff15',
   },
   modalHeader: {
@@ -842,7 +876,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end', zIndex: 1000,
   },
   bottomSheet: {
-    backgroundColor: '#1e2260', borderTopLeftRadius: 20, borderTopRightRadius: 20,paddingBottom: 50,
+    backgroundColor: '#1e2260', borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingBottom: 50,
     padding: 18, maxHeight: '85%', borderWidth: 1,
     borderColor: '#ffffff15', borderBottomWidth: 0,
   },
