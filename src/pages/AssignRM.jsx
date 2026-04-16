@@ -346,7 +346,7 @@ const AssignRM = () => {
   );
   const handleDownloadFormat = async () => {
     const fileName = 'mulyam_new.xlsx';
-    const destPath = `${RNFS.DownloadDirectoryPath}/${fileName}`;
+    const destPath = `${RNFS.ExternalDirectoryPath}/${fileName}`;
     // const destPath = `${RNFS.ExternalDirectoryPath}/mulyam_new.xlsx`;
     // const destPath = `${RNFS.CachesDirectoryPath}/${fileName}`;
     try {
@@ -1117,17 +1117,10 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   selectedBadgeText: { color: '#00cfff', fontSize: 11, fontWeight: '500' },
-  filterBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: '#3a3f7a',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#ffffff20',
-    marginTop: 10,
+ filterBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#3a3f7a', marginTop:'10',
+    paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20,
+    borderWidth: 1, borderColor: '#ffffff20',
   },
   filterText: { color: '#fff', fontSize: 12, fontWeight: '500' },
   card: {

@@ -332,9 +332,9 @@ const LeadsListScreen = () => {
   const LeadStatus = [
     { label: 'Active', value: '1' },
     { label: 'Inactive', value: '2' },
-    { label: 'Site Visit', value: '3' },
-    { label: 'Meeting Done', value: '4' },
-    { label: 'Booking Done', value: '5' },
+    // { label: 'Site Visit', value: '3' },
+    // { label: 'Meeting Done', value: '4' },
+    // { label: 'Booking Done', value: '5' },
   ];
 
   /* ================= HANDLERS ================= */

@@ -168,7 +168,7 @@ const ChangeRM = () => {
   const Rm = allRmList?.map(item => ({ label: item.name, value: item.id }));
 
   /* ================= LEADS ================= */
-  const { data: Lead = [], refetch: leadrefetch } = useQuery({
+  const { data: Lead = [], refetch: leadrefetch ,isLoading} = useQuery({
     queryKey: ['AllPropertyLeads', appliedFilters, searchText],
     queryFn: async () => {
       try {
@@ -373,7 +373,12 @@ const ChangeRM = () => {
         </View>
 
         {/* Lead Cards */}
-        {Lead.length === 0 ? (
+         {isLoading ? (
+                  <Text style={{ color: '#fff', textAlign: 'center', marginTop: 20 }}>
+                    Loading...
+                  </Text>
+                ) :
+        Lead.length === 0 ? (
           <Text style={styles.emptyText}>No leads found</Text>
         ) : (
           Lead.map(item => {

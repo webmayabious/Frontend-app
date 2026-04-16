@@ -410,6 +410,8 @@ export default function MeetingsEdit({ route }) {
               'SiteVisitandBookingsData',
               'TodaysFollowUpsandMeetings',
               'AllPropertyLeads',
+              'Uploadleads',
+              'Leads Assigned'
             ].includes(query.queryKey[0]);
           },
         });
@@ -538,13 +540,13 @@ export default function MeetingsEdit({ route }) {
 
           {/* Lead Profile */}
           <Section title="Lead Profile">
-            <DropdownField
+            {/* <DropdownField
               label="Lead Status"
               data={Lead}
               placeholder="Select"
               value={form.active}
               onChange={value => onChange('active', value)}
-            />
+            /> */}
             <DropdownField
               label="Location of Property *"
               data={Property}
