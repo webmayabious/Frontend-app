@@ -11,6 +11,7 @@ import {
   Alert,
   Platform
 } from 'react-native';
+import { getFCMToken } from '../pages/utils/fcm';
 import socket from '../socket';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useDispatch } from 'react-redux';
@@ -74,7 +75,7 @@ const handleLogin = async () => {
     setLoading(true);
 
     // FCM TOKEN
-    const fcmToken = await messaging().getToken();
+    const fcmToken = await getFCMToken();
 
     // DEVICE INFO (SAFE)
     const deviceId = await DeviceInfo.getUniqueId();

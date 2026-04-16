@@ -1,5 +1,4 @@
 import { legacy_createStore as createStore } from "redux";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // Default initial state
 const initialState = {
