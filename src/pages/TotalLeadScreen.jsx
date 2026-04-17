@@ -1,4 +1,4 @@
-// FollowUpsScreen.js (Fixed - useNavigation inside component)
+// TotalLeadScreen.js (Fixed - Infinite Scroll Working)
 import React, { useRef, useState } from 'react';
 import {
   View,
@@ -16,11 +16,13 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import Header from '../Layout/Header';
 import BottomNav from '../navigations/BottomNav';
 import { useNavigation } from '@react-navigation/native';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useInfiniteQuery } from '@tanstack/react-query';
 import api from '../api/AxiosInstance';
 import { Dropdown } from 'react-native-element-dropdown';
+
 const STATUSBAR_HEIGHT =
   Platform.OS === 'android' ? StatusBar.currentHeight : 44;
+
 /* ================= CALL ================= */
 const makeCall = phoneNumber => {
   if (!phoneNumber) return;
@@ -29,6 +31,8 @@ const makeCall = phoneNumber => {
     { text: 'Call', onPress: () => Linking.openURL(`tel:${phoneNumber}`) },
   ]);
 };
+
+/* ================= DROPDOWN FIELD ================= */
 const DropdownField = ({ label, data, placeholder, value, onChange }) => {
   const [isFocus, setIsFocus] = useState(false);
   return (
@@ -68,43 +72,23 @@ const DropdownField = ({ label, data, placeholder, value, onChange }) => {
   );
 };
 
-//  navigation prop টা বাইরে থেকে pass করা হচ্ছে
+/* ================= SITE CARD ================= */
 const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
   <View style={styles.card}>
     {/* Header */}
     <View style={styles.cardHeader}>
       <View style={styles.nameRow}>
         <Text style={styles.name}>{data?.name}</Text>
-
         <View
           style={[
             styles.activeBadge,
             {
-              backgroundColor:
-                data?.active === '1'
-                  ? '#4caf50' // Active
-                  : '#f44336',
-              // data?.active === '2'
-              // ? '#f44336' // Inactive
-              // : data?.active === '3'
-              // ? '#2196f3' // Site Visit
-              // : data?.active === '4'
-              // ? '#ff9800' // Meeting Done
-              // : '#9c27b0', // Booking Done (or default)
+              backgroundColor: data?.active === '1' ? '#4caf50' : '#f44336',
             },
           ]}
         >
           <Text style={styles.activeText}>
-            {
-              data?.active === '1' ? 'Active' : 'Inactive'
-              // data?.active === '2'
-              // ? 'Inactive'
-              // : data?.active === '3'
-              // ? 'Site Visit'
-              // : data?.active === '4'
-              // ? 'Meeting Done'
-              // : 'Booking Done'
-            }
+            {data?.active === '1' ? 'Active' : 'Inactive'}
           </Text>
         </View>
       </View>
@@ -116,7 +100,7 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
           flexShrink: 0,
         }}
       >
-        {/* ✅ REMARKS BUTTON */}
+        {/* REMARKS BUTTON */}
         <TouchableOpacity
           style={styles.remarksBtn}
           onPress={() => {
@@ -160,15 +144,12 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
     </View>
     <View style={styles.rowBetween}>
       <Text style={styles.label}>
-        <Text style={styles.label}>
-          Site Visit Date:
-          <Text style={styles.value}>
-            {' '}
-            {data?.propertyfeedbacks?.map(x => x?.site_visit_date).join(', ')}
-          </Text>
+        Site Visit Date:
+        <Text style={styles.value}>
+          {' '}
+          {data?.propertyfeedbacks?.map(x => x?.site_visit_date).join(', ')}
         </Text>
       </Text>
-
       <Text style={styles.label}>
         RM:{' '}
         <Text style={styles.value}>
@@ -206,6 +187,7 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
   </View>
 );
 
+/* ================= MAIN SCREEN ================= */
 const TotalLeadScreen = () => {
   const navigation = useNavigation();
   const [showRemarks, setShowRemarks] = useState(false);
@@ -221,13 +203,25 @@ const TotalLeadScreen = () => {
     location: null,
     status: null,
   });
-  const [appliedFilters, setAppliedFilters] = useState();
-  /* ================= API ================= */
-  const { data: Lead, isLoading } = useQuery({
-    queryKey: ['TotalLead', appliedFilters],
-    queryFn: async () => {
+
+  const [showTopBtn, setShowTopBtn] = useState(false);
+  const scrollRef = useRef();
+  const isScrollingToTop = useRef(false); // ✅ scroll to top চলাকালীন load more block করবে
+
+  /* ================= INFINITE QUERY ================= */
+  const {
+    data,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    isLoading,
+  } = useInfiniteQuery({
+    queryKey: ['TotalLead', filters, searchText],
+    queryFn: async ({ pageParam = 1 }) => {
       const res = await api.get('/api/pm/getAllPropertyLeadsWithAndWihoutRM', {
         params: {
+          page: pageParam,
+          limit: 20,
           search: searchText || undefined,
           company_id: filters.company_id || undefined,
           rm_id: filters.rm_id || undefined,
@@ -238,23 +232,26 @@ const TotalLeadScreen = () => {
           status: filters.status || undefined,
         },
       });
-      return res.data.data;
+      return res.data;
     },
+    getNextPageParam: lastPage => {
+      const { currentPage, totalPages } = lastPage;
+      return currentPage < totalPages ? currentPage + 1 : undefined;
+    },
+    initialPageParam: 1,
   });
-  const filteredfollowUps = (Lead || [])?.filter(item => {
-    const name = item?.name?.toLowerCase() || '';
-    const phone = item?.phone || '';
-    const email = item?.email?.toLowerCase() || '';
 
-    const search = searchText.toLowerCase();
+  // ✅ সব pages থেকে data flatten করো
+  const leads = data?.pages?.flatMap(page => page.data) || [];
 
-    return (
-      name.includes(search) || phone.includes(search) || email.includes(search)
-    );
-  });
-  // console.log('siteVisits1', Lead);
-  const [showTopBtn, setShowTopBtn] = useState(false);
-  const scrollRef = useRef();
+  // ✅ Infinite scroll handler — scroll position দেখে trigger করে
+  const handleLoadMore = () => {
+    if (hasNextPage && !isFetchingNextPage) {
+      fetchNextPage();
+    }
+  };
+
+  /* ================= FILTER QUERIES ================= */
   const { data: AllProperty } = useQuery({
     queryKey: ['AllProperty'],
     queryFn: async () => {
@@ -263,7 +260,6 @@ const TotalLeadScreen = () => {
     },
   });
 
-  // Fetch RMs
   const { data: allRmList = [] } = useQuery({
     queryKey: ['allRMList'],
     queryFn: async () => {
@@ -272,7 +268,6 @@ const TotalLeadScreen = () => {
     },
   });
 
-  // Fetch Projects
   const { data: projectList = [] } = useQuery({
     queryKey: ['project'],
     queryFn: async () => {
@@ -295,9 +290,6 @@ const TotalLeadScreen = () => {
   const LeadStatus = [
     { label: 'Active', value: '1' },
     { label: 'Inactive', value: '2' },
-    // { label: 'Site Visit', value: '3' },
-    // { label: 'Meeting Done', value: '4' },
-    // { label: 'Booking Done', value: '5' },
   ];
 
   /* ================= HANDLERS ================= */
@@ -306,7 +298,6 @@ const TotalLeadScreen = () => {
   };
 
   const applyFilter = () => {
-    setAppliedFilters(filters);
     setShowFilterModal(false);
   };
 
@@ -318,18 +309,21 @@ const TotalLeadScreen = () => {
       toDate: null,
       project: null,
       location: null,
-      active: null,
+      status: null,
     };
-
     setFilters(cleared);
-    setAppliedFilters(cleared);
     setShowFilterModal(false);
   };
 
   const scrollToTop = () => {
+    isScrollingToTop.current = true; // ✅ block শুরু
     scrollRef.current?.scrollTo({ y: 0, animated: true });
+    setTimeout(() => {
+      isScrollingToTop.current = false; // ✅ animation শেষে unblock
+    }, 600);
   };
 
+  /* ================= RENDER ================= */
   return (
     <View style={styles.container}>
       <StatusBar
@@ -350,7 +344,6 @@ const TotalLeadScreen = () => {
           </View>
 
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            {/* <Icon name="filter-alt" size={18} color="#00e5ff" /> */}
             <TouchableOpacity
               style={[
                 styles.backBtn,
@@ -360,27 +353,39 @@ const TotalLeadScreen = () => {
             >
               <Icon name="filter-alt" size={18} color="#00e5ff" />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.backBtn}>
-              <Text
-                style={styles.backText}
-                onPress={() => navigation.navigate('Dashboard')}
-              >
-                Back
-              </Text>
+            <TouchableOpacity
+              style={styles.backBtn}
+              onPress={() => navigation.navigate('Dashboard')}
+            >
+              <Text style={styles.backText}>Back</Text>
             </TouchableOpacity>
           </View>
         </View>
       </View>
 
+      {/* ✅ ScrollView — onScroll দিয়ে bottom detect করে load more trigger */}
       <ScrollView
         ref={scrollRef}
         showsVerticalScrollIndicator={false}
         onScroll={event => {
-          const y = event.nativeEvent.contentOffset.y;
+          const { layoutMeasurement, contentOffset, contentSize } =
+            event.nativeEvent;
+          const y = contentOffset.y;
+
+          // Scroll to top button
           setShowTopBtn(y > 200);
+          if (isScrollingToTop.current) return;
+
+         
+          const isNearBottom =
+            layoutMeasurement.height + y >= contentSize.height - 150;
+          if (isNearBottom) {
+            handleLoadMore();
+          }
         }}
-        scrollEventThrottle={16}
+        scrollEventThrottle={400}
       >
+        {/* Search Box */}
         <View style={styles.searchBox}>
           <Icon name="search" size={18} color="#aaa" />
           <TextInput
@@ -391,12 +396,14 @@ const TotalLeadScreen = () => {
             style={{ marginLeft: 8, color: '#fff', flex: 1 }}
           />
         </View>
+
+        {/* ✅ List Render — শুধু leads use করো, double filter নেই */}
         {isLoading ? (
           <Text style={{ color: '#fff', textAlign: 'center', marginTop: 20 }}>
             Loading...
           </Text>
-        ) : filteredfollowUps?.length > 0 ? (
-          filteredfollowUps?.map((visit, i) => (
+        ) : leads?.length > 0 ? (
+          leads.map((visit, i) => (
             <SiteCard
               key={visit.id || i}
               data={visit}
@@ -406,25 +413,49 @@ const TotalLeadScreen = () => {
             />
           ))
         ) : (
-          <Text
-            style={{ textAlign: 'center', marginTop: 20, color: '#ffffff' }}
-          >
+          <Text style={{ textAlign: 'center', marginTop: 20, color: '#fff' }}>
             No data found
           </Text>
         )}
+
+        {isFetchingNextPage && (
+          <Text
+            style={{
+              color: '#aaa',
+              textAlign: 'center',
+              paddingVertical: 12,
+              fontSize: 13,
+            }}
+          >
+            Loading more...
+          </Text>
+        )}
+
+        {/* ✅ End of list message */}
+        {!hasNextPage && leads.length > 0 && (
+          <Text
+            style={{
+              color: '#06f65a',
+              textAlign: 'center',
+              paddingBottom: 12,
+              fontSize: 15,
+              fontWeight: 'bold',
+            }}
+          >
+            You've reached the end of the list.
+          </Text>
+        )}
       </ScrollView>
-      {/* ✅ REMARKS MODAL */}
+
+      {/* REMARKS MODAL */}
       {showRemarks && (
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             <View style={styles.checkIcon}>
               <Icon name="check-circle" size={32} color="#00acc1" />
             </View>
-
             <Text style={styles.modalTitle}>Latest Remarks</Text>
-
             <Text style={styles.modalText}>{remarksText}</Text>
-
             <TouchableOpacity
               style={styles.modalCloseBtn}
               onPress={() => setShowRemarks(false)}
@@ -434,7 +465,8 @@ const TotalLeadScreen = () => {
           </View>
         </View>
       )}
-      {/* ✅ FILTER MODAL */}
+
+      {/* FILTER MODAL */}
       {showFilterModal && (
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
@@ -458,16 +490,6 @@ const TotalLeadScreen = () => {
                 value={filters.rm_id}
                 onChange={value => onChange('rm_id', value)}
               />
-
-              {/* Date Row */}
-              <View
-                style={{
-                  flexDirection: 'row',
-                  justifyContent: 'space-between',
-                  width: '100%',
-                }}
-              ></View>
-
               <DropdownField
                 label="Project"
                 data={projectOptions}
@@ -506,6 +528,8 @@ const TotalLeadScreen = () => {
           </View>
         </View>
       )}
+
+      {/* Scroll to Top Button */}
       {showTopBtn && (
         <TouchableOpacity style={styles.topButton} onPress={scrollToTop}>
           <Icon name="keyboard-arrow-up" size={26} color="#fff" />
@@ -520,6 +544,7 @@ const TotalLeadScreen = () => {
 
 export default TotalLeadScreen;
 
+/* ================= STYLES ================= */
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#070c4d' },
 
@@ -548,7 +573,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 3,
   },
- 
+
   backText: { color: '#fff', fontSize: 12 },
 
   searchBox: {
@@ -578,7 +603,18 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
 
-  name: { color: '#fff', fontWeight: 'bold' },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    flexWrap: 'wrap',
+  },
+
+  name: {
+    color: '#fff',
+    fontWeight: 'bold',
+    flexShrink: 1,
+  },
 
   activeBadge: {
     backgroundColor: '#4caf50',
@@ -620,6 +656,7 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     paddingTop: 2,
   },
+
   value: {
     color: '#fff',
     flexShrink: 1,
@@ -642,6 +679,7 @@ const styles = StyleSheet.create({
   },
 
   buttonText: { color: '#fff', fontSize: 12 },
+
   completed: {
     color: '#aaa',
     fontSize: 12,
@@ -711,7 +749,9 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '600',
   },
+
   inputWrapper: { width: '100%', marginBottom: 12 },
+
   dropdown: {
     height: 40,
     backgroundColor: '#ffffff10',
@@ -720,19 +760,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#444',
   },
+
   dropdownContainer: { backgroundColor: '#fff', borderRadius: 8 },
   placeholderStyle: { color: '#aaa', fontSize: 14 },
   selectedTextStyle: { color: '#fff', fontSize: 14 },
-  nameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    flexWrap: 'wrap',
-  },
-
-  name: {
-    color: '#fff',
-    fontWeight: 'bold',
-    flexShrink: 1,
-  },
 });
