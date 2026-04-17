@@ -11,12 +11,13 @@ import {
   Platform,
   Alert,
   Linking,
+  Image,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import Header from '../Layout/Header';
 import BottomNav from '../navigations/BottomNav';
 import { useNavigation } from '@react-navigation/native';
-import { useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import api from '../api/AxiosInstance';
 import { Dropdown } from 'react-native-element-dropdown';
 const STATUSBAR_HEIGHT =
@@ -196,11 +197,13 @@ const UploadedLeads = () => {
     status: null,
   });
   const [appliedFilters, setAppliedFilters] = useState();
-  const { data: uploadleads, isLoading } = useQuery({
+  const { data: uploadleads, isLoading,fetchNextPage, hasNextPage, isFetchingNextPage  } = useInfiniteQuery({
     queryKey: ['Uploadleads', appliedFilters],
-    queryFn: async () => {
+    queryFn: async ({ pageParam = 1 }) => {
       const res = await api.get('api/pm/getLeadsUploadedToday', {
         params: {
+          page: pageParam,
+        
           search: searchText || undefined,
           company_id: filters.company_id || undefined,
           rm_id: filters.rm_id || undefined,
@@ -213,12 +216,24 @@ const UploadedLeads = () => {
       });
       console.log('res site visite', res.data.data);
 
-      return res.data.data;
+      return res.data;
     },
+      getNextPageParam: lastPage => {
+      const { currentPage, totalPages } = lastPage;
+      return currentPage < totalPages ? currentPage + 1 : undefined;
+    },
+    initialPageParam: 1,
   });
+const Uploadleads = uploadleads?.pages?.flatMap(page => page.data) || [];
 
+  // ✅ Infinite scroll handler — scroll position দেখে trigger করে
+  const handleLoadMore = () => {
+    if (hasNextPage && !isFetchingNextPage) {
+      fetchNextPage();
+    }
+  };
   // const siteVisits = data?.todays_siteVisit || [];
-  const filteredSiteVisits = uploadleads?.filter(item => {
+  const filteredSiteVisits = Uploadleads?.filter(item => {
     const name = item?.name?.toLowerCase() || '';
     const phone = item?.phone || '';
     const email = item?.email?.toLowerCase() || '';
@@ -230,6 +245,7 @@ const UploadedLeads = () => {
     );
   });
   const scrollRef = useRef();
+  const isScrollingToTop = useRef(false);
   const { data: AllProperty } = useQuery({
     queryKey: ['AllProperty'],
     queryFn: async () => {
@@ -301,7 +317,13 @@ const UploadedLeads = () => {
     setShowFilterModal(false);
   };
   const [showTopBtn, setShowTopBtn] = useState(false);
-
+  const scrollToTop = () => {
+    isScrollingToTop.current = true;
+    scrollRef.current?.scrollTo({ y: 0, animated: true });
+    setTimeout(() => {
+      isScrollingToTop.current = false;
+    }, 600);
+  };
   return (
     <View style={styles.container}>
       <StatusBar
@@ -333,7 +355,13 @@ const UploadedLeads = () => {
               style={styles.backBtn}
               onPress={() => navigation.navigate('Dashboard')}
             >
-              <Text style={styles.backText}>Back</Text>
+                <View style={styles.backButton}>
+                              <Image
+                                source={require('../asset/image/icon/Arrow.png')}
+                                style={{ width:12, height: 12, marginRight: 6 }}
+                              />
+                              <Text style={styles.backText}>Back</Text>
+                            </View>
             </TouchableOpacity>
           </View>
         </View>
@@ -343,11 +371,21 @@ const UploadedLeads = () => {
       <ScrollView
         ref={scrollRef}
         showsVerticalScrollIndicator={false}
-        onScroll={e => {
-          const y = e.nativeEvent.contentOffset.y;
+         onScroll={event => {
+          const { layoutMeasurement, contentOffset, contentSize } =
+            event.nativeEvent;
+          const y = contentOffset.y;
+
+          // Scroll to top button
           setShowTopBtn(y > 200);
+          if (isScrollingToTop.current) return;
+
+          const isNearBottom =
+            layoutMeasurement.height + y >= contentSize.height - 150;
+          if (isNearBottom) {
+            handleLoadMore();
+          }
         }}
-        scrollEventThrottle={16}
       >
         {/* Search */}
         <View style={styles.searchBox}>
@@ -483,7 +521,7 @@ const UploadedLeads = () => {
       {showTopBtn && (
         <TouchableOpacity
           style={styles.topButton}
-          onPress={() => scrollRef.current?.scrollTo({ y: 0, animated: true })}
+          onPress={scrollToTop}
         >
           <Icon name="keyboard-arrow-up" size={26} color="#fff" />
         </TouchableOpacity>
@@ -582,7 +620,10 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     lineHeight: 16,
   },
-
+  backButton: {
+  flexDirection: 'row',
+  alignItems: 'center',
+},
   rowBetween: {
     flexDirection: 'row',
     justifyContent: 'space-between',

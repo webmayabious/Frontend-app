@@ -11,13 +11,14 @@ import {
   Platform,
   Alert,
   Linking,
+  Image,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import Header from '../Layout/Header';
 import BottomNav from '../navigations/BottomNav';
 import { useNavigation } from '@react-navigation/native';
 import api from '../api/AxiosInstance';
-import { useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { Dropdown } from 'react-native-element-dropdown';
 
 const STATUSBAR_HEIGHT =
@@ -178,12 +179,15 @@ const LeadsassignedScreen = () => {
   const [appliedFilters, setAppliedFilters] = useState();
   const [showTopBtn, setShowTopBtn] = useState(false);
   const scrollRef = useRef();
-
-  const { data: leadassigned, isLoading } = useQuery({
+const isScrollingToTop = useRef(false);
+  const { data: leadassigned, isLoading,fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage, } = useInfiniteQuery({
     queryKey: ['Leads Assigned', appliedFilters],
-    queryFn: async () => {
+    queryFn: async ({ pageParam = 1 }) => {
       const res = await api.get('/api/pm/getLeadAssignedToday', {
         params: {
+          page: pageParam,
           search: searchText || undefined,
           company_id: filters.company_id || undefined,
           rm_id: filters.rm_id || undefined,
@@ -194,11 +198,23 @@ const LeadsassignedScreen = () => {
           active: filters.active || undefined,
         },
       });
-      return res.data.data;
+      return res.data;
     },
+         getNextPageParam: lastPage => {
+      const { currentPage, totalPages } = lastPage;
+      return currentPage < totalPages ? currentPage + 1 : undefined;
+    },
+    initialPageParam: 1,
   });
+ const leads = leadassigned?.pages?.flatMap(page => page.data) || [];
 
-  const filteredfollowUps = leadassigned?.filter(item => {
+  // ✅ Infinite scroll handler — scroll position দেখে trigger করে
+  const handleLoadMore = () => {
+    if (hasNextPage && !isFetchingNextPage) {
+      fetchNextPage();
+    }
+  };
+  const filteredfollowUps = leads?.filter(item => {
     const name = item?.name?.toLowerCase() || '';
     const phone = item?.phone || '';
     const email = item?.email?.toLowerCase() || '';
@@ -263,8 +279,12 @@ const LeadsassignedScreen = () => {
     setShowFilterModal(false);
   };
 
-  const scrollToTop = () => {
+ const scrollToTop = () => {
+    isScrollingToTop.current = true;
     scrollRef.current?.scrollTo({ y: 0, animated: true });
+    setTimeout(() => {
+      isScrollingToTop.current = false;
+    }, 600);
   };
 
   return (
@@ -294,7 +314,13 @@ const LeadsassignedScreen = () => {
               style={styles.backBtn}
               onPress={() => navigation.navigate('Dashboard')}
             >
-              <Text style={styles.backText}>Back</Text>
+          <View style={styles.backButton}>
+                        <Image
+                          source={require('../asset/image/icon/Arrow.png')}
+                          style={{ width:12, height: 12, marginRight: 6 }}
+                        />
+                        <Text style={styles.backText}>Back</Text>
+                      </View>
             </TouchableOpacity>
           </View>
         </View>
@@ -304,10 +330,21 @@ const LeadsassignedScreen = () => {
         ref={scrollRef}
         showsVerticalScrollIndicator={false}
         onScroll={event => {
-          const y = event.nativeEvent.contentOffset.y;
+          const { layoutMeasurement, contentOffset, contentSize } =
+            event.nativeEvent;
+          const y = contentOffset.y;
+
+          // Scroll to top button
           setShowTopBtn(y > 200);
+          if (isScrollingToTop.current) return;
+
+          const isNearBottom =
+            layoutMeasurement.height + y >= contentSize.height - 150;
+          if (isNearBottom) {
+            handleLoadMore();
+          }
         }}
-        scrollEventThrottle={16}
+        scrollEventThrottle={400}
       >
         {/* ✅ iOS fixed search box */}
         <View style={styles.searchBox}>
@@ -343,6 +380,16 @@ const LeadsassignedScreen = () => {
             No data found
           </Text>
         )}
+          {isFetchingNextPage && (
+                  <ActivityIndicator
+                    size="small"
+                    color="#999"
+                    style={{
+                      marginVertical: 12,
+                      alignSelf: 'center',
+                    }}
+                  />
+                )}
       </ScrollView>
 
       {/* ✅ REMARKS MODAL */}
@@ -685,7 +732,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#3d55cc',
   },
-
+  backButton: {
+  flexDirection: 'row',
+  alignItems: 'center',
+},
   dropdownContainer: { backgroundColor: '#fff', borderRadius: 8 },
   placeholderStyle: { color: '#7a8fc4', fontSize: 13 },
   selectedTextStyle: { color: '#fff', fontSize: 13 },

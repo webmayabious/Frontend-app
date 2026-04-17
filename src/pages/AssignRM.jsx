@@ -12,7 +12,8 @@ import {
   Animated,
   Dimensions,
   StatusBar,
-  KeyboardAvoidingView
+  KeyboardAvoidingView,
+  Image,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Dropdown } from 'react-native-element-dropdown';
@@ -506,535 +507,566 @@ const AssignRM = () => {
     ]);
   };
   return (
-    <SafeAreaView style={styles.container} edges={['left', 'right',]}>
-       <KeyboardAvoidingView
-    style={{ flex: 1 }}
-    behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-  >
-      <StatusBar barStyle="light-content" />
-      <Header />
-
-      <View style={[styles.topBarContainer, { paddingTop: 10 }]}>
-        <View style={styles.topBar}>
-          <View style={styles.titleRow}>
-            <MaterialCommunityIcons
-              name="account-details"
-              size={18}
-              color="#00cfff"
-            />
-            <Text style={styles.title}>Assign RM</Text>
-            <View style={styles.badge}>
-              <Text style={styles.total}>{Rm?.totalRecords} Records</Text>
-            </View>
-          </View>
-          <TouchableOpacity
-            onPress={() => navigation.navigate('Dashboard')}
-            style={styles.backBtn}
-          >
-            <Text style={styles.backText}>← Back</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      <View style={styles.buttonRow}>
-        <TouchableOpacity
-          style={styles.btn}
-          onPress={() => {
-            if (selected.length === 0) {
-              Alert.alert('Please select at least one lead');
-              return;
-            }
-            setShowModal(true);
-          }}
-        >
-        <Text style={styles.btnText}>Assign RM</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.btn}
-          onPress={() => navigation.navigate('Rmform')}
-        >
-          <Text style={styles.btnText} numberOfLines={1} adjustsFontSizeToFit>
-            Add New Lead
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.btn}>
-          <Text
-            style={styles.btnText}
-            numberOfLines={1}
-            adjustsFontSizeToFit
-            onPress={() => setShowUploadModal(true)}
-          >
-            Upload Lead Info List
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      <ScrollView
-        contentContainerStyle={{ paddingHorizontal: 12, paddingBottom: 10, paddingBottom: insets.bottom + 80 }}
-        keyboardShouldPersistTaps="handled" 
-        showsVerticalScrollIndicator={false}
+    <SafeAreaView style={styles.container} edges={['left', 'right']}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <View style={styles.searchBox}>
-          <Icon name="search" size={18} color="#aaa" />
-          <TextInput
-            placeholder="Search name / phone / email..."
-            placeholderTextColor="#aaa"
-            value={searchText}
-            onChangeText={setSearchText}
-            style={{ marginLeft: 8, color: '#fff', flex: 1 }}
-          />
-        </View>
+        <StatusBar barStyle="light-content" />
+        <Header />
 
-      <View style={styles.selectAllRow}>
-
-  {/* LEFT SIDE */}
-  <View style={styles.selectAllLeft}>
-    <TouchableOpacity
-      style={styles.selectAllLeft}
-      onPress={toggleSelectAll}
-    >
-      <View
-        style={[styles.checkbox, isAllSelected && styles.checkboxChecked]}
-      >
-        {isAllSelected && <Icon name="check" size={12} color="#fff" />}
-      </View>
-
-      <Text style={styles.selectAllText}>
-        {isAllSelected ? 'Deselect All' : 'Select All'}
-      </Text>
-
-      {selected.length > 0 && (
-        <View style={styles.selectedBadge}>
-          <Text style={styles.selectedBadgeText}>
-            {selected.length} selected
-          </Text>
-        </View>
-      )}
-    </TouchableOpacity>
-  </View>
-
-  {/* RIGHT SIDE (FIXED) */}
-  <TouchableOpacity style={styles.filterBtn} onPress={openFilterModal}>
-    <Icon name="filter-list" size={14} color="#fff" />
-    <Text style={styles.filterText}>By Details</Text>
-    <Icon name="keyboard-arrow-down" size={14} color="#fff" />
-  </TouchableOpacity>
-
-</View>
-        {isLoading ? (
-          <Text style={{ color: '#fff', textAlign: 'center', marginTop: 20 }}>
-            Loading...
-          </Text>
-        ) : (
-          filteredrm?.map((item, index) => {
-            const isChecked = selected.includes(index);
-            return (
-              <View
-                key={item.id}
-                style={[styles.card, isChecked && styles.cardSelected]}
-              >
-                <View style={styles.cardTop}>
-                  <View style={styles.nameRow}>
-                    <TouchableOpacity
-                      onPress={() => toggleSelect(index)}
-                      style={[
-                        styles.checkbox,
-                        isChecked && styles.checkboxChecked,
-                      ]}
-                    >
-                      {isChecked && (
-                        <Icon name="check" size={12} color="#fff" />
-                      )}
-                    </TouchableOpacity>
-                    <View style={styles.nameIndicator} />
-                    <Text style={styles.name}>{item.name}</Text>
-                  </View>
-                  <View style={styles.iconRow}>
-                    <Icon
-                      name="delete"
-                      size={16}
-                      color="#ff4444"
-                      onPress={() =>
-                        handleDeleteProspect(
-                          item?.id,
-                          item?.active == 1 ? 0 : 1,
-                        )
-                      }
-                    />
-                    <Icon
-                      name="edit"
-                      size={16}
-                      color="#00cfff"
-                      onPress={() =>
-                        navigation.navigate('MeetingsEdit', {
-                          id: item?.id,
-                        })
-                      }
-                    />
-                  </View>
-                </View>
-
-                <View style={styles.divider} />
-                <Text style={styles.section}>Contact Details:</Text>
-
-                <View style={styles.contactRow}>
-                  <View style={styles.contactItem}>
-                    <Icon name="call" size={13} color="#00cfff" />
-                    <Text style={styles.text} onPress={() => makeCall(item?.phone)}>{item?.phone}</Text>
-                  </View>
-                  <View style={styles.contactItem}>
-                    <Icon name="email" size={13} color="#00cfff" />
-                    <Text style={styles.text} numberOfLines={1}>
-                      {item.email}
-                    </Text>
-                  </View>
-                </View>
-
-                <View style={styles.row}>
-                  <Icon name="location-on" size={13} color="#00cfff" />
-                  <Text style={styles.text}>{item.address || 'N/A'}</Text>
-                </View>
-
-                <View style={styles.refRow}>
-                  <Text style={styles.refLabel}>Reference: </Text>
-                  <Text style={styles.refValue}>
-                    {item?.mrreference?.mrf_name || 'N/A'}
-                  </Text>
-                </View>
-              </View>
-            );
-          })
-        )}
-      </ScrollView>
-
-      {/* ✅ ASSIGN RM MODAL */}
-      {showModal && (
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Assign RM</Text>
-              <TouchableOpacity
-                onPress={() => {
-                  setShowModal(false);
-                  setSelectedRM(null);
-                }}
-              >
-                <Icon name="close" size={20} color="#aaa" />
-              </TouchableOpacity>
-            </View>
-
-            {/* Selected leads count info */}
-            <View style={styles.infoBox}>
-              <Icon name="people" size={14} color="#f4c542" />
-              <Text style={styles.infoText}>
-                {selectedLeadIds.length} lead
-                {selectedLeadIds.length > 1 ? 's' : ''} selected
-              </Text>
-            </View>
-
-            <Text style={styles.label}>Select RM</Text>
-
-            {rmLoading ? (
-              <ActivityIndicator
+        <View style={[styles.topBarContainer, { paddingTop: 10 }]}>
+          <View style={styles.topBar}>
+            <View style={styles.titleRow}>
+              <MaterialCommunityIcons
+                name="account-details"
+                size={18}
                 color="#00cfff"
-                style={{ marginVertical: 20 }}
               />
-            ) : (
-              <ScrollView
-                style={styles.dropdownList}
-                nestedScrollEnabled={true}
-                showsVerticalScrollIndicator={true}
-              >
-                {rmList.length === 0 ? (
-                  <Text style={styles.noRMText}>No RM found</Text>
-                ) : (
-                  rmList.map(rm => {
-                    const isSelected = selectedRM === rm.id;
-                    return (
-                      <TouchableOpacity
-                        key={rm.id}
-                        style={[
-                          styles.dropdownItem,
-                          isSelected && styles.dropdownItemSelected,
-                        ]}
-                        onPress={() => setSelectedRM(rm.id)}
-                      >
-                        <View style={styles.rmItemLeft}>
-                          <View
-                            style={[
-                              styles.rmRadio,
-                              isSelected && styles.rmRadioSelected,
-                            ]}
-                          >
-                            {isSelected && <View style={styles.rmRadioInner} />}
-                          </View>
-                          <Text
-                            style={[
-                              styles.dropdownItemText,
-                              isSelected && styles.dropdownItemTextSelected,
-                            ]}
-                          >
-                            {rm.name}
-                          </Text>
-                        </View>
-                        {isSelected && (
-                          <Icon name="check-circle" size={16} color="#00cfff" />
-                        )}
-                      </TouchableOpacity>
-                    );
-                  })
-                )}
-              </ScrollView>
-            )}
-
-            {selectedRM && (
-              <View style={styles.selectedRMBadge}>
-                <Icon name="person-pin" size={14} color="#00cfff" />
-                <Text style={styles.selectedRMText}>
-                  {rmList.find(r => r.id === selectedRM)?.name}
-                </Text>
-              </View>
-            )}
-
-            <View style={styles.modalBtnRow}>
-              <TouchableOpacity
-                style={styles.cancelBtn}
-                onPress={() => {
-                  setShowModal(false);
-                  setSelectedRM(null);
-                }}
-              >
-                <Text style={styles.cancelBtnText}>Cancel</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  styles.assignBtn,
-                  (!selectedRM || assigning) && styles.assignBtnDisabled,
-                ]}
-                onPress={handleAssignRM}
-                disabled={!selectedRM || assigning}
-              >
-                {assigning ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <Text style={styles.assignBtnText}>Assign</Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      )}
-      {showUploadModal && (
-        <View style={styles.modalOverlay}>
-          <View style={styles.uploadModalContainer}>
-            {/* HEADER */}
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Upload Files</Text>
-              <TouchableOpacity onPress={() => setShowUploadModal(false)}>
-                <Icon name="close" size={20} color="#aaa" />
-              </TouchableOpacity>
-            </View>
-            <View style={styles.formBox}>
-              {/* FORM */}
-              <DropdownField
-                label="Location of Property *"
-                data={Property}
-                placeholder="Select"
-                value={uploadProspect.location}
-                onChange={value => onChange('location', value)}
-              />
-
-              {/* Reference */}
-
-              <DropdownField
-                label="Reference *"
-                data={References}
-                placeholder="Select"
-                value={uploadProspect.reference}
-                onChange={value => onChange('reference', value)}
-              />
-
-              {isAdmin && (
-                <DropdownField
-                  label="Company *"
-                  data={Company}
-                  placeholder="Select"
-                  value={uploadProspect.com_id}
-                  onChange={value => onChange('com_id', value)}
-                />
-              )}
-
-              {/* Upload Row */}
-              <View style={styles.uploadRow}>
-                <TouchableOpacity
-                  style={styles.browseBtn}
-                  onPress={pickExcelFile}
-                >
-                  <Icon name="folder-open" size={16} color="#fff" />
-                  <Text style={styles.browseText}>
-                    {selectedFile ? selectedFile.name : 'Browse file...'}
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.uploadBtn}
-                  onPress={handleUpload}
-                >
-                  <Text style={styles.uploadBtnText}>Upload</Text>
-                </TouchableOpacity>
+              <Text style={styles.title}>Assign RM</Text>
+              <View style={styles.badge}>
+                <Text style={styles.total}>{Rm?.totalRecords} Records</Text>
               </View>
             </View>
-
-            {/* DOWNLOAD BOX */}
-            <View style={styles.downloadCard}>
-              <Text style={styles.downloadTitle}>Download Format</Text>
-              <Text style={styles.downloadDesc}>
-                It is a long established fact that a reader will be distracted
-                by readable content.
-              </Text>
-
-              <TouchableOpacity
-                style={styles.downloadBtn}
-                onPress={handleDownloadFormat}
-              >
-                <Icon name="download" size={16} color="#000" />
-                <Text style={styles.downloadBtnText}>Download</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* FOOTER */}
             <TouchableOpacity
-              style={styles.cancelBtnBottom}
-              onPress={() => setShowUploadModal(false)}
+              onPress={() => navigation.navigate('Dashboard')}
+              style={styles.backBtn}
             >
-              <Text style={styles.cancelText}>Cancel</Text>
+              <View style={styles.backButton}>
+                <Image
+                  source={require('../asset/image/icon/Arrow.png')}
+                  style={{ width:12, height: 12, marginRight: 6 }}
+                />
+                <Text style={styles.backText}>Back</Text>
+              </View>
             </TouchableOpacity>
           </View>
         </View>
-      )}
-      {/* ── FILTER BOTTOM SHEET ── */}
-      {showFilterModal && (
-        <View style={styles.bottomSheetOverlay}>
-          {/* Dark bg tap to close */}
+
+        <View style={styles.buttonRow}>
           <TouchableOpacity
-            style={StyleSheet.absoluteFill}
-            activeOpacity={1}
-            onPress={closeFilterModal}
-          />
-
-          <Animated.View
-            style={[
-              styles.bottomSheet,
-              { transform: [{ translateY: filterAnim }] },
-            ]}
+            style={styles.btn}
+            onPress={() => {
+              if (selected.length === 0) {
+                Alert.alert('Please select at least one lead');
+                return;
+              }
+              setShowModal(true);
+            }}
           >
-            {/* Handle Bar */}
-            <View style={styles.handleBar} />
+            <Text style={styles.btnText}>Assign RM</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.btn}
+            onPress={() => navigation.navigate('Rmform')}
+          >
+            <Text style={styles.btnText} numberOfLines={1} adjustsFontSizeToFit>
+              Add New Lead
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.btn}>
+            <Text
+              style={styles.btnText}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              onPress={() => setShowUploadModal(true)}
+            >
+              Upload Lead Info List
+            </Text>
+          </TouchableOpacity>
+        </View>
 
-            {/* Header */}
-            <View style={styles.modalHeader}>
-              <View style={styles.filterModalTitleRow}>
-                <Icon name="filter-list" size={18} color="#00cfff" />
-                <Text style={styles.modalTitle}>Filter Leads</Text>
-              </View>
-              <TouchableOpacity onPress={closeFilterModal}>
-                <Icon name="close" size={20} color="#aaa" />
+        <ScrollView
+          contentContainerStyle={{
+            paddingHorizontal: 12,
+            paddingBottom: 10,
+            paddingBottom: insets.bottom + 80,
+          }}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.searchBox}>
+            <Icon name="search" size={18} color="#aaa" />
+            <TextInput
+              placeholder="Search name / phone / email..."
+              placeholderTextColor="#aaa"
+              value={searchText}
+              onChangeText={setSearchText}
+              style={{ marginLeft: 8, color: '#fff', flex: 1 }}
+            />
+          </View>
+
+          <View style={styles.selectAllRow}>
+            {/* LEFT SIDE */}
+            <View style={styles.selectAllLeft}>
+              <TouchableOpacity
+                style={styles.selectAllLeft}
+                onPress={toggleSelectAll}
+              >
+                <View
+                  style={[
+                    styles.checkbox,
+                    isAllSelected && styles.checkboxChecked,
+                  ]}
+                >
+                  {isAllSelected && (
+                    <Icon name="check" size={12} color="#fff" />
+                  )}
+                </View>
+
+                <Text style={styles.selectAllText}>
+                  {isAllSelected ? 'Deselect All' : 'Select All'}
+                </Text>
+
+                {selected.length > 0 && (
+                  <View style={styles.selectedBadge}>
+                    <Text style={styles.selectedBadgeText}>
+                      {selected.length} selected
+                    </Text>
+                  </View>
+                )}
               </TouchableOpacity>
             </View>
 
-            <View style={styles.filterDivider} />
-
-            <ScrollView
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={{ paddingBottom: 8 }}
+            {/* RIGHT SIDE (FIXED) */}
+            <TouchableOpacity
+              style={styles.filterBtn}
+              onPress={openFilterModal}
             >
-              <Text style={styles.filterLabel}>Property Location</Text>
-              <DropdownField
-                data={Property}
-                placeholder="Select location"
-                value={filters.location}
-                onChange={value => onChange('location', value)}
-              />
-                <Text style={styles.filterLabel}>Project</Text>
-              <DropdownField
-                data={projectOptions}
-                placeholder="Select project"
-                value={filters.project}
-                onChange={value => onChange('project', value)}
-              />
-              <Text style={styles.filterLabel}>Date Range</Text>
-              <View style={styles.dateRow}>
-                <View style={styles.dateField}>
-                  <Text style={styles.dateSubLabel}>From</Text>
-                  <InputField
-                    placeholder="YYYY-MM-DD"
-                    icon="calendar-today"
-                    value={filters.fromDate}
-                    onPress={() => setShowFromPicker(true)}
-                  />
+              <Icon name="filter-list" size={14} color="#fff" />
+              <Text style={styles.filterText}>By Details</Text>
+              <Icon name="keyboard-arrow-down" size={14} color="#fff" />
+            </TouchableOpacity>
+          </View>
+          {isLoading ? (
+            <Text style={{ color: '#fff', textAlign: 'center', marginTop: 20 }}>
+              Loading...
+            </Text>
+          ) : (
+            filteredrm?.map((item, index) => {
+              const isChecked = selected.includes(index);
+              return (
+                <View
+                  key={item.id}
+                  style={[styles.card, isChecked && styles.cardSelected]}
+                >
+                  <View style={styles.cardTop}>
+                    <View style={styles.nameRow}>
+                      <TouchableOpacity
+                        onPress={() => toggleSelect(index)}
+                        style={[
+                          styles.checkbox,
+                          isChecked && styles.checkboxChecked,
+                        ]}
+                      >
+                        {isChecked && (
+                          <Icon name="check" size={12} color="#fff" />
+                        )}
+                      </TouchableOpacity>
+                      <View style={styles.nameIndicator} />
+                      <Text style={styles.name}>{item.name}</Text>
+                    </View>
+                    <View style={styles.iconRow}>
+                      <Icon
+                        name="delete"
+                        size={16}
+                        color="#ff4444"
+                        onPress={() =>
+                          handleDeleteProspect(
+                            item?.id,
+                            item?.active == 1 ? 0 : 1,
+                          )
+                        }
+                      />
+                      <Icon
+                        name="edit"
+                        size={16}
+                        color="#00cfff"
+                        onPress={() =>
+                          navigation.navigate('MeetingsEdit', {
+                            id: item?.id,
+                          })
+                        }
+                      />
+                    </View>
+                  </View>
+
+                  <View style={styles.divider} />
+                  <Text style={styles.section}>Contact Details:</Text>
+
+                  <View style={styles.contactRow}>
+                    <View style={styles.contactItem}>
+                      <Icon name="call" size={13} color="#00cfff" />
+                      <Text
+                        style={styles.text}
+                        onPress={() => makeCall(item?.phone)}
+                      >
+                        {item?.phone}
+                      </Text>
+                    </View>
+                    <View style={styles.contactItem}>
+                      <Icon name="email" size={13} color="#00cfff" />
+                      <Text style={styles.text} numberOfLines={1}>
+                        {item.email}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.row}>
+                    <Icon name="location-on" size={13} color="#00cfff" />
+                    <Text style={styles.text}>{item.address || 'N/A'}</Text>
+                  </View>
+
+                  <View style={styles.refRow}>
+                    <Text style={styles.refLabel}>Reference: </Text>
+                    <Text style={styles.refValue}>
+                      {item?.mrreference?.mrf_name || 'N/A'}
+                    </Text>
+                  </View>
                 </View>
-                <View style={styles.dateSeparator}>
-                  <Icon name="arrow-forward" size={16} color="#555" />
-                </View>
-                <View style={styles.dateField}>
-                  <Text style={styles.dateSubLabel}>To</Text>
-                  <InputField
-                    placeholder="YYYY-MM-DD"
-                    icon="calendar-today"
-                    value={filters.toDate}
-                    onPress={() => setShowToPicker(true)}
-                  />
-                </View>
+              );
+            })
+          )}
+        </ScrollView>
+
+        {/* ✅ ASSIGN RM MODAL */}
+        {showModal && (
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContainer}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Assign RM</Text>
+                <TouchableOpacity
+                  onPress={() => {
+                    setShowModal(false);
+                    setSelectedRM(null);
+                  }}
+                >
+                  <Icon name="close" size={20} color="#aaa" />
+                </TouchableOpacity>
               </View>
 
-             
-            </ScrollView>
+              {/* Selected leads count info */}
+              <View style={styles.infoBox}>
+                <Icon name="people" size={14} color="#f4c542" />
+                <Text style={styles.infoText}>
+                  {selectedLeadIds.length} lead
+                  {selectedLeadIds.length > 1 ? 's' : ''} selected
+                </Text>
+              </View>
 
-            {showFromPicker && (
-              <DateTimePicker
-                value={
-                  filters.fromDate ? new Date(filters.fromDate) : new Date()
-                }
-                mode="date"
-                display="default"
-                onChange={(e, d) => onDateChange(e, d, 'fromDate')}
-              />
-            )}
-            {showToPicker && (
-              <DateTimePicker
-                value={filters.toDate ? new Date(filters.toDate) : new Date()}
-                mode="date"
-                display="default"
-                onChange={(e, d) => onDateChange(e, d, 'toDate')}
-              />
-            )}
+              <Text style={styles.label}>Select RM</Text>
 
-            <View style={styles.filterDivider} />
+              {rmLoading ? (
+                <ActivityIndicator
+                  color="#00cfff"
+                  style={{ marginVertical: 20 }}
+                />
+              ) : (
+                <ScrollView
+                  style={styles.dropdownList}
+                  nestedScrollEnabled={true}
+                  showsVerticalScrollIndicator={true}
+                >
+                  {rmList.length === 0 ? (
+                    <Text style={styles.noRMText}>No RM found</Text>
+                  ) : (
+                    rmList.map(rm => {
+                      const isSelected = selectedRM === rm.id;
+                      return (
+                        <TouchableOpacity
+                          key={rm.id}
+                          style={[
+                            styles.dropdownItem,
+                            isSelected && styles.dropdownItemSelected,
+                          ]}
+                          onPress={() => setSelectedRM(rm.id)}
+                        >
+                          <View style={styles.rmItemLeft}>
+                            <View
+                              style={[
+                                styles.rmRadio,
+                                isSelected && styles.rmRadioSelected,
+                              ]}
+                            >
+                              {isSelected && (
+                                <View style={styles.rmRadioInner} />
+                              )}
+                            </View>
+                            <Text
+                              style={[
+                                styles.dropdownItemText,
+                                isSelected && styles.dropdownItemTextSelected,
+                              ]}
+                            >
+                              {rm.name}
+                            </Text>
+                          </View>
+                          {isSelected && (
+                            <Icon
+                              name="check-circle"
+                              size={16}
+                              color="#00cfff"
+                            />
+                          )}
+                        </TouchableOpacity>
+                      );
+                    })
+                  )}
+                </ScrollView>
+              )}
 
-            {/* Footer */}
-            <View style={styles.filterBtnRow}>
-              <TouchableOpacity style={styles.resetBtn} onPress={resetFilters}>
-                <Icon name="refresh" size={14} color="#ff5252" />
-                <Text style={styles.resetBtnText}>Reset</Text>
-              </TouchableOpacity>
-              <View style={styles.filterActionBtns}>
+              {selectedRM && (
+                <View style={styles.selectedRMBadge}>
+                  <Icon name="person-pin" size={14} color="#00cfff" />
+                  <Text style={styles.selectedRMText}>
+                    {rmList.find(r => r.id === selectedRM)?.name}
+                  </Text>
+                </View>
+              )}
+
+              <View style={styles.modalBtnRow}>
                 <TouchableOpacity
                   style={styles.cancelBtn}
-                  onPress={closeFilterModal}
+                  onPress={() => {
+                    setShowModal(false);
+                    setSelectedRM(null);
+                  }}
                 >
                   <Text style={styles.cancelBtnText}>Cancel</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.applyBtn} onPress={applyFilter}>
-                  <Icon name="check" size={14} color="#fff" />
-                  <Text style={styles.applyBtnText}>Apply</Text>
+
+                <TouchableOpacity
+                  style={[
+                    styles.assignBtn,
+                    (!selectedRM || assigning) && styles.assignBtnDisabled,
+                  ]}
+                  onPress={handleAssignRM}
+                  disabled={!selectedRM || assigning}
+                >
+                  {assigning ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Text style={styles.assignBtnText}>Assign</Text>
+                  )}
                 </TouchableOpacity>
               </View>
             </View>
-          </Animated.View>
-        </View>
-      )}
-      <BottomNav style={{ paddingBottom: insets.bottom }} />
+          </View>
+        )}
+        {showUploadModal && (
+          <View style={styles.modalOverlay}>
+            <View style={styles.uploadModalContainer}>
+              {/* HEADER */}
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Upload Files</Text>
+                <TouchableOpacity onPress={() => setShowUploadModal(false)}>
+                  <Icon name="close" size={20} color="#aaa" />
+                </TouchableOpacity>
+              </View>
+              <View style={styles.formBox}>
+                {/* FORM */}
+                <DropdownField
+                  label="Location of Property *"
+                  data={Property}
+                  placeholder="Select"
+                  value={uploadProspect.location}
+                  onChange={value => onChange('location', value)}
+                />
+
+                {/* Reference */}
+
+                <DropdownField
+                  label="Reference *"
+                  data={References}
+                  placeholder="Select"
+                  value={uploadProspect.reference}
+                  onChange={value => onChange('reference', value)}
+                />
+
+                {isAdmin && (
+                  <DropdownField
+                    label="Company *"
+                    data={Company}
+                    placeholder="Select"
+                    value={uploadProspect.com_id}
+                    onChange={value => onChange('com_id', value)}
+                  />
+                )}
+
+                {/* Upload Row */}
+                <View style={styles.uploadRow}>
+                  <TouchableOpacity
+                    style={styles.browseBtn}
+                    onPress={pickExcelFile}
+                  >
+                    <Icon name="folder-open" size={16} color="#fff" />
+                    <Text style={styles.browseText}>
+                      {selectedFile ? selectedFile.name : 'Browse file...'}
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.uploadBtn}
+                    onPress={handleUpload}
+                  >
+                    <Text style={styles.uploadBtnText}>Upload</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* DOWNLOAD BOX */}
+              <View style={styles.downloadCard}>
+                <Text style={styles.downloadTitle}>Download Format</Text>
+                <Text style={styles.downloadDesc}>
+                  It is a long established fact that a reader will be distracted
+                  by readable content.
+                </Text>
+
+                <TouchableOpacity
+                  style={styles.downloadBtn}
+                  onPress={handleDownloadFormat}
+                >
+                  <Icon name="download" size={16} color="#000" />
+                  <Text style={styles.downloadBtnText}>Download</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* FOOTER */}
+              <TouchableOpacity
+                style={styles.cancelBtnBottom}
+                onPress={() => setShowUploadModal(false)}
+              >
+                <Text style={styles.cancelText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+        {/* ── FILTER BOTTOM SHEET ── */}
+        {showFilterModal && (
+          <View style={styles.bottomSheetOverlay}>
+            {/* Dark bg tap to close */}
+            <TouchableOpacity
+              style={StyleSheet.absoluteFill}
+              activeOpacity={1}
+              onPress={closeFilterModal}
+            />
+
+            <Animated.View
+              style={[
+                styles.bottomSheet,
+                { transform: [{ translateY: filterAnim }] },
+              ]}
+            >
+              {/* Handle Bar */}
+              <View style={styles.handleBar} />
+
+              {/* Header */}
+              <View style={styles.modalHeader}>
+                <View style={styles.filterModalTitleRow}>
+                  <Icon name="filter-list" size={18} color="#00cfff" />
+                  <Text style={styles.modalTitle}>Filter Leads</Text>
+                </View>
+                <TouchableOpacity onPress={closeFilterModal}>
+                  <Icon name="close" size={20} color="#aaa" />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.filterDivider} />
+
+              <ScrollView
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ paddingBottom: 8 }}
+              >
+                <Text style={styles.filterLabel}>Property Location</Text>
+                <DropdownField
+                  data={Property}
+                  placeholder="Select location"
+                  value={filters.location}
+                  onChange={value => onChange('location', value)}
+                />
+                <Text style={styles.filterLabel}>Project</Text>
+                <DropdownField
+                  data={projectOptions}
+                  placeholder="Select project"
+                  value={filters.project}
+                  onChange={value => onChange('project', value)}
+                />
+                <Text style={styles.filterLabel}>Date Range</Text>
+                <View style={styles.dateRow}>
+                  <View style={styles.dateField}>
+                    <Text style={styles.dateSubLabel}>From</Text>
+                    <InputField
+                      placeholder="YYYY-MM-DD"
+                      icon="calendar-today"
+                      value={filters.fromDate}
+                      onPress={() => setShowFromPicker(true)}
+                    />
+                  </View>
+                  <View style={styles.dateSeparator}>
+                    <Icon name="arrow-forward" size={16} color="#555" />
+                  </View>
+                  <View style={styles.dateField}>
+                    <Text style={styles.dateSubLabel}>To</Text>
+                    <InputField
+                      placeholder="YYYY-MM-DD"
+                      icon="calendar-today"
+                      value={filters.toDate}
+                      onPress={() => setShowToPicker(true)}
+                    />
+                  </View>
+                </View>
+              </ScrollView>
+
+              {showFromPicker && (
+                <DateTimePicker
+                  value={
+                    filters.fromDate ? new Date(filters.fromDate) : new Date()
+                  }
+                  mode="date"
+                  display="default"
+                  onChange={(e, d) => onDateChange(e, d, 'fromDate')}
+                />
+              )}
+              {showToPicker && (
+                <DateTimePicker
+                  value={filters.toDate ? new Date(filters.toDate) : new Date()}
+                  mode="date"
+                  display="default"
+                  onChange={(e, d) => onDateChange(e, d, 'toDate')}
+                />
+              )}
+
+              <View style={styles.filterDivider} />
+
+              {/* Footer */}
+              <View style={styles.filterBtnRow}>
+                <TouchableOpacity
+                  style={styles.resetBtn}
+                  onPress={resetFilters}
+                >
+                  <Icon name="refresh" size={14} color="#ff5252" />
+                  <Text style={styles.resetBtnText}>Reset</Text>
+                </TouchableOpacity>
+                <View style={styles.filterActionBtns}>
+                  <TouchableOpacity
+                    style={styles.cancelBtn}
+                    onPress={closeFilterModal}
+                  >
+                    <Text style={styles.cancelBtnText}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.applyBtn}
+                    onPress={applyFilter}
+                  >
+                    <Icon name="check" size={14} color="#fff" />
+                    <Text style={styles.applyBtnText}>Apply</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </Animated.View>
+          </View>
+        )}
+        <BottomNav style={{ paddingBottom: insets.bottom }} />
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -1115,7 +1147,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     flex: 1,
     height: 38,
-    marginBottom:10
+    marginBottom: 10,
   },
   input: { color: '#fff', marginLeft: 5, flex: 1, fontSize: 13 },
   selectAllRow: {
@@ -1132,12 +1164,12 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   selectAllLeft: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  flex: 1,          // 👈 important
-  flexShrink: 1,    // 👈 prevents overflow pushing right side
-  gap: 8,
-},
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1, // 👈 important
+    flexShrink: 1, // 👈 prevents overflow pushing right side
+    gap: 8,
+  },
 
   selectAllText: { color: '#fff', fontSize: 13, fontWeight: '500' },
   selectedBadge: {
@@ -1149,34 +1181,34 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   selectedBadgeText: { color: '#00cfff', fontSize: 11, fontWeight: '500' },
- filterBtn: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  gap: 5,
-  backgroundColor: '#3a3f7a',
-  paddingHorizontal: 12,
-  paddingVertical: 6,
-  borderRadius: 20,
-  borderWidth: 1,
-  borderColor: '#ffffff20',
-  flexShrink: 0, // 👈 keeps it fixed right
-},
+  filterBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#3a3f7a',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#ffffff20',
+    flexShrink: 0, // 👈 keeps it fixed right
+  },
   filterText: { color: '#fff', fontSize: 12, fontWeight: '500' },
- card: {
-  backgroundColor: '#1e2260',
-  borderRadius: 12,
-  padding: 12,
-  marginBottom: 10,
+  card: {
+    backgroundColor: '#1e2260',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 10,
 
-  // iOS shadow
-  shadowColor: '#000',
-  shadowOpacity: 0.25,
-  shadowRadius: 6,
-  shadowOffset: { width: 0, height: 3 },
+    // iOS shadow
+    shadowColor: '#000',
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 },
 
-  // Android
-  elevation: 4,
-},
+    // Android
+    elevation: 4,
+  },
   cardSelected: { borderColor: '#00cfff55', backgroundColor: '#1a2a6a' },
   cardTop: {
     flexDirection: 'row',
@@ -1226,28 +1258,28 @@ const styles = StyleSheet.create({
   refValue: { color: '#fff', fontSize: 11 },
 
   // MODAL
-modalOverlay: {
-  flex: 1,
-  backgroundColor: 'rgba(0,0,0,0.6)',
-  justifyContent: 'center',
-  alignItems: 'center',
-  paddingHorizontal: 16,
-},
-modalContainer: {
-  width: '90%',
-  maxWidth: 420,
-  backgroundColor: '#1e2260',
-  borderRadius: 20,
-  padding: 16,
-  // iOS shadow
-  shadowColor: '#000',
-  shadowOpacity: 0.25,
-  shadowRadius: 10,
-  shadowOffset: { width: 0, height: 4 },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+  },
+  modalContainer: {
+    width: '90%',
+    maxWidth: 420,
+    backgroundColor: '#1e2260',
+    borderRadius: 20,
+    padding: 16,
+    // iOS shadow
+    shadowColor: '#000',
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
 
-  // Android
-  elevation: 8,
-},
+    // Android
+    elevation: 8,
+  },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1338,6 +1370,10 @@ modalContainer: {
     borderWidth: 1,
     borderColor: '#ffffff25',
   },
+  backButton: {
+  flexDirection: 'row',
+  alignItems: 'center',
+},
   cancelBtnText: { color: '#fff', fontWeight: '500', fontSize: 13 },
   assignBtn: {
     backgroundColor: '#00cfff',

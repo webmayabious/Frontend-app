@@ -11,6 +11,7 @@ import {
   Platform,
   Linking,
   Alert,
+  Image,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import Header from '../Layout/Header';
@@ -30,7 +31,7 @@ const makeCall = phoneNumber => {
   ]);
 };
 //  navigation prop টা বাইরে থেকে pass করা হচ্ছে
-const SiteCard = ({ data, navigation,setShowRemarks, setRemarksText }) => (
+const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
   <View style={styles.card}>
     {/* Header */}
     <View style={styles.cardHeader}>
@@ -87,7 +88,7 @@ const SiteCard = ({ data, navigation,setShowRemarks, setRemarksText }) => (
         >
           <Text style={styles.remarksText}>Remarks</Text>
         </TouchableOpacity> */}
-{/* 
+        {/* 
         <Icon
           name="edit"
           size={18}
@@ -99,7 +100,7 @@ const SiteCard = ({ data, navigation,setShowRemarks, setRemarksText }) => (
             })
           }
         /> */}
-           <Icon
+        <Icon
           name="visibility"
           size={18}
           color="#00e5ff"
@@ -107,7 +108,7 @@ const SiteCard = ({ data, navigation,setShowRemarks, setRemarksText }) => (
           onPress={() =>
             navigation.navigate('BookingDetailScreen', {
               id: data.id,
-              data:data
+              data: data,
             })
           }
         />
@@ -132,9 +133,10 @@ const SiteCard = ({ data, navigation,setShowRemarks, setRemarksText }) => (
       <Text style={styles.label}>
         <Text style={styles.label}>
           Site Visit Date:
-          <Text style={styles.value}> {data?.propertyfeedbacks
-          ?.map(x => x?.site_visit_date)
-          .join(', ')}</Text>
+          <Text style={styles.value}>
+            {' '}
+            {data?.propertyfeedbacks?.map(x => x?.site_visit_date).join(', ')}
+          </Text>
         </Text>
       </Text>
 
@@ -176,18 +178,17 @@ const SiteCard = ({ data, navigation,setShowRemarks, setRemarksText }) => (
 );
 
 const TotalBookingsAgreementsTillDateScreen = () => {
- 
   const navigation = useNavigation();
   const [showRemarks, setShowRemarks] = useState(false);
   const [remarksText, setRemarksText] = useState('');
   const [searchText, setSearchText] = useState('');
   /* ================= API ================= */
-   const { data:Lead, isLoading } = useQuery({
+  const { data: Lead, isLoading } = useQuery({
     queryKey: ['totalBookingAndAgreementTillDate'],
     queryFn: async () => {
       const res = await api.get('/api/pm/totalBookingAndAgreementTillDate');
       return res?.data?.data?.Bookings;
-    }
+    },
   });
   const filteredfollowUps = (Lead || [])?.filter(item => {
     const name = item?.name?.toLowerCase() || '';
@@ -224,18 +225,24 @@ const TotalBookingsAgreementsTillDateScreen = () => {
         <View style={styles.topBar}>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <Icon name="event-note" size={18} color="#cfd8dc" />
-            <Text style={styles.screenTitle}>Total Bookings Agreements Till Date</Text>
+            <Text style={styles.screenTitle}>
+              Total Bookings Agreements Till Date
+            </Text>
           </View>
 
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             {/* <Icon name="filter-alt" size={18} color="#00e5ff" /> */}
-            <TouchableOpacity style={styles.backBtn}>
-              <Text
-                style={styles.backText}
-                onPress={() => navigation.navigate('Dashboard')}
-              >
-                Back
-              </Text>
+            <TouchableOpacity
+              style={styles.backBtn}
+              onPress={() => navigation.navigate('Dashboard')}
+            >
+              <View style={styles.backButton}>
+                <Image
+                  source={require('../asset/image/icon/Arrow.png')}
+                  style={{ width: 12, height: 12, marginRight: 6 }}
+                />
+                <Text style={styles.backText}>Back</Text>
+              </View>
             </TouchableOpacity>
           </View>
         </View>
@@ -261,29 +268,29 @@ const TotalBookingsAgreementsTillDateScreen = () => {
           />
         </View>
 
-          {isLoading ? (
-                <Text style={{ color: '#fff', textAlign: 'center', marginTop: 20 }}>
-                  Loading...
-                </Text>
-              ) : filteredfollowUps?.length > 0 ? (
-                filteredfollowUps?.map((visit, i) => (
-                  <SiteCard
-                    key={visit.id || i}
-                    data={visit}
-                    setShowRemarks={setShowRemarks}
-                    setRemarksText={setRemarksText}
-                    navigation={navigation}
-                  />
-                ))
-              ) : (
-                <Text
-                  style={{ textAlign: 'center', marginTop: 20, color: '#ffffff' }}
-                >
-                  No data found
-                </Text>
-              )}
+        {isLoading ? (
+          <Text style={{ color: '#fff', textAlign: 'center', marginTop: 20 }}>
+            Loading...
+          </Text>
+        ) : filteredfollowUps?.length > 0 ? (
+          filteredfollowUps?.map((visit, i) => (
+            <SiteCard
+              key={visit.id || i}
+              data={visit}
+              setShowRemarks={setShowRemarks}
+              setRemarksText={setRemarksText}
+              navigation={navigation}
+            />
+          ))
+        ) : (
+          <Text
+            style={{ textAlign: 'center', marginTop: 20, color: '#ffffff' }}
+          >
+            No data found
+          </Text>
+        )}
       </ScrollView>
-  {/* ✅ REMARKS MODAL */}
+      {/* ✅ REMARKS MODAL */}
       {showRemarks && (
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
@@ -520,5 +527,9 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: 'bold',
     flexShrink: 1,
+  },
+  backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
 });

@@ -11,7 +11,8 @@ import {
   Platform,
   Linking,
   Alert,
-  ActivityIndicator 
+  ActivityIndicator, 
+  Image
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import Header from '../Layout/Header';
@@ -358,7 +359,13 @@ const TotalLeadScreen = () => {
               style={styles.backBtn}
               onPress={() => navigation.navigate('Dashboard')}
             >
-              <Text style={styles.backText}>Back</Text>
+               <View style={styles.backButton}>
+                             <Image
+                               source={require('../asset/image/icon/Arrow.png')}
+                               style={{ width:12, height: 12, marginRight: 6 }}
+                             />
+                             <Text style={styles.backText}>Back</Text>
+                           </View>
             </TouchableOpacity>
           </View>
         </View>
@@ -759,7 +766,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#444',
   },
-
+  backButton: {
+  flexDirection: 'row',
+  alignItems: 'center',
+},
   dropdownContainer: { backgroundColor: '#fff', borderRadius: 8 },
   placeholderStyle: { color: '#aaa', fontSize: 14 },
   selectedTextStyle: { color: '#fff', fontSize: 14 },

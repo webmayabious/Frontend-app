@@ -13,6 +13,7 @@ import {
   Dimensions,
   StatusBar,
   Platform,
+  Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialIcons';
@@ -334,7 +335,13 @@ const ChangeRM = () => {
               style={styles.backBtn}
               onPress={() => navigation.navigate('Dashboard')}
             >
-              <Text style={styles.backText}>← Back</Text>
+               <View style={styles.backButton}>
+                             <Image
+                               source={require('../asset/image/icon/Arrow.png')}
+                               style={{ width:12, height: 12, marginRight: 6 }}
+                             />
+                             <Text style={styles.backText}>Back</Text>
+                           </View>
             </TouchableOpacity>
           </View>
         </View>
@@ -940,5 +947,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', backgroundColor: '#ffffff10',
     borderWidth: 1, borderColor: '#444', borderRadius: 8, paddingHorizontal: 10, height: 40,
   },
+    backButton: {
+  flexDirection: 'row',
+  alignItems: 'center',
+},
   input: { color: '#fff', flex: 1, fontSize: 13 },
 });

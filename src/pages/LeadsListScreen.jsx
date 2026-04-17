@@ -11,6 +11,8 @@ import {
   Platform,
   Linking,
   Alert,
+  ActivityIndicator,
+  Image,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import Icon from 'react-native-vector-icons/MaterialIcons';
@@ -18,7 +20,7 @@ import { Dropdown } from 'react-native-element-dropdown';
 import Header from '../Layout/Header';
 import BottomNav from '../navigations/BottomNav';
 import { useNavigation } from '@react-navigation/native';
-import { useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import api from '../api/AxiosInstance';
 
 const STATUSBAR_HEIGHT =
@@ -36,7 +38,7 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
   <View style={styles.card}>
     <View style={styles.cardHeader}>
       <View style={styles.nameRow}>
-        <Text style={styles.name}>{data?.name}</Text>
+        <Text style={styles.name}>{data?.name||[]}</Text>
         <View
           style={[
             styles.activeBadge,
@@ -57,7 +59,7 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
           style={styles.remarksBtn}
           onPress={() => {
             setRemarksText(
-              data?.propertyfeedbacks?.map(x => x?.remarks).join(', ') ||
+              data?.propertyfeedbacks?.map(x => x?.remarks||[]).join(', ') ||
                 'No remarks available',
             );
             setShowRemarks(true);
@@ -77,7 +79,7 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
     </View>
 
     <Text style={styles.location}>
-      {data?.propertyproject?.project_name} | {data?.propertylocation?.name}
+      {data?.propertyproject?.project_name||[]} | {data?.propertylocation?.name||[]}
     </Text>
 
     <View style={styles.rowBetween}>
@@ -95,14 +97,14 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
       <Text style={styles.label}>
         Site Visit Date:
         <Text style={styles.value}>
-          {' '}{data?.propertyfeedbacks?.map(x => x?.site_visit_date).join(', ')}
+          {' '}{data?.propertyfeedbacks?.map(x => x?.site_visit_date||[]).join(', ')}
         </Text>
       </Text>
       <Text style={styles.label}>
         RM:{' '}
         <Text style={styles.value}>
           {data?.relationshipManager
-            ? `${data.relationshipManager.usr_fname} ${data.relationshipManager.usr_lname}`
+            ? `${data.relationshipManager.usr_fname||[]} ${data.relationshipManager.usr_lname||[]}`
             : 'N/A'}
         </Text>
       </Text>
@@ -110,7 +112,7 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
 
     <Text style={{ color: '#fb9e08', fontSize: 12, marginTop: 4 }}>
       Lead Source:{' '}
-      <Text style={styles.value}>{data?.mrreference?.mrf_name}</Text>
+      <Text style={styles.value}>{data?.mrreference?.mrf_name||[]}</Text>
     </Text>
 
     <View style={styles.cardFooter}>
@@ -191,7 +193,7 @@ const InputField = ({ label, placeholder, icon, value, onChange, onPress }) => {
 const LeadsListScreen = () => {
   const navigation = useNavigation();
   const scrollRef = useRef();
-
+  const isScrollingToTop = useRef(false);
   const [showRemarks, setShowRemarks] = useState(false);
   const [remarksText, setRemarksText] = useState('');
   const [searchText, setSearchText] = useState('');
@@ -227,11 +229,14 @@ const LeadsListScreen = () => {
     }
   };
 
-  const { data: Lead, isLoading, refetch: leadrefetch } = useQuery({
+  const { data: Lead, isLoading, fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage, refetch: leadrefetch } = useInfiniteQuery({
     queryKey: ['AllPropertyLeads', appliedFilters, searchText],
-    queryFn: async () => {
+    queryFn: async ({ pageParam = 1 }) => {
       const res = await api.get('/api/pm/getAllPropertyLeads', {
         params: {
+           page: pageParam,
           search: searchText || undefined,
           company_id: filters.company_id || undefined,
           rm_id: filters.rm_id || undefined,
@@ -242,14 +247,26 @@ const LeadsListScreen = () => {
           active: filters.active || undefined,
         },
       });
-      return res.data.data;
+      return res.data;
     },
+        getNextPageParam: lastPage => {
+      const { currentPage, totalPages } = lastPage;
+      return currentPage < totalPages ? currentPage + 1 : undefined;
+    },
+    initialPageParam: 1,
   });
 
-  useEffect(() => {
-    leadrefetch();
-  }, [searchText]);
+  // useEffect(() => {
+  //   leadrefetch();
+  // }, [searchText]);
+ const leads = Lead?.pages?.flatMap(page => page.data) || [];
 
+  // ✅ Infinite scroll handler — scroll position দেখে trigger করে
+  const handleLoadMore = () => {
+    if (hasNextPage && !isFetchingNextPage) {
+      fetchNextPage();
+    }
+  };
   const { data: AllProperty } = useQuery({
     queryKey: ['AllProperty'],
     queryFn: async () => {
@@ -305,8 +322,12 @@ const LeadsListScreen = () => {
     setShowFilterModal(false);
   };
 
-  const scrollToTop = () => {
+   const scrollToTop = () => {
+    isScrollingToTop.current = true;
     scrollRef.current?.scrollTo({ y: 0, animated: true });
+    setTimeout(() => {
+      isScrollingToTop.current = false; 
+    }, 600);
   };
 
   return (
@@ -331,7 +352,13 @@ const LeadsListScreen = () => {
               style={styles.backBtn}
               onPress={() => navigation.navigate('Dashboard')}
             >
-              <Text style={styles.backText}>Back</Text>
+              <View style={styles.backButton}>
+                             <Image
+                               source={require('../asset/image/icon/Arrow.png')}
+                               style={{ width:12, height: 12, marginRight: 6 }}
+                             />
+                             <Text style={styles.backText}>Back</Text>
+                           </View>
             </TouchableOpacity>
           </View>
         </View>
@@ -341,10 +368,22 @@ const LeadsListScreen = () => {
         ref={scrollRef}
         showsVerticalScrollIndicator={false}
         onScroll={event => {
-          const y = event.nativeEvent.contentOffset.y;
+          const { layoutMeasurement, contentOffset, contentSize } =
+            event.nativeEvent;
+          const y = contentOffset.y;
+
+          // Scroll to top button
           setShowTopBtn(y > 200);
+          if (isScrollingToTop.current) return;
+
+         
+          const isNearBottom =
+            layoutMeasurement.height + y >= contentSize.height - 150;
+          if (isNearBottom) {
+            handleLoadMore();
+          }
         }}
-        scrollEventThrottle={16}
+        scrollEventThrottle={400}
       >
         {/* ✅ FIXED SEARCH BOX — iOS compatible */}
         <View style={styles.searchBox}>
@@ -365,8 +404,8 @@ const LeadsListScreen = () => {
           <Text style={{ color: '#fff', textAlign: 'center', marginTop: 20 }}>
             Loading...
           </Text>
-        ) : Lead && Lead.length > 0 ? (
-          Lead.map((visit, i) => (
+        ) : leads && leads.length > 0 ? (
+          leads?.map((visit, i) => (
             <SiteCard
               key={visit.id || i}
               data={visit}
@@ -380,6 +419,32 @@ const LeadsListScreen = () => {
             No Data Found
           </Text>
         )}
+               {isFetchingNextPage && (
+          <ActivityIndicator
+            size="small"
+            color="#999"
+            style={{
+              marginVertical: 12,
+              alignSelf: 'center',
+            }}
+          />
+        )}
+              
+        
+                {/* ✅ End of list message */}
+                {/* {!hasNextPage && leads.length > 0 && (
+                  <Text
+                    style={{
+                      color: '#06f65a',
+                      textAlign: 'center',
+                      paddingBottom: 12,
+                      fontSize: 15,
+                      fontWeight: 'bold',
+                    }}
+                  >
+                    You've reached the end of the list.
+                  </Text>
+                )} */}
       </ScrollView>
 
       {/* ✅ REMARKS MODAL */}
@@ -728,6 +793,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     height: 40,
   },
+    backButton: {
+  flexDirection: 'row',
+  alignItems: 'center',
+},
   filterInput: {
     flex: 1,
     color: '#fff',

@@ -11,6 +11,7 @@ import {
   Platform,
   Linking,
   Alert,
+  Image,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import Header from '../Layout/Header';
@@ -240,14 +241,18 @@ const TotalBookingsAgreementsPerMonth = () => {
 
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             {/* <Icon name="filter-alt" size={18} color="#00e5ff" /> */}
-            <TouchableOpacity style={styles.backBtn}>
-              <Text
-                style={styles.backText}
-                onPress={() => navigation.navigate('Dashboard')}
-              >
-                Back
-              </Text>
-            </TouchableOpacity>
+         <TouchableOpacity
+  style={styles.backBtn}
+  onPress={() => navigation.navigate('Dashboard')}
+>
+  <View style={styles.backButton}>
+    <Image
+      source={require('../asset/image/icon/Arrow.png')}
+      style={{ width: 12, height: 12, marginRight: 6 }}
+    />
+    <Text style={styles.backText}>Back</Text>
+  </View>
+</TouchableOpacity>
           </View>
         </View>
       </View>
@@ -531,4 +536,8 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     flexShrink: 1,
   },
+    backButton: {
+  flexDirection: 'row',
+  alignItems: 'center',
+},
 });

@@ -12,6 +12,7 @@ import {
   Platform,
   Alert,
   Linking,
+  Image,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import Header from '../Layout/Header';
@@ -383,7 +384,13 @@ const FollowUpsScreen = () => {
               style={styles.backBtn}
               onPress={() => navigation.navigate('Dashboard')}
             >
-              <Text style={styles.backText}>Back</Text>
+              <View style={styles.backButton}>
+                            <Image
+                              source={require('../asset/image/icon/Arrow.png')}
+                              style={{ width:12, height: 12, marginRight: 6 }}
+                            />
+                            <Text style={styles.backText}>Back</Text>
+                          </View>
             </TouchableOpacity>
           </View>
         </View>
@@ -816,7 +823,10 @@ resetText: {
   fontWeight: 'bold',
   fontSize: 14,
 },
-
+  backButton: {
+  flexDirection: 'row',
+  alignItems: 'center',
+},
 cancelText: {
   color: '#a0b4e8',
   fontSize: 13,

@@ -12,8 +12,9 @@ import {
   Alert,
   StatusBar,
   Platform,
+  Image,
 } from 'react-native';
-import { useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import api from '../api/AxiosInstance';
 import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
@@ -185,7 +186,7 @@ const LeadCard = ({ item, navigation, setShowRemarks, setRemarksText }) => {
 const MissedFollowup = () => {
   const navigation = useNavigation();
   const scrollRef = useRef();
-
+  const isScrollingToTop = useRef(false);
   const [searchText, setSearchText] = useState('');
   const [showTopBtn, setShowTopBtn] = useState(false);
   const [showRemarks, setShowRemarks] = useState(false);
@@ -201,26 +202,40 @@ const MissedFollowup = () => {
     active: null,
   });
   const [appliedFilters, setAppliedFilters] = useState();
-  const { data, isLoading } = useQuery({
-    queryKey: ['MissedFollowups', appliedFilters],
-    queryFn: async () => {
-      const res = await api.get('/api/pm/missedCallBackLeads', {
-        params: {
-          search: searchText || undefined,
-          company_id: filters.company_id || undefined,
-          rm_id: filters.rm_id || undefined,
-          fromDate: filters.fromDate || undefined,
-          toDate: filters.toDate || undefined,
-          project: filters.project || undefined,
-          location: filters.location || undefined,
-          status: filters.status || undefined,
-        },
-      });
-      return res.data.data;
+  const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } =
+    useInfiniteQuery({
+      queryKey: ['MissedFollowups', appliedFilters],
+      queryFn: async ({ pageParam = 1 }) => {
+        const res = await api.get('/api/pm/missedCallBackLeads', {
+          params: {
+            page: pageParam,
+            search: searchText || undefined,
+            company_id: filters.company_id || undefined,
+            rm_id: filters.rm_id || undefined,
+            fromDate: filters.fromDate || undefined,
+            toDate: filters.toDate || undefined,
+            project: filters.project || undefined,
+            location: filters.location || undefined,
+            status: filters.status || undefined,
+          },
+        });
+        return res.data;
+      },
+        getNextPageParam: lastPage => {
+      const { currentPage, totalPages } = lastPage;
+      return currentPage < totalPages ? currentPage + 1 : undefined;
     },
-  });
+    initialPageParam: 1,
+    });
 
-  const leads = data || [];
+  const leads = data?.pages?.flatMap(page => page.data) || [];
+
+  // ✅ Infinite scroll handler — scroll position দেখে trigger করে
+  const handleLoadMore = () => {
+    if (hasNextPage && !isFetchingNextPage) {
+      fetchNextPage();
+    }
+  };
 
   const filteredLeads = leads.filter(item => {
     const search = searchText.toLowerCase();
@@ -308,7 +323,13 @@ const MissedFollowup = () => {
   //     </View>
   //   );
   // }
-
+  const scrollToTop = () => {
+    isScrollingToTop.current = true;
+    scrollRef.current?.scrollTo({ y: 0, animated: true });
+    setTimeout(() => {
+      isScrollingToTop.current = false;
+    }, 600);
+  };
   return (
     <View style={styles.container}>
       <StatusBar
@@ -340,7 +361,13 @@ const MissedFollowup = () => {
               onPress={() => navigation.navigate('Dashboard')}
               style={styles.backBtn}
             >
-              <Text style={styles.backText}>Back</Text>
+            <View style={styles.backButton}>
+                            <Image
+                              source={require('../asset/image/icon/Arrow.png')}
+                              style={{ width:12, height: 12, marginRight: 6 }}
+                            />
+                            <Text style={styles.backText}>Back</Text>
+                          </View>
             </TouchableOpacity>
           </View>
         </View>
@@ -351,10 +378,22 @@ const MissedFollowup = () => {
         ref={scrollRef}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 120 }}
-        onScroll={e => {
-          setShowTopBtn(e.nativeEvent.contentOffset.y > 200);
+        onScroll={event => {
+          const { layoutMeasurement, contentOffset, contentSize } =
+            event.nativeEvent;
+          const y = contentOffset.y;
+
+          // Scroll to top button
+          setShowTopBtn(y > 200);
+          if (isScrollingToTop.current) return;
+
+          const isNearBottom =
+            layoutMeasurement.height + y >= contentSize.height - 150;
+          if (isNearBottom) {
+            handleLoadMore();
+          }
         }}
-        scrollEventThrottle={16}
+        scrollEventThrottle={400}
       >
         {/* SEARCH */}
         <View style={styles.searchBox}>
@@ -386,6 +425,16 @@ const MissedFollowup = () => {
         ) : (
           <Text style={styles.empty}>No missed followups found</Text>
         )}
+        {isFetchingNextPage && (
+          <ActivityIndicator
+            size="small"
+            color="#999"
+            style={{
+              marginVertical: 12,
+              alignSelf: 'center',
+            }}
+          />
+        )}
       </ScrollView>
 
       {/* REMARKS MODAL */}
@@ -408,7 +457,7 @@ const MissedFollowup = () => {
       {showFilterModal && (
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
-              <View style={styles.dragHandle} />
+            <View style={styles.dragHandle} />
             <Text style={styles.modalTitle}>Filter Leads</Text>
 
             <ScrollView
@@ -479,10 +528,7 @@ const MissedFollowup = () => {
       )}
       {/* TOP BUTTON */}
       {showTopBtn && (
-        <TouchableOpacity
-          style={styles.topButton}
-          onPress={() => scrollRef.current?.scrollTo({ y: 0, animated: true })}
-        >
+        <TouchableOpacity style={styles.topButton} onPress={scrollToTop}>
           <Icon name="keyboard-arrow-up" size={26} color="#fff" />
         </TouchableOpacity>
       )}
@@ -512,7 +558,10 @@ const styles = StyleSheet.create({
   },
 
   screenTitle: { color: '#cfd8dc', fontSize: 13, marginLeft: 6 },
-
+  backButton: {
+  flexDirection: 'row',
+  alignItems: 'center',
+},
   backBtn: {
     borderWidth: 1,
     borderColor: '#888',
@@ -649,7 +698,7 @@ const styles = StyleSheet.create({
   },
 
   modalTitle: {
-       color: '#00e5ff',
+    color: '#00e5ff',
     fontSize: 18,
     marginBottom: 10,
     fontWeight: 'bold',
@@ -673,7 +722,7 @@ const styles = StyleSheet.create({
 
   modalCloseText: { color: '#fff', fontWeight: '600', fontSize: 14 },
   inputWrapper: { width: '100%', marginBottom: 12 },
-    dragHandle: {
+  dragHandle: {
     width: 36,
     height: 4,
     backgroundColor: '#3d55cc',

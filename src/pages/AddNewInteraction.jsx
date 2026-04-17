@@ -6,6 +6,7 @@ import {
   TextInput,
   TouchableOpacity,
   ScrollView,
+  Image,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { Dropdown } from 'react-native-element-dropdown';
@@ -263,7 +264,13 @@ const onChangeTime = (event, selectedTime) => {
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               {/* <Icon name="filter-alt" size={18} color="#00e5ff" /> */}
               <TouchableOpacity style={styles.backBtn}onPress={()=>{navigation.replace('AllInteractionsScreen',{ id: route.params.id });}}>
-                <Text style={styles.backText}>Back</Text>
+                  <View style={styles.backButton}>
+                                <Image
+                                  source={require('../asset/image/icon/Arrow.png')}
+                                  style={{ width:12, height: 12, marginRight: 6 }}
+                                />
+                                <Text style={styles.backText}>Back</Text>
+                              </View>
               </TouchableOpacity>
             </View>
           </View>
@@ -511,7 +518,10 @@ const styles = StyleSheet.create({
     color: '#cfd8dc',
     fontSize: 12,
   },
-
+  backButton: {
+  flexDirection: 'row',
+  alignItems: 'center',
+},
   addBtn: {
     backgroundColor: '#00acc1',
     borderRadius: 20,
