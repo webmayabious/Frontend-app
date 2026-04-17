@@ -11,6 +11,7 @@ import {
   Platform,
   Linking,
   Alert,
+  ActivityIndicator 
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import Header from '../Layout/Header';
@@ -206,7 +207,7 @@ const TotalLeadScreen = () => {
 
   const [showTopBtn, setShowTopBtn] = useState(false);
   const scrollRef = useRef();
-  const isScrollingToTop = useRef(false); // ✅ scroll to top চলাকালীন load more block করবে
+  const isScrollingToTop = useRef(false); 
 
   /* ================= INFINITE QUERY ================= */
   const {
@@ -316,10 +317,10 @@ const TotalLeadScreen = () => {
   };
 
   const scrollToTop = () => {
-    isScrollingToTop.current = true; // ✅ block শুরু
+    isScrollingToTop.current = true;
     scrollRef.current?.scrollTo({ y: 0, animated: true });
     setTimeout(() => {
-      isScrollingToTop.current = false; // ✅ animation শেষে unblock
+      isScrollingToTop.current = false; 
     }, 600);
   };
 
@@ -363,7 +364,7 @@ const TotalLeadScreen = () => {
         </View>
       </View>
 
-      {/* ✅ ScrollView — onScroll দিয়ে bottom detect করে load more trigger */}
+    
       <ScrollView
         ref={scrollRef}
         showsVerticalScrollIndicator={false}
@@ -397,7 +398,6 @@ const TotalLeadScreen = () => {
           />
         </View>
 
-        {/* ✅ List Render — শুধু leads use করো, double filter নেই */}
         {isLoading ? (
           <Text style={{ color: '#fff', textAlign: 'center', marginTop: 20 }}>
             Loading...
@@ -418,18 +418,17 @@ const TotalLeadScreen = () => {
           </Text>
         )}
 
-        {isFetchingNextPage && (
-          <Text
-            style={{
-              color: '#aaa',
-              textAlign: 'center',
-              paddingVertical: 12,
-              fontSize: 13,
-            }}
-          >
-            Loading more...
-          </Text>
-        )}
+       {isFetchingNextPage && (
+  <ActivityIndicator
+    size="small"
+    color="#999"
+    style={{
+      marginVertical: 12,
+      alignSelf: 'center',
+    }}
+  />
+)}
+      
 
         {/* ✅ End of list message */}
         {!hasNextPage && leads.length > 0 && (
