@@ -43,7 +43,6 @@ const Card = ({ title, subtitle, value, onPress }) => (
 /* ================= Main Screen ================= */
 const Dashboard = () => {
   const navigation = useNavigation();
-
   const { data: dashboardCards,refetch:dashboardrefetch } = useQuery({
     queryKey: ['dashboardCards'],
     queryFn: async () => {

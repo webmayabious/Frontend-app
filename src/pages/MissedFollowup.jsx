@@ -213,7 +213,7 @@ const MissedFollowup = () => {
           toDate: filters.toDate || undefined,
           project: filters.project || undefined,
           location: filters.location || undefined,
-          active: filters.active || undefined,
+          status: filters.status || undefined,
         },
       });
       return res.data.data;
@@ -293,7 +293,7 @@ const MissedFollowup = () => {
       toDate: null,
       project: null,
       location: null,
-      active: null,
+      status: null,
     };
 
     setFilters(cleared);
@@ -449,8 +449,8 @@ const MissedFollowup = () => {
                 label="Lead Status"
                 data={LeadStatus}
                 placeholder="Select"
-                value={filters.active}
-                onChange={value => onChange('active', value)}
+                value={filters.status}
+                onChange={value => onChange('status', value)}
               />
             </ScrollView>
 

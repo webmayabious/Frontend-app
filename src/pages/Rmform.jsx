@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   StatusBar,
   Platform,
+  Alert,
 } from 'react-native';
 import Header from '../Layout/Header';
 import BottomNav from '../navigations/BottomNav';
@@ -144,7 +145,6 @@ const DobGenderRow = ({ form, onChange }) => {
             <Text style={styles.radioText}>Female</Text>
           </TouchableOpacity>
         </View>
-        
       </View>
     </View>
   );
@@ -227,7 +227,6 @@ const Lead = [
 ];
 
 export default function Rmform() {
- 
   const userRole = useSelector(state => state.userRole);
   const isAdmin = userRole?.includes('ADMIN');
   const [projects, setProjects] = useState([]);
@@ -241,7 +240,7 @@ export default function Rmform() {
     date_of_birth: '',
     gender: '',
     marital_status: '',
-    active: 'active',
+    active: '1',
     office_location: '',
     industry: '',
     occupation: '',
@@ -278,7 +277,6 @@ export default function Rmform() {
     value: item.id,
   }));
   //console.log('project',projectOptions);
-
 
   // *************************************** get all  AllPropertyLocation  ***************************************//
   const { data: AllReferences, isLoading: AllReferencesLoading } = useQuery({
@@ -379,7 +377,7 @@ export default function Rmform() {
               'AllPropertyLeads',
               'Uploadleads',
               'dashboardCards',
-              'Rm'
+              'AssignRm',
             ].includes(query.queryKey[0]);
           },
         });
@@ -389,6 +387,12 @@ export default function Rmform() {
       }
     } catch (e) {
       console.log('create ERROR:', e.response?.data || e.message);
+
+      const msg =
+        e.response?.data?.message ||
+        'Lead already exists for this phone and project.';
+
+      Alert.alert('Error', msg);
     } finally {
       setSaving(false);
     }
@@ -439,7 +443,9 @@ export default function Rmform() {
               value={form.name}
               onChangeText={v => onChange('name', v)}
             />
-            {errors.name && <Text style={{color:'#f83b3b'}}>{errors.name}</Text>}
+            {errors.name && (
+              <Text style={{ color: '#f83b3b' }}>{errors.name}</Text>
+            )}
             <InputField
               label="Residence Address"
               placeholder="City"
@@ -447,7 +453,7 @@ export default function Rmform() {
               onChangeText={v => onChange('address', v)}
             />
             {errors.address && (
-              <Text style={{color:'#f83b3b'}}>{errors.address}</Text>
+              <Text style={{ color: '#f83b3b' }}>{errors.address}</Text>
             )}
             <InputField
               label="Mobile No. *"
@@ -456,7 +462,7 @@ export default function Rmform() {
               onChangeText={v => onChange('phone', v)}
             />
             {errors.phone && (
-              <Text style={{color:'#f83b3b'}}>{errors.phone}</Text>
+              <Text style={{ color: '#f83b3b' }}>{errors.phone}</Text>
             )}
             <InputField
               label="Email id *"
@@ -464,8 +470,8 @@ export default function Rmform() {
               value={form.email}
               onChangeText={v => onChange('email', v)}
             />
-             {errors.email && (
-              <Text style={{color:'#f83b3b'}}>{errors.email}</Text>
+            {errors.email && (
+              <Text style={{ color: '#f83b3b' }}>{errors.email}</Text>
             )}
             <DobGenderRow form={form} onChange={onChange} />
             <DropdownField

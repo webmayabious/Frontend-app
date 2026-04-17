@@ -411,7 +411,8 @@ export default function MeetingsEdit({ route }) {
               'TodaysFollowUpsandMeetings',
               'AllPropertyLeads',
               'Uploadleads',
-              'Leads Assigned'
+              'Leads Assigned',
+              'AssignRm'
             ].includes(query.queryKey[0]);
           },
         });

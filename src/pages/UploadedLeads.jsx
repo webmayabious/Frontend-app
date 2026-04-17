@@ -193,7 +193,7 @@ const UploadedLeads = () => {
     toDate: null,
     project: null,
     location: null,
-    active: null,
+    status: null,
   });
   const [appliedFilters, setAppliedFilters] = useState();
   const { data: uploadleads, isLoading } = useQuery({
@@ -208,7 +208,7 @@ const UploadedLeads = () => {
           toDate: filters.toDate || undefined,
           project: filters.project || undefined,
           location: filters.location || undefined,
-          active: filters.active || undefined,
+          status: filters.status || undefined,
         },
       });
       console.log('res site visite', res.data.data);
@@ -293,7 +293,7 @@ const UploadedLeads = () => {
       toDate: null,
       project: null,
       location: null,
-      active: null,
+      status: null,
     };
 
     setFilters(cleared);
@@ -451,8 +451,8 @@ const UploadedLeads = () => {
                 label="Lead Status"
                 data={LeadStatus}
                 placeholder="Select"
-                value={filters.active}
-                onChange={value => onChange('active', value)}
+                value={filters.status}
+                onChange={value => onChange('status', value)}
               />
             </ScrollView>
 

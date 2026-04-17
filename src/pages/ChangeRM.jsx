@@ -692,6 +692,7 @@ const ChangeRM = () => {
             <View style={styles.filterDivider} />
 
             {/* Footer */}
+            
             <View style={styles.filterBtnRow}>
               <TouchableOpacity style={styles.resetBtn} onPress={resetFilters}>
                 <Icon name="refresh" size={14} color="#ff5252" />

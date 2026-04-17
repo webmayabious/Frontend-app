@@ -196,7 +196,7 @@ const SiteVisitsScreen = () => {
     toDate: null,
     project: null,
     location: null,
-    active: null,
+    status: null,
   });
   const [appliedFilters, setAppliedFilters] = useState();
   const { data, isLoading } = useQuery({
@@ -211,7 +211,7 @@ const SiteVisitsScreen = () => {
           toDate: filters.toDate || undefined,
           project: filters.project || undefined,
           location: filters.location || undefined,
-          active: filters.active || undefined,
+          status: filters.status || undefined,
         },
       });
       console.log('res site visite', res.data);
@@ -296,7 +296,7 @@ const SiteVisitsScreen = () => {
       toDate: null,
       project: null,
       location: null,
-      active: null,
+      status: null,
     };
 
     setFilters(cleared);
@@ -454,8 +454,8 @@ const SiteVisitsScreen = () => {
                 label="Lead Status"
                 data={LeadStatus}
                 placeholder="Select"
-                value={filters.active}
-                onChange={value => onChange('active', value)}
+                value={filters.status}
+                onChange={value => onChange('status', value)}
               />
             </ScrollView>
 
