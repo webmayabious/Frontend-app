@@ -405,9 +405,10 @@ const MissedFollowup = () => {
           </View>
         </View>
       )}
-    {showFilterModal && (
+      {showFilterModal && (
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
+              <View style={styles.dragHandle} />
             <Text style={styles.modalTitle}>Filter Leads</Text>
 
             <ScrollView
@@ -587,7 +588,12 @@ const styles = StyleSheet.create({
     gap: 6,
   },
 
-  label: { color: '#FFB85D', fontSize: 12, flex: 1 },
+  label: {
+    color: '#a0b4e8', // muted blue-white — better contrast on dark bg
+    fontSize: 12,
+    marginBottom: 5,
+    fontWeight: '500',
+  },
 
   value: { color: '#fff' },
 
@@ -632,17 +638,21 @@ const styles = StyleSheet.create({
   },
 
   modalCard: {
-    width: '85%',
-    backgroundColor: '#2f2f8f',
-    borderRadius: 12,
+    width: '88%',
+    backgroundColor: '#1a1f6b', // deep navy base
+    borderWidth: 1,
+    borderColor: '#3d45b0', // soft blue border
+    borderRadius: 18,
     padding: 20,
     alignItems: 'center',
+    maxHeight: '88%',
   },
 
   modalTitle: {
-    color: '#00e5ff',
+       color: '#00e5ff',
     fontSize: 18,
-    marginVertical: 10,
+    marginBottom: 10,
+    fontWeight: 'bold',
   },
 
   modalText: {
@@ -654,21 +664,31 @@ const styles = StyleSheet.create({
   modalCloseBtn: {
     backgroundColor: '#00acc1',
     paddingHorizontal: 20,
-    paddingVertical: 6,
-    borderRadius: 20,
+    paddingVertical: 10,
+    borderRadius: 24,
+    marginTop: 6,
+    width: '100%',
+    alignItems: 'center',
   },
 
-  modalCloseText: { color: '#fff' },
-   inputWrapper: { width: '100%', marginBottom: 12 },
+  modalCloseText: { color: '#fff', fontWeight: '600', fontSize: 14 },
+  inputWrapper: { width: '100%', marginBottom: 12 },
+    dragHandle: {
+    width: 36,
+    height: 4,
+    backgroundColor: '#3d55cc',
+    borderRadius: 2,
+    marginBottom: 14,
+  },
   dropdown: {
     height: 40,
-    backgroundColor: '#ffffff10',
+    backgroundColor: '#ffffff12',
     borderRadius: 8,
-    paddingHorizontal: 8,
+    paddingHorizontal: 10,
     borderWidth: 1,
-    borderColor: '#444',
+    borderColor: '#3d55cc',
   },
   dropdownContainer: { backgroundColor: '#fff', borderRadius: 8 },
-  placeholderStyle: { color: '#aaa', fontSize: 14 },
-  selectedTextStyle: { color: '#fff', fontSize: 14 },
+  placeholderStyle: { color: '#aaa', fontSize: 13 },
+  selectedTextStyle: { color: '#fff', fontSize: 13 },
 });
