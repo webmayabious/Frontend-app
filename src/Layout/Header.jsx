@@ -218,8 +218,8 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   logoImage: {
-    width: 90,
-    height: 25,
+    width: 120,
+    height: 33,
     resizeMode: "contain",
     marginLeft: 10,
   },

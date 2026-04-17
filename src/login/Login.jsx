@@ -11,6 +11,7 @@ import {
   Alert,
   Platform
 } from 'react-native';
+import { CommonActions } from '@react-navigation/native';
 import { getFCMToken } from '../pages/utils/fcm';
 import socket from '../socket';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -19,9 +20,10 @@ import { useNavigation } from '@react-navigation/native';
 import api from '../api/AxiosInstance';
 import messaging from '@react-native-firebase/messaging';
 import DeviceInfo from 'react-native-device-info';
+import SplashScreen from '../Layout/SplashScreen';
 // import socket from '../../socket'
 // import AnimatedSplash from "../../AnimatedSplash";
-const bgImage = require("../asset/image/background0.jpg");
+const bgImage = require("../asset/image/mulyambg.png");
 const mayaLogo = require('../asset/image/logo/mokhsLogo.png');
 
 const LoginUI = () => {
@@ -36,8 +38,8 @@ const LoginUI = () => {
   // Auto-login check with loading
   useEffect(() => {
     const checkToken = async () => {
-      await new Promise(resolve => setTimeout(resolve, 1000));
 
+       await new Promise(resolve => setTimeout(resolve, 2000));
       const token = await AsyncStorage.getItem('PM_TOKEN');
       const user = await AsyncStorage.getItem('PM_USER');
       const roles = await AsyncStorage.getItem('PM_ROLES'); // 👈 add this
@@ -54,9 +56,12 @@ const LoginUI = () => {
         //   socket.auth = { token };
         //   socket.connect();
         // }
-        navigation.replace('Dashboard', {
-          screen: 'Dashboard',
-        });
+        navigation.dispatch(
+          CommonActions.reset({
+            index: 0,
+            routes: [{ name: 'Dashboard' }],
+          })
+        );
       } else {
         setCheckingLogin(false);
       }
@@ -64,80 +69,80 @@ const LoginUI = () => {
 
     checkToken();
   }, []);
-
-const handleLogin = async () => {
-  if (!loginData.userid.trim() || !loginData.password.trim()) {
-    Alert.alert('Error', 'Please enter User ID and Password');
-    return;
+  if (checkingLogin) {
+    return <SplashScreen />;
   }
-
-  try {
-    setLoading(true);
-
-    // FCM TOKEN
-    const fcmToken = await getFCMToken();
-
-    // DEVICE INFO (SAFE)
-    const deviceId = await DeviceInfo.getUniqueId();
-    const deviceType = Platform.OS === 'ios' ? 'IOS' : 'ANDROID';
-    const appVersion = DeviceInfo.getVersion();
-    const buildNumber = DeviceInfo.getBuildNumber();
-    let deviceName = 'Unknown Device';
-    try {
-      deviceName = await DeviceInfo.getDeviceName();
-    } catch (e) {}
-
-    const body = {
-      ...loginData,
-      fcm_token: fcmToken,
-      mobile_device_id: deviceId,
-      device_type: deviceType,
-      device_name: deviceName,
-      application_name: 'CRM_APP',
-      app_version: appVersion,
-      build_number: buildNumber,
-    };
-
-    console.log('📤 LOGIN REQUEST BODY:', body);
-
-    const response = await api.post('/api/pm/auth/login', body);
-    const data = response.data;
-
-    if (!data.status) {
-      Alert.alert('Login Failed', data.message || 'Invalid credentials');
+  const handleLogin = async () => {
+    if (!loginData.userid.trim() || !loginData.password.trim()) {
+      Alert.alert('Error', 'Please enter User ID and Password');
       return;
     }
 
-    // Save to AsyncStorage
-    await AsyncStorage.setItem('PM_TOKEN', data.token);
-    await AsyncStorage.setItem('PM_USER', JSON.stringify(data.user));
-    await AsyncStorage.setItem('PM_ROLES', JSON.stringify(data.roles));
+    try {
+      setLoading(true);
 
-    // Redux Dispatch
-    dispatch({ type: 'setToken', payload: data.token });
-    dispatch({ type: 'setUserInfo', payload: data.user });
-    dispatch({ type: 'setRole', payload: data.roles });
+      // FCM TOKEN
+      const fcmToken = await getFCMToken();
 
-    // ✅ Socket Connect
-    if (!socket.connected) {
-      socket.auth = { token: data.token };
-      socket.connect();
+      // DEVICE INFO (SAFE)
+      const deviceId = await DeviceInfo.getUniqueId();
+      const deviceType = Platform.OS === 'ios' ? 'IOS' : 'ANDROID';
+      const appVersion = DeviceInfo.getVersion();
+      const buildNumber = DeviceInfo.getBuildNumber();
+      let deviceName = 'Unknown Device';
+      try {
+        deviceName = await DeviceInfo.getDeviceName();
+      } catch (e) { }
+
+      const body = {
+        ...loginData,
+        fcm_token: fcmToken,
+        mobile_device_id: deviceId,
+        device_type: deviceType,
+        device_name: deviceName,
+        application_name: 'CRM_APP',
+        app_version: appVersion,
+        build_number: buildNumber,
+      };
+      console.log('📤 LOGIN REQUEST BODY:', body);
+      const response = await api.post('/api/pm/auth/login', body);
+      const data = response.data;
+
+      if (!data.status) {
+        Alert.alert('Login Failed', data.message || 'Invalid credentials');
+        return;
+      }
+
+      // Save to AsyncStorage
+      await AsyncStorage.setItem('PM_TOKEN', data.token);
+      await AsyncStorage.setItem('PM_USER', JSON.stringify(data.user));
+      await AsyncStorage.setItem('PM_ROLES', JSON.stringify(data.roles));
+
+      // Redux Dispatch
+      dispatch({ type: 'setToken', payload: data.token });
+      dispatch({ type: 'setUserInfo', payload: data.user });
+      dispatch({ type: 'setRole', payload: data.roles });
+
+      // ✅ Socket Connect
+      if (!socket.connected) {
+        socket.auth = { token: data.token };
+        socket.connect();
+      }
+
+      navigation.replace('Dashboard', {
+        screen: 'Dashboard',
+      });
+    } catch (error) {
+      console.log('❌ LOGIN ERROR:', error);
+
+      Alert.alert(
+        'Login Failed',
+        error?.response?.data?.message || 'Something went wrong',
+      );
+    } finally {
+      setLoading(false);
     }
-
-    navigation.replace('Dashboard', {
-      screen: 'Dashboard',
-    });
-  } catch (error) {
-    console.log('❌ LOGIN ERROR:', error);
-
-    Alert.alert(
-      'Login Failed',
-      error?.response?.data?.message || 'Something went wrong',
-    );
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   // if (showSplash) {
   //   return <AnimatedSplash onFinish={() => setShowSplash(false)} />;
@@ -206,7 +211,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   card: {
     width: '83%',
-    backgroundColor: 'rgba(47,46,46,0.45)',
+    backgroundColor: 'rgba(250, 248, 248, 0.21)',
     borderRadius: 20,
     padding: 20,
   },
