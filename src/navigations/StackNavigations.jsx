@@ -19,11 +19,18 @@ import ChangeRM from "../pages/ChangeRM";
 import BookingDetailScreen from "../pages/BookingDetailScreen";
 import LeadsassignedScreen from "../pages/LeadsassignedScreen";
 import Rmform from "../pages/Rmform";
+import SplashScreen from "../Layout/SplashScreen";
 const Stack = createNativeStackNavigator();
 export default function StackNavigations() {
+  
   return (
     <NavigationContainer>
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Navigator screenOptions={{ headerShown: false }} > 
+        {/* <Stack.Screen
+          name="Splash"
+          component={SplashScreen}
+            options={{ headerShown: false }} 
+        /> */}
         <Stack.Screen
           name="Login"
           component={LoginUI}

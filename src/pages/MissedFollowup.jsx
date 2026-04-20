@@ -128,12 +128,12 @@ const LeadCard = ({ item, navigation, setShowRemarks, setRemarksText }) => {
       {/* PHONE + EMAIL */}
       <View style={styles.rowBetween}>
         <TouchableOpacity onPress={() => makeCall(item?.phone)}>
-          <Text style={styles.label}>
+          <Text style={styles.label} numberOfLines={1} ellipsizeMode="tail">
             Phone: <Text style={styles.value}>{item?.phone || 'N/A'}</Text>
           </Text>
         </TouchableOpacity>
 
-        <Text style={styles.label}>
+        <Text style={styles.label} numberOfLines={1} ellipsizeMode="tail">
           Email: <Text style={styles.value}>{item?.email || 'N/A'}</Text>
         </Text>
       </View>
@@ -599,12 +599,13 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
 
-  nameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    flexWrap: 'wrap',
-  },
+nameRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  flex: 1,
+  flexWrap: 'wrap',
+  marginRight: 8,          
+},
 
   name: { color: '#fff', fontWeight: 'bold', flexShrink: 1 },
 
@@ -630,21 +631,24 @@ const styles = StyleSheet.create({
     marginTop: 5,
   },
 
-  rowBetween: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 5,
-    gap: 6,
-  },
+rowBetween: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  marginTop: 5,
+  gap: 6,
+  flexWrap: 'wrap',        
+},
 
-  label: {
-    color: '#a0b4e8', // muted blue-white — better contrast on dark bg
-    fontSize: 12,
-    marginBottom: 5,
-    fontWeight: '500',
-  },
+label: {
+  color: '#a0b4e8',
+  fontSize: 12,
+  marginBottom: 5,
+  fontWeight: '500',
+  flex: 1,                 
+  flexShrink: 1,           
+},
 
-  value: { color: '#fff' },
+ value: { color: '#fff', flexShrink: 1 }, 
 
   cardFooter: {
     flexDirection: 'row',
