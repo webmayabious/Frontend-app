@@ -15,7 +15,7 @@ import BottomNav from '../navigations/BottomNav';
 import { useNavigation } from '@react-navigation/native';
 import api from '../api/AxiosInstance';
 import { useQuery } from '@tanstack/react-query';
-
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 /* ================= Reusable Card ================= */
 const Card = ({ title, subtitle, value, onPress }) => (
   <TouchableOpacity style={styles.card} onPress={onPress}>
@@ -43,6 +43,7 @@ const Card = ({ title, subtitle, value, onPress }) => (
 /* ================= Main Screen ================= */
 const Dashboard = () => {
   const navigation = useNavigation();
+  const insets = useSafeAreaInsets();
   const { data: dashboardCards,refetch:dashboardrefetch } = useQuery({
     queryKey: ['dashboardCards'],
     queryFn: async () => {
@@ -66,7 +67,8 @@ useEffect(() => {
       <SafeAreaView style={{ flex: 1 }} edges={['bottom']}>
         <ScrollView
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ padding: 15 }}
+          contentContainerStyle={{ padding: 15 , paddingBottom: insets.bottom + 70, }}
+          
         >
           {/* Header */}
           <View style={styles.dashboardHeader}>

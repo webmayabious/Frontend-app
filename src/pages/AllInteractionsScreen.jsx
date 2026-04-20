@@ -20,14 +20,18 @@ import api from '../api/AxiosInstance';
 import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 // import Toast from 'react-native-toast-message';
-// ─── Mock Data ────────────────────────────────────────────────────────────────
+
+// ─── Status Colors ────────────────────────────────────────────────────────────
 
 const statusColors = {
-  'Call Completed': 'green',
-  BusyT: 'orange',
-  'Unable To Contact': 'red',
-  'Call Status-3': 'gray',
+  'Call Completed': '#00C48C',
+  BusyT: '#F5A623',
+  'Unable To Contact': '#FF6B6B',
+  'Call Status-3': '#8A90B4',
 };
+
+// ─── Section Header ───────────────────────────────────────────────────────────
+
 const SectionHeader = ({ navigation, route }) => (
   <View style={styles.sectionHeader}>
     <View style={styles.sectionTitleRow}>
@@ -40,24 +44,22 @@ const SectionHeader = ({ navigation, route }) => (
         onPress={() =>
           navigation.navigate('AddNewInteraction', { id: route.params.id })
         }
+        activeOpacity={0.75}
       >
         <Text style={styles.addNewText}>Add New Interaction</Text>
       </TouchableOpacity>
       <TouchableOpacity
         style={styles.closeBtn}
         onPress={() => navigation.goBack()}
+        activeOpacity={0.75}
       >
         <Text style={styles.closeBtnText}>✕</Text>
       </TouchableOpacity>
     </View>
   </View>
 );
-const InfoRow = ({ label, value, style }) => (
-  <View style={[styles.infoRow, style]}>
-    <Text style={styles.infoLabel}>{label}</Text>
-    <Text style={styles.infoValue}>{value}</Text>
-  </View>
-);
+
+// ─── Interaction Card ─────────────────────────────────────────────────────────
 
 const InteractionCard = ({ item, setShowRemarks, setRemarksText }) => (
   <View style={styles.card}>
@@ -73,6 +75,7 @@ const InteractionCard = ({ item, setShowRemarks, setRemarksText }) => (
           setRemarksText(item?.remarks || 'No remarks available');
           setShowRemarks(true);
         }}
+        activeOpacity={0.8}
       >
         <Text style={styles.remarksBtnText}>Remarks</Text>
       </TouchableOpacity>
@@ -98,12 +101,12 @@ const InteractionCard = ({ item, setShowRemarks, setRemarksText }) => (
       </Text>
     </View>
 
-    {/* Site Visit */}
-
+    {/* Lead Sub Status */}
     <Text style={styles.statusLabel}>
       Lead Sub Status:{' '}
       <Text style={styles.statusValue}>{item?.lead_sub_status?.name}</Text>
     </Text>
+
     {/* Call Back */}
     <Text style={styles.fieldLabelHighlight}>
       Call Back Date & Time:{' '}
@@ -121,9 +124,7 @@ const InteractionCard = ({ item, setShowRemarks, setRemarksText }) => (
       <Text
         style={[
           styles.callResult,
-          {
-            color: statusColors[item?.call_status?.name] || 'black',
-          },
+          { color: statusColors[item?.call_status?.name] || '#8A90B4' },
         ]}
       >
         {item?.call_status?.name}
@@ -132,6 +133,30 @@ const InteractionCard = ({ item, setShowRemarks, setRemarksText }) => (
   </View>
 );
 
+// ─── Remarks Modal ────────────────────────────────────────────────────────────
+
+const RemarksModal = ({ visible, text, onClose }) => {
+  if (!visible) return null;
+  return (
+    <View style={styles.modalOverlay}>
+      <View style={styles.modalCard}>
+        <View style={styles.checkIcon}>
+          <Icon name="check-circle" size={32} color="#00acc1" />
+        </View>
+        <Text style={styles.modalTitle}>Latest Remarks</Text>
+        <Text style={styles.modalText}>{text}</Text>
+        <TouchableOpacity
+          style={styles.modalCloseBtn}
+          onPress={onClose}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.modalCloseText}>OK</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+};
+
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 const AllInteractionsScreen = ({ route }) => {
@@ -139,11 +164,10 @@ const AllInteractionsScreen = ({ route }) => {
   const [remarksText, setRemarksText] = useState('');
   const { id } = route.params;
   const navigation = useNavigation();
-  // ================= Fetch Feedback =================
+
   const {
     data: feedback,
     isLoading,
-    refetch,
   } = useQuery({
     queryKey: ['feedback', id],
     queryFn: async () => {
@@ -151,74 +175,58 @@ const AllInteractionsScreen = ({ route }) => {
       return res?.data?.data || [];
     },
     onError: err => {
-      Toast.show({
-        type: 'error',
-        text1: err?.response?.data?.message || 'Failed to fetch feedback',
-      });
+      // Toast.show({
+      //   type: 'error',
+      //   text1: err?.response?.data?.message || 'Failed to fetch feedback',
+      // });
     },
   });
-  console.log('feedback', feedback);
 
   return (
-    <>
-      <SafeAreaView style={styles.safeArea}>
-        <StatusBar barStyle="light-content" backgroundColor="#0A0F2E" />
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar barStyle="light-content" backgroundColor="#0A0F2E" />
 
-        <Header />
+      {/* ── Header pinned to top ── */}
+      <Header />
 
-        <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
-          <SectionHeader navigation={navigation} route={route} />
-          {isLoading ? (
-            <Text style={{ color: '#fff', textAlign: 'center', marginTop: 20 }}>
-              Loading...
-            </Text>
-          ) : feedback?.length >0 ? (
-            feedback?.map(item => (
-              <InteractionCard
-                key={item.id}
-                item={item}
-                setShowRemarks={setShowRemarks}
-                setRemarksText={setRemarksText}
-              />
-            ))
-          ) : (
-            <Text style={{ color: '#fff', textAlign: 'center', marginTop: 20 }}>
-              No Data Found
-            </Text>
-          )}
-        </ScrollView>
+      {/* ── Scrollable content ── */}
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <SectionHeader navigation={navigation} route={route} />
 
-        {showRemarks && (
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalCard}>
-              <View style={styles.checkIcon}>
-                <Icon name="check-circle" size={32} color="#00acc1" />
-              </View>
-
-              <Text style={styles.modalTitle}>Latest Remarks</Text>
-
-              <Text style={styles.modalText}>{remarksText}</Text>
-
-              <TouchableOpacity
-                style={styles.modalCloseBtn}
-                onPress={() => setShowRemarks(false)}
-              >
-                <Text style={styles.modalCloseText}>OK</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
+        {isLoading ? (
+          <Text style={styles.centeredText}>Loading...</Text>
+        ) : feedback?.length > 0 ? (
+          feedback.map(item => (
+            <InteractionCard
+              key={item.id}
+              item={item}
+              setShowRemarks={setShowRemarks}
+              setRemarksText={setRemarksText}
+            />
+          ))
+        ) : (
+          <Text style={styles.centeredText}>No Data Found</Text>
         )}
-        <BottomNav />
-      </SafeAreaView>
-    </>
+      </ScrollView>
+
+      {/* ── Remarks Modal (absolute overlay) ── */}
+      <RemarksModal
+        visible={showRemarks}
+        text={remarksText}
+        onClose={() => setShowRemarks(false)}
+      />
+
+      {/* ── Bottom Nav pinned to bottom ── */}
+      <BottomNav />
+    </SafeAreaView>
   );
 };
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
+// ─── Colors ───────────────────────────────────────────────────────────────────
 
 const COLORS = {
   bg: '#080d5a',
@@ -230,54 +238,51 @@ const COLORS = {
   white: '#FFFFFF',
   mutedText: '#8A90B4',
   labelText: '#FFB85D',
-  valueText: '#FFFFFF',
   orange: '#F5A623',
   green: '#00C48C',
   red: '#FF6B6B',
   remarksBg: '#2488B5',
-  addNewBg: '#1e2a6e47',
+  addNewBg: 'rgba(30,42,110,0.28)',
   borderColor: '#1E2550',
-  navBg: '#0D1230',
 };
 
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
+
+  // ── Layout ──
   safeArea: {
     flex: 1,
     backgroundColor: COLORS.bg,
   },
-
-  // ── Header ──
-
-  menuLine: {
-    width: 22,
-    height: 2,
-    backgroundColor: COLORS.white,
-    borderRadius: 2,
-    marginVertical: 2,
-  },
-
-  // ── Scroll ──
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 24,
+    paddingBottom: 16,
   },
+  centeredText: {
+    color: COLORS.white,
+    textAlign: 'center',
+    marginTop: 24,
+    fontSize: 14,
+    opacity: 0.7,
+  },
+
   // ── Section Header ──
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: COLORS.headerBg,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    marginBottom: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.borderColor,
-    backgroundColor: '#ffffff5a', // slightly lighter for header
+    backgroundColor: 'rgba(255,255,255,0.15)',
     borderRadius: 20,
     marginHorizontal: 12,
     marginTop: 10,
+    marginBottom: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
   },
   sectionTitleRow: {
     flexDirection: 'row',
@@ -285,12 +290,12 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   sectionIcon: {
-    fontSize: 16,
+    fontSize: 15,
   },
   sectionTitle: {
     color: COLORS.white,
-    fontSize: 15,
-    fontWeight: '600',
+    fontSize: 14,
+    fontWeight: '700',
   },
   sectionActions: {
     flexDirection: 'row',
@@ -302,13 +307,13 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     paddingHorizontal: 12,
     paddingVertical: 5,
-    borderWidth: 2,
+    borderWidth: 1.5,
     borderColor: COLORS.accent,
   },
   addNewText: {
     color: COLORS.white,
     fontSize: 11,
-    fontWeight: '500',
+    fontWeight: '600',
   },
   closeBtn: {
     width: 24,
@@ -322,6 +327,7 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontSize: 12,
     fontWeight: '700',
+    lineHeight: 14,
   },
 
   // ── Card ──
@@ -329,17 +335,16 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.cardBg,
     marginHorizontal: 12,
     marginBottom: 10,
-    borderRadius: 10,
+    borderRadius: 12,
     padding: 14,
     borderWidth: 0.5,
-    borderColor: COLORS.borderColor,
-    borderColor: '#FFFFFF',
+    borderColor: 'rgba(255,255,255,0.35)',
   },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: 5,
   },
   cardTitleRow: {
     flexDirection: 'row',
@@ -349,7 +354,7 @@ const styles = StyleSheet.create({
   },
   cardName: {
     color: COLORS.white,
-    fontWeight: '700',
+    fontWeight: '800',
     fontSize: 14,
     flexShrink: 1,
   },
@@ -366,52 +371,53 @@ const styles = StyleSheet.create({
   remarksBtnText: {
     color: COLORS.white,
     fontSize: 12,
-    fontWeight: '500',
+    fontWeight: '600',
   },
   leadQualification: {
     color: COLORS.accent,
-    fontSize: 12,
-    marginBottom: 6,
+    fontSize: 11.5,
+    marginBottom: 5,
   },
   leadQualificationValue: {
     color: COLORS.accentLight,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   statusRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 4,
+    marginBottom: 3,
     gap: 6,
   },
   statusLabel: {
     color: COLORS.labelText,
-    fontSize: 11.5,
+    fontSize: 11,
     flex: 1,
     flexWrap: 'wrap',
+    marginBottom: 3,
   },
   statusValue: {
     color: COLORS.white,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   fieldLabel: {
     color: COLORS.labelText,
-    fontSize: 11.5,
+    fontSize: 11,
     marginBottom: 3,
     flexWrap: 'wrap',
   },
   fieldValue: {
     color: COLORS.white,
-    fontWeight: '500',
+    fontWeight: '600',
   },
   fieldLabelHighlight: {
     color: COLORS.orange,
-    fontSize: 11.5,
+    fontSize: 11,
     marginBottom: 3,
-    fontWeight: '500',
+    fontWeight: '600',
   },
   fieldValueHighlight: {
     color: COLORS.white,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   closureRow: {
     flexDirection: 'row',
@@ -421,74 +427,62 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   callResult: {
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: 11.5,
+    fontWeight: '700',
   },
 
-  // ── Info Row (generic) ──
-  infoRow: {
-    flexDirection: 'row',
-    marginBottom: 2,
-  },
-  infoLabel: {
-    color: COLORS.labelText,
-    fontSize: 12,
-    marginRight: 4,
-  },
-  infoValue: {
-    color: COLORS.white,
-    fontSize: 12,
-    fontWeight: '500',
-  },
+  // ── Remarks Modal ──
   modalOverlay: {
     position: 'absolute',
-    width: '100%',
-    height: '100%',
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.65)',
     justifyContent: 'center',
     alignItems: 'center',
+    zIndex: 999,
   },
-
   modalCard: {
-    width: '85%',
+    width: '82%',
     backgroundColor: '#2f2f8f',
-    borderRadius: 12,
-    padding: 20,
+    borderRadius: 16,
+    padding: 24,
     alignItems: 'center',
   },
-
   checkIcon: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     backgroundColor: '#e6f7ff',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 12,
   },
-
   modalTitle: {
     color: '#00e5ff',
-    fontSize: 18,
+    fontSize: 17,
+    fontWeight: '700',
     marginBottom: 10,
   },
-
   modalText: {
-    color: '#fff',
+    color: COLORS.white,
     textAlign: 'center',
-    marginBottom: 15,
+    fontSize: 13,
+    lineHeight: 20,
+    marginBottom: 18,
+    opacity: 0.9,
   },
-
   modalCloseBtn: {
     backgroundColor: '#00acc1',
-    paddingHorizontal: 20,
-    paddingVertical: 6,
+    paddingHorizontal: 32,
+    paddingVertical: 8,
     borderRadius: 20,
   },
-
   modalCloseText: {
-    color: '#fff',
-    fontWeight: '600',
+    color: COLORS.white,
+    fontWeight: '700',
+    fontSize: 14,
   },
 });
 

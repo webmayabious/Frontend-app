@@ -28,17 +28,40 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 
 const screenHeight = Dimensions.get('window').height;
 
-/* ================= DROPDOWN FIELD ================= */
+// ─── COLORS ──────────────────────────────────────────────────────────────────
+
+const COLORS = {
+  bg: '#080d5a',
+  cardBg: '#ffffff0e',
+  cardSelected: '#0d1a6e',
+  headerBg: '#0A0F2E',
+  accent: '#00cfff',
+  accentDim: '#00cfff18',
+  accentBorder: '#00cfff40',
+  white: '#FFFFFF',
+  mutedText: '#8A90B4',
+  labelText: '#FFB85D',
+  gold: '#f4c542',
+  goldDim: '#f4c54218',
+  goldBorder: '#f4c54235',
+  green: '#00C48C',
+  red: '#FF6B6B',
+  borderColor: '#ffffff20',
+  modalBg: '#0f1550',
+  sectionBg: 'rgba(255,255,255,0.13)',
+};
+
+// ─── DROPDOWN FIELD ───────────────────────────────────────────────────────────
+
 const DropdownField = ({ label, data, placeholder, value, onChange }) => {
   const [isFocus, setIsFocus] = useState(false);
   return (
-
     <View style={styles.inputWrapper}>
-      {label ? <Text style={styles.label}>{label}</Text> : null}
+      {label ? <Text style={styles.filterLabel}>{label}</Text> : null}
       <Dropdown
         style={[
           styles.dropdown,
-          isFocus && { borderColor: '#00e5ff', borderWidth: 1.5 },
+          isFocus && { borderColor: COLORS.accent, borderWidth: 1.5 },
         ]}
         containerStyle={styles.dropdownContainer}
         placeholderStyle={styles.placeholderStyle}
@@ -60,7 +83,7 @@ const DropdownField = ({ label, data, placeholder, value, onChange }) => {
           <Icon
             name={isFocus ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
             size={20}
-            color="#00e5ff"
+            color={COLORS.accent}
           />
         )}
       />
@@ -68,29 +91,29 @@ const DropdownField = ({ label, data, placeholder, value, onChange }) => {
   );
 };
 
-/* ================= INPUT FIELD ================= */
-const InputField = ({ label, placeholder, icon, value, onChange, onPress }) => {
-  return (
-    <View style={styles.field}>
-      {label ? <Text style={styles.label}>{label}</Text> : null}
-      <TouchableOpacity activeOpacity={0.8} onPress={onPress}>
-        <View style={styles.inputContainer}>
-          <TextInput
-            placeholder={placeholder}
-            placeholderTextColor="#8aa0c8"
-            style={styles.input}
-            value={value}
-            onChangeText={onChange}
-            editable={!onPress}
-          />
-          {icon && <Icon name={icon} size={18} color="#00bcd4" />}
-        </View>
-      </TouchableOpacity>
-    </View>
-  );
-};
+// ─── INPUT FIELD ──────────────────────────────────────────────────────────────
 
-/* ================= CALL ================= */
+const InputField = ({ label, placeholder, icon, value, onChange, onPress }) => (
+  <View style={styles.field}>
+    {label ? <Text style={styles.filterLabel}>{label}</Text> : null}
+    <TouchableOpacity activeOpacity={0.8} onPress={onPress}>
+      <View style={styles.inputContainer}>
+        <TextInput
+          placeholder={placeholder}
+          placeholderTextColor={COLORS.mutedText}
+          style={styles.input}
+          value={value}
+          onChangeText={onChange}
+          editable={!onPress}
+        />
+        {icon && <Icon name={icon} size={18} color={COLORS.accent} />}
+      </View>
+    </TouchableOpacity>
+  </View>
+);
+
+// ─── MAKE CALL ────────────────────────────────────────────────────────────────
+
 const makeCall = phoneNumber => {
   if (!phoneNumber) return;
   Alert.alert('Call', `Do you want to call ${phoneNumber}?`, [
@@ -99,7 +122,8 @@ const makeCall = phoneNumber => {
   ]);
 };
 
-/* ================= MAIN COMPONENT ================= */
+// ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
+
 const ChangeRM = () => {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
@@ -142,7 +166,7 @@ const ChangeRM = () => {
     }).start(() => setShowFilterModal(false));
   };
 
-  /* ================= DATE ================= */
+  // ── Date ──
   const formatDate = date => {
     if (!date) return '';
     const d = new Date(date);
@@ -157,7 +181,7 @@ const ChangeRM = () => {
     if (selectedDate) onChange(key, formatDate(selectedDate));
   };
 
-  /* ================= RM LIST ================= */
+  // ── RM List ──
   const { data: allRmList = [] } = useQuery({
     queryKey: ['allRMList'],
     queryFn: async () => {
@@ -172,7 +196,7 @@ const ChangeRM = () => {
 
   const Rm = allRmList?.map(item => ({ label: item.name, value: item.id }));
 
-  /* ================= LEADS ================= */
+  // ── Leads ──
   const { data: Lead = [], refetch: leadrefetch, isLoading } = useQuery({
     queryKey: ['AllPropertyLeads', appliedFilters, searchText],
     queryFn: async () => {
@@ -200,7 +224,7 @@ const ChangeRM = () => {
     leadrefetch();
   }, [searchText]);
 
-  /* ================= LOCATIONS ================= */
+  // ── Locations ──
   const { data: AllProperty } = useQuery({
     queryKey: ['AllProperty'],
     queryFn: async () => {
@@ -209,7 +233,7 @@ const ChangeRM = () => {
     },
   });
 
-  /* ================= PROJECTS ================= */
+  // ── Projects ──
   const { data: projectList = [] } = useQuery({
     queryKey: ['project'],
     queryFn: async () => {
@@ -218,7 +242,6 @@ const ChangeRM = () => {
     },
   });
 
-  /* ================= DATA MAPPING ================= */
   const Property = AllProperty?.map(item => ({ label: item.name, value: item.id }));
   const projectOptions = projectList?.map(item => ({
     label: item.project_name,
@@ -233,7 +256,7 @@ const ChangeRM = () => {
     { label: 'Booking Done', value: '5' },
   ];
 
-  /* ================= SELECT ================= */
+  // ── Select ──
   const toggleSelect = id => {
     setSelected(prev =>
       prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id],
@@ -250,7 +273,7 @@ const ChangeRM = () => {
 
   const isAllSelected = selected.length === Lead.length && Lead.length > 0;
 
-  /* ================= ASSIGN RM ================= */
+  // ── Assign RM ──
   const { mutate: handleAssignRm } = useMutation({
     mutationFn: async () => {
       if (!selected.length) throw new Error('Please select prospects');
@@ -271,7 +294,7 @@ const ChangeRM = () => {
     },
   });
 
-  /* ================= FILTER HANDLERS ================= */
+  // ── Filter Handlers ──
   const onChange = (key, value) => {
     setFilters(prev => ({ ...prev, [key]: value }));
   };
@@ -296,81 +319,77 @@ const ChangeRM = () => {
     closeFilterModal();
   };
 
-  /* ================= RENDER ================= */
+  // ─── RENDER ───────────────────────────────────────────────────────────────
+
   return (
-    <SafeAreaView style={styles.container} edges={['left', 'right']}>
-      <StatusBar
-        barStyle="light-content"
-        translucent={true}
-        backgroundColor="transparent"
-      />
+    <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor="#0A0F2E" />
+
+      {/* ── Header pinned to top ── */}
       <Header />
 
-      {/* ── TOP BAR ── */}
-      <View
-        style={[
-          styles.topBarContainer,
-          { paddingTop: Platform.OS === 'ios' ? insets.top : 10 },
-        ]}
-      >
-        <View style={styles.topBar}>
-          <View style={styles.topBarLeft}>
-            <MaterialCommunityIcons name="account-switch" size={18} color="#00cfff" />
-            <Text style={styles.title}>Change RM</Text>
-          </View>
-          <View style={styles.topBarRight}>
-            <TouchableOpacity
-              style={styles.changeBtn}
-              onPress={() => {
-                if (selected.length === 0) {
-                  Alert.alert('', 'Please select at least one lead');
-                  return;
-                }
-                setShowrmModal(true);
-              }}
-            >
-              <Text style={styles.changeBtnText}>Change</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.backBtn}
-              onPress={() => navigation.navigate('Dashboard')}
-            >
-               <View style={styles.backButton}>
-                             <Image
-                               source={require('../asset/image/icon/Arrow.png')}
-                               style={{ width:12, height: 12, marginRight: 6 }}
-                             />
-                             <Text style={styles.backText}>Back</Text>
-                           </View>
-            </TouchableOpacity>
-          </View>
+      {/* ── Top Bar (title + actions) ── */}
+      <View style={styles.sectionHeader}>
+        <View style={styles.sectionTitleRow}>
+          <MaterialCommunityIcons name="account-switch" size={16} color={COLORS.accent} />
+          <Text style={styles.sectionTitle}>Change RM</Text>
+        </View>
+        <View style={styles.sectionActions}>
+          <TouchableOpacity
+            style={styles.changeBtn}
+            onPress={() => {
+              if (selected.length === 0) {
+                Alert.alert('', 'Please select at least one lead');
+                return;
+              }
+              setShowrmModal(true);
+            }}
+            activeOpacity={0.75}
+          >
+            <Text style={styles.changeBtnText}>Change</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.closeBtn}
+            onPress={() => navigation.navigate('Dashboard')}
+            activeOpacity={0.75}
+          >
+            <View style={styles.backButton}>
+              <Image
+                source={require('../asset/image/icon/Arrow.png')}
+                style={{ width: 11, height: 11, marginRight: 4 }}
+              />
+              <Text style={styles.closeBtnText}>Back</Text>
+            </View>
+          </TouchableOpacity>
         </View>
       </View>
 
-      {/* ── LIST ── */}
+      {/* ── Scrollable List ── */}
       <ScrollView
-        contentContainerStyle={{ paddingHorizontal: 12, paddingBottom: 80 }}
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
       >
-        {/* Search */}
+        {/* Search Bar */}
         <View style={styles.searchRow}>
           <View style={styles.searchBox}>
-            <Icon name="search" size={16} color="#aaa" />
+            <Icon name="search" size={16} color={COLORS.mutedText} />
             <TextInput
               placeholder="Search name / phone / email..."
-              placeholderTextColor="#aaa"
+              placeholderTextColor={COLORS.mutedText}
               value={searchText}
               onChangeText={setSearchText}
               style={styles.searchInput}
             />
             {searchText ? (
               <TouchableOpacity onPress={() => setSearchText('')}>
-                <Icon name="close" size={15} color="#aaa" />
+                <Icon name="close" size={15} color={COLORS.mutedText} />
               </TouchableOpacity>
             ) : null}
           </View>
         </View>
 
-        {/* Select All + Filter */}
+        {/* Select All + Filter Row */}
         <View style={styles.selectAllRow}>
           <TouchableOpacity style={styles.selectAllLeft} onPress={toggleSelectAll}>
             <View style={[styles.checkbox, isAllSelected && styles.checkboxChecked]}>
@@ -385,130 +404,135 @@ const ChangeRM = () => {
             </View>
           )}
 
-          {/* ✅ By Details — animation trigger */}
           <TouchableOpacity style={styles.filterBtn} onPress={openFilterModal}>
-            <Icon name="filter-list" size={14} color="#fff" />
-            <Text style={styles.filterText}>By Details</Text>
-            <Icon name="keyboard-arrow-down" size={14} color="#fff" />
+            <Icon name="filter-list" size={13} color="#fff" />
+            <Text style={styles.filterBtnText}>By Details</Text>
+            <Icon name="keyboard-arrow-down" size={13} color="#fff" />
           </TouchableOpacity>
         </View>
 
         {/* Lead Cards */}
         {isLoading ? (
-          <Text style={{ color: '#fff', textAlign: 'center', marginTop: 20 }}>
-            Loading...
-          </Text>
-        ) :
-          Lead.length === 0 ? (
-            <Text style={styles.emptyText}>No leads found</Text>
-          ) : (
-            Lead.map(item => {
-              const isChecked = selected.includes(item.id);
-              return (
-                <View
-                  key={item.id}
-                  style={[styles.card, isChecked && styles.cardSelected]}
-                >
-                  <View style={styles.cardTop}>
-                    <View style={styles.nameRow}>
-                      <TouchableOpacity
-                        onPress={() => toggleSelect(item.id)}
-                        style={[styles.checkbox, isChecked && styles.checkboxChecked]}
-                      >
-                        {isChecked && <Icon name="check" size={11} color="#fff" />}
-                      </TouchableOpacity>
-
-                      <Text style={styles.name}>{item?.name || 'N/A'}</Text>
-
-                      <View
+          <Text style={styles.centeredText}>Loading...</Text>
+        ) : Lead.length === 0 ? (
+          <Text style={styles.centeredText}>No leads found</Text>
+        ) : (
+          Lead.map(item => {
+            const isChecked = selected.includes(item.id);
+            return (
+              <View
+                key={item.id}
+                style={[styles.card, isChecked && styles.cardSelected]}
+              >
+                {/* Card Top */}
+                <View style={styles.cardTop}>
+                  <View style={styles.nameRow}>
+                    <TouchableOpacity
+                      onPress={() => toggleSelect(item.id)}
+                      style={[styles.checkbox, isChecked && styles.checkboxChecked]}
+                    >
+                      {isChecked && <Icon name="check" size={11} color="#fff" />}
+                    </TouchableOpacity>
+                    <Text style={styles.cardName}>{item?.name || 'N/A'}</Text>
+                    <View
+                      style={[
+                        styles.statusBadge,
+                        {
+                          backgroundColor:
+                            item?.active === '1' ? '#00C48C22' : '#FF6B6B22',
+                          borderColor:
+                            item?.active === '1' ? '#00C48C60' : '#FF6B6B60',
+                        },
+                      ]}
+                    >
+                      <Text
                         style={[
-                          styles.statusBadge,
-                          {
-                            backgroundColor:
-                              item?.active === '1' ? '#4caf50' : '#f44336',
-                          },
+                          styles.statusText,
+                          { color: item?.active === '1' ? COLORS.green : COLORS.red },
                         ]}
                       >
-                        <Text style={styles.statusText}>
-                          {item?.active === '1' ? 'Active' : 'Inactive'}
-                        </Text>
-                      </View>
-                    </View>
-                  </View>
-
-                  <View style={styles.divider} />
-
-                  <View style={styles.cardBody}>
-                    <View style={styles.leftCol}>
-                      <View style={styles.infoRow}>
-                        <Icon name="call" size={12} color="#00cfff" />
-                        <Text
-                          style={styles.infoText}
-                          onPress={() => makeCall(item?.phone)}
-                        >
-                          {item?.phone || 'N/A'}
-                        </Text>
-                      </View>
-                      <View style={styles.infoRow}>
-                        <MaterialCommunityIcons
-                          name="file-document-outline"
-                          size={12}
-                          color="#00cfff"
-                        />
-                        <Text style={styles.infoText}>
-                          {item?.company?.com_name || 'N/A'}
-                        </Text>
-                      </View>
-                      <View style={styles.infoRow}>
-                        <Icon name="email" size={12} color="#00cfff" />
-                        <Text style={styles.infoText}>{item?.email || 'N/A'}</Text>
-                      </View>
-                    </View>
-
-                    <View style={styles.rightCol}>
-                      <View style={styles.infoRow}>
-                        <Text style={styles.rmLabelCard}>RM: </Text>
-                        <Text style={styles.rmValue}>
-                          {item?.relationshipManager
-                            ? `${item.relationshipManager.usr_fname} ${item.relationshipManager.usr_lname}`
-                            : 'N/A'}
-                        </Text>
-                      </View>
-                      <View style={styles.infoRow}>
-                        <Icon name="location-on" size={12} color="#f4c542" />
-                        <Text style={styles.infoText}>
-                          {item?.propertylocation?.name || 'N/A'}
-                        </Text>
-                      </View>
-                      <View style={styles.infoRow}>
-                        <Text style={styles.refLabel}>Reference: </Text>
-                        <Text style={styles.refValue}>
-                          {item?.mrreference?.mrf_name || 'N/A'}
-                        </Text>
-                      </View>
+                        {item?.active === '1' ? 'Active' : 'Inactive'}
+                      </Text>
                     </View>
                   </View>
                 </View>
-              );
-            })
-          )}
+
+                <View style={styles.divider} />
+
+                {/* Card Body */}
+                <View style={styles.cardBody}>
+                  <View style={styles.leftCol}>
+                    <View style={styles.infoRow}>
+                      <Icon name="call" size={12} color={COLORS.accent} />
+                      <Text
+                        style={[styles.infoText, { color: COLORS.accent }]}
+                        onPress={() => makeCall(item?.phone)}
+                      >
+                        {item?.phone || 'N/A'}
+                      </Text>
+                    </View>
+                    <View style={styles.infoRow}>
+                      <MaterialCommunityIcons
+                        name="file-document-outline"
+                        size={12}
+                        color={COLORS.accent}
+                      />
+                      <Text style={styles.infoText}>
+                        {item?.company?.com_name || 'N/A'}
+                      </Text>
+                    </View>
+                    <View style={styles.infoRow}>
+                      <Icon name="email" size={12} color={COLORS.accent} />
+                      <Text style={styles.infoText}>{item?.email || 'N/A'}</Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.rightCol}>
+                    <View style={styles.infoRow}>
+                      <Text style={styles.rmLabelCard}>RM: </Text>
+                      <Text style={styles.rmValue}>
+                        {item?.relationshipManager
+                          ? `${item.relationshipManager.usr_fname} ${item.relationshipManager.usr_lname}`
+                          : 'N/A'}
+                      </Text>
+                    </View>
+                    <View style={styles.infoRow}>
+                      <Icon name="location-on" size={12} color={COLORS.gold} />
+                      <Text style={styles.infoText}>
+                        {item?.propertylocation?.name || 'N/A'}
+                      </Text>
+                    </View>
+                    <View style={styles.infoRow}>
+                      <Text style={styles.refLabel}>Reference: </Text>
+                      <Text style={styles.refValue}>
+                        {item?.mrreference?.mrf_name || 'N/A'}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              </View>
+            );
+          })
+        )}
       </ScrollView>
 
-      {/* ── CHANGE RM MODAL (center) ── */}
+      {/* ── Change RM Modal (center) ── */}
       {showrmModal && (
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
-            {/* Header */}
+            {/* Modal Header */}
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Change RM</Text>
-              <TouchableOpacity onPress={() => { setShowrmModal(false); setrms(null); }}>
-                <Icon name="close" size={20} color="#aaa" />
+              <TouchableOpacity
+                onPress={() => { setShowrmModal(false); setrms(null); }}
+              >
+                <Icon name="close" size={20} color={COLORS.mutedText} />
               </TouchableOpacity>
             </View>
 
             {/* Selected leads info */}
             <View style={styles.infoBox}>
-              <Icon name="people" size={14} color="#f4c542" />
+              <Icon name="people" size={14} color={COLORS.gold} />
               <Text style={styles.infoBoxText}>
                 {selected.length} lead{selected.length > 1 ? 's' : ''} selected
               </Text>
@@ -530,18 +554,33 @@ const ChangeRM = () => {
                   return (
                     <TouchableOpacity
                       key={rm.value}
-                      style={[styles.dropdownItem, isSelected && styles.dropdownItemSelected]}
+                      style={[
+                        styles.dropdownItem,
+                        isSelected && styles.dropdownItemSelected,
+                      ]}
                       onPress={() => setrms(rm.value)}
                     >
                       <View style={styles.rmItemLeft}>
-                        <View style={[styles.rmRadio, isSelected && styles.rmRadioSelected]}>
+                        <View
+                          style={[
+                            styles.rmRadio,
+                            isSelected && styles.rmRadioSelected,
+                          ]}
+                        >
                           {isSelected && <View style={styles.rmRadioInner} />}
                         </View>
-                        <Text style={[styles.dropdownItemText, isSelected && styles.dropdownItemTextSelected]}>
+                        <Text
+                          style={[
+                            styles.dropdownItemText,
+                            isSelected && styles.dropdownItemTextSelected,
+                          ]}
+                        >
                           {rm.label}
                         </Text>
                       </View>
-                      {isSelected && <Icon name="check-circle" size={16} color="#00cfff" />}
+                      {isSelected && (
+                        <Icon name="check-circle" size={16} color={COLORS.accent} />
+                      )}
                     </TouchableOpacity>
                   );
                 })
@@ -551,7 +590,7 @@ const ChangeRM = () => {
             {/* Selected RM badge */}
             {rms && (
               <View style={styles.selectedRMBadge}>
-                <Icon name="person-pin" size={14} color="#00cfff" />
+                <Icon name="person-pin" size={14} color={COLORS.accent} />
                 <Text style={styles.selectedRMText}>
                   {Rm.find(r => r.value === rms)?.label}
                 </Text>
@@ -578,30 +617,29 @@ const ChangeRM = () => {
         </View>
       )}
 
-      {/* ── FILTER BOTTOM SHEET ── */}
+      {/* ── Filter Bottom Sheet ── */}
       {showFilterModal && (
         <View style={styles.bottomSheetOverlay}>
-          {/* Dark bg tap to close */}
           <TouchableOpacity
             style={StyleSheet.absoluteFill}
             activeOpacity={1}
             onPress={closeFilterModal}
           />
-
           <Animated.View
-            style={[styles.bottomSheet, { transform: [{ translateY: filterAnim }] }]}
+            style={[
+              styles.bottomSheet,
+              { transform: [{ translateY: filterAnim }] },
+            ]}
           >
-            {/* Handle Bar */}
             <View style={styles.handleBar} />
 
-            {/* Header */}
             <View style={styles.modalHeader}>
               <View style={styles.filterModalTitleRow}>
-                <Icon name="filter-list" size={18} color="#00cfff" />
+                <Icon name="filter-list" size={17} color={COLORS.accent} />
                 <Text style={styles.modalTitle}>Filter Leads</Text>
               </View>
               <TouchableOpacity onPress={closeFilterModal}>
-                <Icon name="close" size={20} color="#aaa" />
+                <Icon name="close" size={20} color={COLORS.mutedText} />
               </TouchableOpacity>
             </View>
 
@@ -611,16 +649,16 @@ const ChangeRM = () => {
               showsVerticalScrollIndicator={false}
               contentContainerStyle={{ paddingBottom: 8 }}
             >
-              <Text style={styles.filterLabel}>Property Location</Text>
               <DropdownField
+                label="Property Location"
                 data={Property}
                 placeholder="Select location"
                 value={filters.location}
                 onChange={value => onChange('location', value)}
               />
 
-              <Text style={styles.filterLabel}>Relationship Manager</Text>
               <DropdownField
+                label="Relationship Manager"
                 data={Rm}
                 placeholder="Select RM"
                 value={filters.rm_id}
@@ -639,7 +677,7 @@ const ChangeRM = () => {
                   />
                 </View>
                 <View style={styles.dateSeparator}>
-                  <Icon name="arrow-forward" size={16} color="#555" />
+                  <Icon name="arrow-forward" size={16} color={COLORS.mutedText} />
                 </View>
                 <View style={styles.dateField}>
                   <Text style={styles.dateSubLabel}>To</Text>
@@ -652,8 +690,8 @@ const ChangeRM = () => {
                 </View>
               </View>
 
-              <Text style={styles.filterLabel}>Project</Text>
               <DropdownField
+                label="Project"
                 data={projectOptions}
                 placeholder="Select project"
                 value={filters.project}
@@ -661,16 +699,23 @@ const ChangeRM = () => {
               />
 
               <Text style={styles.filterLabel}>Lead Status</Text>
-              <View style={styles.statusRow}>
+              <View style={styles.statusChipRow}>
                 {LeadStatus.map(status => {
                   const isActive = filters.active === status.value;
                   return (
                     <TouchableOpacity
                       key={status.value}
                       style={[styles.statusChip, isActive && styles.statusChipActive]}
-                      onPress={() => onChange('active', isActive ? null : status.value)}
+                      onPress={() =>
+                        onChange('active', isActive ? null : status.value)
+                      }
                     >
-                      <Text style={[styles.statusChipText, isActive && styles.statusChipTextActive]}>
+                      <Text
+                        style={[
+                          styles.statusChipText,
+                          isActive && styles.statusChipTextActive,
+                        ]}
+                      >
                         {status.label}
                       </Text>
                     </TouchableOpacity>
@@ -698,11 +743,9 @@ const ChangeRM = () => {
 
             <View style={styles.filterDivider} />
 
-            {/* Footer */}
-            
             <View style={styles.filterBtnRow}>
               <TouchableOpacity style={styles.resetBtn} onPress={resetFilters}>
-                <Icon name="refresh" size={14} color="#ff5252" />
+                <Icon name="refresh" size={14} color={COLORS.red} />
                 <Text style={styles.resetBtnText}>Reset</Text>
               </TouchableOpacity>
               <View style={styles.filterActionBtns}>
@@ -719,6 +762,7 @@ const ChangeRM = () => {
         </View>
       )}
 
+      {/* ── Bottom Nav pinned to bottom ── */}
       <BottomNav />
     </SafeAreaView>
   );
@@ -726,230 +770,601 @@ const ChangeRM = () => {
 
 export default ChangeRM;
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0b0f4a' },
-  topBarContainer: {
-    paddingHorizontal: 12,
-    marginBottom: 8,
-  },
-  topBar: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    backgroundColor: '#ffffff10', paddingVertical: 8, paddingHorizontal: 14, borderRadius: 20,
-  },
-  topBarLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  topBarRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  title: { color: '#fff', fontSize: 14, fontWeight: '700' },
-  changeBtn: {
-    borderWidth: 1, borderColor: '#ffffff40', borderRadius: 20,
-    paddingHorizontal: 14, paddingVertical: 5, backgroundColor: '#ffffff10',
-  },
-  changeBtnText: { color: '#fff', fontSize: 12, fontWeight: '500' },
-  backBtn: {
-    borderWidth: 1, borderColor: '#ffffff40', borderRadius: 20,
-    paddingHorizontal: 14, paddingVertical: 5, backgroundColor: '#ffffff10',
-  },
-  backText: { color: '#fff', fontSize: 12, fontWeight: '500' },
-  filterBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#3a3f7a',
-    paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20,
-    borderWidth: 1, borderColor: '#ffffff20',
-  },
-  filterText: { color: '#fff', fontSize: 12, fontWeight: '500' },
-  searchRow: {
-  width: '100%',
-  paddingHorizontal:0,
-  marginBottom: 8,
-},
- searchBox: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  borderWidth: 1,
-  borderColor: '#555',
-  borderRadius: 20,
-  paddingHorizontal: 12,
-  height: 40,
-  // iOS fix
-  backgroundColor: '#ffffff08',
-},
-  searchInput: {
-  color: '#fff',
-  marginLeft: 6,
-  fontSize: 13,
-  flex: 1,
+// ─── STYLES ───────────────────────────────────────────────────────────────────
 
-  // 🔥 iOS specific fix
-  paddingVertical: Platform.OS === 'ios' ? 0 : 0,
-  textAlignVertical: 'center',
-},
+const styles = StyleSheet.create({
+
+  // ── Layout ──
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.bg,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingHorizontal: 12,
+    paddingBottom: 16,
+  },
+  centeredText: {
+    color: COLORS.white,
+    textAlign: 'center',
+    marginTop: 24,
+    fontSize: 14,
+    opacity: 0.7,
+  },
+
+  // ── Section Header (same as AllInteractions) ──
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: COLORS.sectionBg,
+    borderRadius: 20,
+    marginHorizontal: 12,
+    marginTop: 10,
+    marginBottom: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+  },
+  sectionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+  },
+  sectionTitle: {
+    color: COLORS.white,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  sectionActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  changeBtn: {
+    backgroundColor: 'rgba(0,207,255,0.12)',
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 5,
+    borderWidth: 1.5,
+    borderColor: COLORS.accent,
+  },
+  changeBtnText: {
+    color: COLORS.white,
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  closeBtn: {
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.25)',
+  },
+  closeBtnText: {
+    color: COLORS.white,
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+
+  // ── Search ──
+  searchRow: {
+    marginBottom: 8,
+    marginTop: 2,
+  },
+  searchBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.borderColor,
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    height: 40,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+  },
+  searchInput: {
+    color: COLORS.white,
+    marginLeft: 8,
+    fontSize: 13,
+    flex: 1,
+    paddingVertical: Platform.OS === 'ios' ? 0 : 0,
+  },
+
+  // ── Select All Row ──
   selectAllRow: {
-    flexDirection: 'row', alignItems: 'center',
-    justifyContent: 'space-between', paddingHorizontal: 13, marginBottom: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+    paddingHorizontal: 2,
   },
-  selectAllLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  selectAllText: { color: '#fff', fontSize: 13, fontWeight: '500' },
+  selectAllLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  selectAllText: {
+    color: COLORS.white,
+    fontSize: 13,
+    fontWeight: '500',
+  },
   selectedBadge: {
-    backgroundColor: '#00cfff22', borderWidth: 1, borderColor: '#00cfff55',
-    borderRadius: 20, paddingHorizontal: 10, paddingVertical: 2,
+    backgroundColor: COLORS.accentDim,
+    borderWidth: 1,
+    borderColor: COLORS.accentBorder,
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
   },
-  selectedBadgeText: { color: '#00cfff', fontSize: 11, fontWeight: '500' },
+  selectedBadgeText: {
+    color: COLORS.accent,
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  filterBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(58,63,122,0.8)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: COLORS.borderColor,
+  },
+  filterBtnText: {
+    color: COLORS.white,
+    fontSize: 11,
+    fontWeight: '500',
+  },
+
+  // ── Checkbox ──
   checkbox: {
-    width: 17, height: 17, borderRadius: 3, borderWidth: 1.5,
-    borderColor: '#ffffff50', alignItems: 'center', justifyContent: 'center',
+    width: 17,
+    height: 17,
+    borderRadius: 4,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.4)',
+    alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: 'transparent',
   },
-  checkboxChecked: { backgroundColor: '#00cfff', borderColor: '#00cfff' },
-  emptyText: { color: '#aaa', textAlign: 'center', marginTop: 40, fontSize: 14 },
-  card: {
-    backgroundColor: '#1e2260', borderRadius: 12, padding: 12,
-    marginBottom: 10, borderWidth: 0.3, borderColor: '#ffffff30',
+  checkboxChecked: {
+    backgroundColor: COLORS.accent,
+    borderColor: COLORS.accent,
   },
-  cardSelected: { borderColor: '#00cfff55', backgroundColor: '#1a2a6a' },
-  cardTop: { marginBottom: 8 },
-  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  name: { color: '#fff', fontWeight: '700', fontSize: 13, letterSpacing: 0.3 },
-  statusBadge: { borderRadius: 20, paddingHorizontal: 8, paddingVertical: 2 },
-  statusText: { color: '#ffffff', fontSize: 10, fontWeight: '600' },
-  divider: { height: 1, backgroundColor: '#ffffff15', marginBottom: 8 },
-  cardBody: { flexDirection: 'row', gap: 8 },
-  leftCol: { flex: 1, gap: 5 },
-  rightCol: { flex: 1, gap: 5 },
-  infoRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  infoText: { color: '#ccc', fontSize: 11, flexShrink: 1 },
-  rmLabelCard: { color: '#f4c542', fontSize: 11, fontWeight: '600' },
-  rmValue: { color: '#f4c542', fontSize: 11, fontWeight: '600', flexShrink: 1 },
-  refLabel: { color: '#f4c542', fontSize: 10, fontWeight: '600' },
-  refValue: { color: '#f4c542', fontSize: 10, flexShrink: 1 },
 
-  // ── Center Modal (Change RM) ──
+  // ── Lead Card ──
+  card: {
+    backgroundColor: COLORS.cardBg,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 10,
+    borderWidth: 0.5,
+    borderColor: 'rgba(255,255,255,0.2)',
+  },
+  cardSelected: {
+    borderColor: 'rgba(0,207,255,0.45)',
+    backgroundColor: COLORS.cardSelected,
+  },
+  cardTop: {
+    marginBottom: 8,
+  },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  cardName: {
+    color: COLORS.white,
+    fontWeight: '800',
+    fontSize: 13,
+    flex: 1,
+  },
+  statusBadge: {
+    borderRadius: 20,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderWidth: 0.8,
+  },
+  statusText: {
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  divider: {
+    height: 0.5,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    marginBottom: 8,
+  },
+  cardBody: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  leftCol: {
+    flex: 1,
+    gap: 5,
+  },
+  rightCol: {
+    flex: 1,
+    gap: 5,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  infoText: {
+    color: COLORS.mutedText,
+    fontSize: 11,
+    flexShrink: 1,
+  },
+  rmLabelCard: {
+    color: COLORS.gold,
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  rmValue: {
+    color: COLORS.gold,
+    fontSize: 11,
+    fontWeight: '600',
+    flexShrink: 1,
+  },
+  refLabel: {
+    color: COLORS.labelText,
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  refValue: {
+    color: COLORS.labelText,
+    fontSize: 10,
+    flexShrink: 1,
+  },
+
+  // ── Change RM Modal ──
   modalOverlay: {
-    position: 'absolute', width: '100%', height: '100%',
-    backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'center',
-    alignItems: 'center', zIndex: 1000
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
   },
   modalContainer: {
-    width: '90%', backgroundColor: '#1e2260', borderRadius: 14,
-    padding: 18, maxHeight: '75%', borderWidth: 1, borderColor: '#ffffff15',
+    width: '90%',
+    backgroundColor: COLORS.modalBg,
+    borderRadius: 16,
+    padding: 18,
+    maxHeight: '75%',
+    borderWidth: 1,
+    borderColor: COLORS.borderColor,
   },
   modalHeader: {
-    flexDirection: 'row', justifyContent: 'space-between',
-    alignItems: 'center', marginBottom: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
   },
-  modalTitle: { color: '#00cfff', fontSize: 16, fontWeight: '700' },
+  modalTitle: {
+    color: COLORS.accent,
+    fontSize: 15,
+    fontWeight: '700',
+  },
   infoBox: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    backgroundColor: '#f4c54215', borderRadius: 8, paddingHorizontal: 10,
-    paddingVertical: 6, marginBottom: 12, borderWidth: 1, borderColor: '#f4c54230',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: COLORS.goldDim,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: COLORS.goldBorder,
   },
-  infoBoxText: { color: '#f4c542', fontSize: 12, fontWeight: '500' },
-  rmLabel: { color: '#fff', marginBottom: 8, fontSize: 13, fontWeight: '500' },
+  infoBoxText: {
+    color: COLORS.gold,
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  rmLabel: {
+    color: COLORS.white,
+    marginBottom: 6,
+    fontSize: 13,
+    fontWeight: '500',
+  },
   dropdownList: {
-    maxHeight: 200, borderWidth: 1, borderColor: '#ffffff20',
-    borderRadius: 8, marginBottom: 12, marginTop: 8,
+    maxHeight: 200,
+    borderWidth: 1,
+    borderColor: COLORS.borderColor,
+    borderRadius: 10,
+    marginBottom: 12,
+    marginTop: 4,
   },
   dropdownItem: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 12, paddingVertical: 11,
-    borderBottomWidth: 0.5, borderBottomColor: '#ffffff10',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+    borderBottomWidth: 0.5,
+    borderBottomColor: 'rgba(255,255,255,0.08)',
   },
-  dropdownItemSelected: { backgroundColor: '#00cfff12' },
-  rmItemLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  dropdownItemSelected: {
+    backgroundColor: COLORS.accentDim,
+  },
+  rmItemLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
   rmRadio: {
-    width: 16, height: 16, borderRadius: 8, borderWidth: 1.5,
-    borderColor: '#ffffff40', alignItems: 'center', justifyContent: 'center',
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.3)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  rmRadioSelected: { borderColor: '#00cfff' },
-  rmRadioInner: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#00cfff' },
-  dropdownItemText: { color: '#bbb', fontSize: 13 },
-  dropdownItemTextSelected: { color: '#00cfff', fontWeight: '600' },
-  noRMText: { color: '#aaa', textAlign: 'center', padding: 20, fontSize: 13 },
+  rmRadioSelected: {
+    borderColor: COLORS.accent,
+  },
+  rmRadioInner: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: COLORS.accent,
+  },
+  dropdownItemText: {
+    color: COLORS.mutedText,
+    fontSize: 13,
+  },
+  dropdownItemTextSelected: {
+    color: COLORS.accent,
+    fontWeight: '600',
+  },
+  noRMText: {
+    color: COLORS.mutedText,
+    textAlign: 'center',
+    padding: 20,
+    fontSize: 13,
+  },
   selectedRMBadge: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    backgroundColor: '#00cfff12', borderWidth: 1, borderColor: '#00cfff35',
-    borderRadius: 8, paddingHorizontal: 12, paddingVertical: 7, marginBottom: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: COLORS.accentDim,
+    borderWidth: 1,
+    borderColor: COLORS.accentBorder,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    marginBottom: 14,
   },
-  selectedRMText: { color: '#00cfff', fontSize: 12, fontWeight: '600' },
-  modalBtnRow: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10 },
+  selectedRMText: {
+    color: COLORS.accent,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  modalBtnRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 10,
+  },
   cancelBtn: {
-    backgroundColor: '#ffffff15', paddingHorizontal: 18, paddingVertical: 9,
-    borderRadius: 20, borderWidth: 1, borderColor: '#ffffff25',
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    paddingHorizontal: 18,
+    paddingVertical: 9,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: COLORS.borderColor,
   },
-  cancelBtnText: { color: '#fff', fontWeight: '500', fontSize: 13 },
+  cancelBtnText: {
+    color: COLORS.white,
+    fontWeight: '500',
+    fontSize: 13,
+  },
   assignBtn: {
-    backgroundColor: '#00cfff', paddingHorizontal: 18, paddingVertical: 9,
-    borderRadius: 20, minWidth: 80, alignItems: 'center',
+    backgroundColor: COLORS.accent,
+    paddingHorizontal: 18,
+    paddingVertical: 9,
+    borderRadius: 20,
+    minWidth: 80,
+    alignItems: 'center',
   },
-  assignBtnDisabled: { backgroundColor: '#00cfff40' },
-  assignBtnText: { color: '#fff', fontWeight: '600', fontSize: 13 },
+  assignBtnDisabled: {
+    backgroundColor: 'rgba(0,207,255,0.3)',
+  },
+  assignBtnText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 13,
+  },
 
-  // ── Bottom Sheet (Filter) ──
+  // ── Filter Bottom Sheet ──
   bottomSheetOverlay: {
-    position: 'absolute', width: '100%', height: '100%',
-    backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end', zIndex: 1000,
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'flex-end',
+    zIndex: 1000,
   },
   bottomSheet: {
-    backgroundColor: '#1e2260', borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingBottom: 50,
-    padding: 18, maxHeight: '85%', borderWidth: 1,
-    borderColor: '#ffffff15', borderBottomWidth: 0,
+    backgroundColor: COLORS.modalBg,
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    padding: 18,
+    paddingBottom: 30,
+    maxHeight: '85%',
+    borderWidth: 1,
+    borderColor: COLORS.borderColor,
+    borderBottomWidth: 0,
   },
   handleBar: {
-    width: 40, height: 4, backgroundColor: '#ffffff30',
-    borderRadius: 4, alignSelf: 'center', marginBottom: 12,
+    width: 40,
+    height: 4,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 4,
+    alignSelf: 'center',
+    marginBottom: 14,
   },
-  filterModalTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  filterDivider: { height: 1, backgroundColor: '#ffffff15', marginVertical: 12 },
+  filterModalTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  filterDivider: {
+    height: 0.5,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    marginVertical: 12,
+  },
   filterLabel: {
-    color: '#00cfff', fontSize: 11, fontWeight: '600',
-    letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 6, marginTop: 4,
+    color: COLORS.accent,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+    marginBottom: 6,
+    marginTop: 4,
   },
-  dateRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
+  dateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 4,
+  },
   dateField: { flex: 1 },
-  dateSubLabel: { color: '#aaa', fontSize: 11, marginBottom: 4 },
-  dateSeparator: { paddingTop: 18 },
-  statusRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 },
-  statusChip: {
-    paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20,
-    backgroundColor: '#ffffff10', borderWidth: 1, borderColor: '#ffffff20',
+  dateSubLabel: {
+    color: COLORS.mutedText,
+    fontSize: 11,
+    marginBottom: 4,
   },
-  statusChipActive: { backgroundColor: '#00cfff20', borderColor: '#00cfff60' },
-  statusChipText: { color: '#aaa', fontSize: 12, fontWeight: '500' },
-  statusChipTextActive: { color: '#00cfff', fontWeight: '600' },
+  dateSeparator: { paddingTop: 18 },
+  statusChipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 8,
+  },
+  statusChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    borderWidth: 1,
+    borderColor: COLORS.borderColor,
+  },
+  statusChipActive: {
+    backgroundColor: COLORS.accentDim,
+    borderColor: COLORS.accentBorder,
+  },
+  statusChipText: {
+    color: COLORS.mutedText,
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  statusChipTextActive: {
+    color: COLORS.accent,
+    fontWeight: '700',
+  },
   filterBtnRow: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 4,
   },
   resetBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 14,
-    paddingVertical: 8, borderRadius: 20, borderWidth: 1,
-    borderColor: '#ff525240', backgroundColor: '#ff525215',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255,82,82,0.35)',
+    backgroundColor: 'rgba(255,82,82,0.1)',
   },
-  resetBtnText: { color: '#ff5252', fontSize: 13, fontWeight: '500' },
-  filterActionBtns: { flexDirection: 'row', gap: 10 },
+  resetBtnText: {
+    color: COLORS.red,
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  filterActionBtns: {
+    flexDirection: 'row',
+    gap: 10,
+  },
   applyBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#00cfff',
-    paddingHorizontal: 18, paddingVertical: 8, borderRadius: 20,
-    minWidth: 80, justifyContent: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: COLORS.accent,
+    paddingHorizontal: 18,
+    paddingVertical: 8,
+    borderRadius: 20,
+    minWidth: 80,
+    justifyContent: 'center',
   },
-  applyBtnText: { color: '#fff', fontWeight: '600', fontSize: 13 },
+  applyBtnText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 13,
+  },
 
-  // ── Dropdown Field styles ──
-  inputWrapper: { marginBottom: 10, width: '100%' },
-  label: { color: '#aaa', fontSize: 12, marginBottom: 4 },
+  // ── Dropdown Field ──
+  inputWrapper: {
+    marginBottom: 10,
+    width: '100%',
+  },
   dropdown: {
-    height: 40, backgroundColor: '#ffffff10', borderRadius: 8,
-    paddingHorizontal: 8, borderWidth: 1, borderColor: '#444',
+    height: 42,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    borderWidth: 1,
+    borderColor: COLORS.borderColor,
   },
-  dropdownContainer: { backgroundColor: '#fff', borderRadius: 8 },
-  placeholderStyle: { color: '#aaa', fontSize: 14 },
-  selectedTextStyle: { color: '#fff', fontSize: 14 },
+  dropdownContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 10,
+  },
+  placeholderStyle: {
+    color: COLORS.mutedText,
+    fontSize: 13,
+  },
+  selectedTextStyle: {
+    color: COLORS.white,
+    fontSize: 13,
+  },
 
-  // ── Input Field styles ──
-  field: { marginBottom: 10 },
-  inputContainer: {
-    flexDirection: 'row', alignItems: 'center', backgroundColor: '#ffffff10',
-    borderWidth: 1, borderColor: '#444', borderRadius: 8, paddingHorizontal: 10, height: 40,
+  // ── Input Field ──
+  field: {
+    marginBottom: 10,
   },
-    backButton: {
-  flexDirection: 'row',
-  alignItems: 'center',
-},
-  input: { color: '#fff', flex: 1, fontSize: 13 },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    borderWidth: 1,
+    borderColor: COLORS.borderColor,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    height: 42,
+  },
+  input: {
+    color: COLORS.white,
+    flex: 1,
+    fontSize: 13,
+  },
 });
