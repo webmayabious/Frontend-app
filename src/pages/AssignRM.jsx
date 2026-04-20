@@ -539,7 +539,10 @@ const AssignRM = () => {
                         {isChecked && <Icon name="check" size={11} color="#fff" />}
                       </TouchableOpacity>
                       <View style={styles.nameIndicator} />
-                      <Text style={styles.cardName}>{item.name}</Text>
+                      <Text style={styles.cardName}>{item.name} |{' '}
+                        <Text style={styles.section}>
+                          {item?.propertyproject?.project_name}
+                        </Text></Text>
                     </View>
                     <View style={styles.iconRow}>
                       <TouchableOpacity
@@ -1568,4 +1571,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 13,
   },
+   section:{
+    color:'rgba(0, 208, 255, 0.84)'
+  }
 });

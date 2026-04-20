@@ -417,7 +417,7 @@ const ChangeRM = () => {
         ) : Lead.length === 0 ? (
           <Text style={styles.centeredText}>No leads found</Text>
         ) : (
-          Lead.map(item => {
+         (Array.isArray(Lead) ? Lead : []).map(item => {
             const isChecked = selected.includes(item.id);
             return (
               <View
@@ -433,7 +433,10 @@ const ChangeRM = () => {
                     >
                       {isChecked && <Icon name="check" size={11} color="#fff" />}
                     </TouchableOpacity>
-                    <Text style={styles.cardName}>{item?.name || 'N/A'}</Text>
+                    <Text style={styles.cardName}>{item?.name || 'N/A' } |{' '}
+                        <Text style={styles.section}>
+                          {item?.propertyproject?.project_name}
+                        </Text></Text>
                     <View
                       style={[
                         styles.statusBadge,
@@ -1367,4 +1370,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 13,
   },
+  section:{
+    color:'rgba(0, 208, 255, 0.84)'
+  }
 });
