@@ -87,7 +87,7 @@ const FileRow = ({ label, value }) => {
       <View style={{ flex: 2, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end' }}>
 
         <Text style={[styles.value, { flex: 0 }]}>
-          {url ? 'File' : 'N/A'}
+          {url ? <Icon name="insert-drive-file" size={24} color="#f5be0b" /> : 'N/A'}
         </Text>
 
         {url && (
