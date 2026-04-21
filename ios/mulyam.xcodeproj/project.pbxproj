@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
+		180EDA222F975FFB00E52036 /* mulyam_new.xlsx in Resources */ = {isa = PBXBuildFile; fileRef = 180EDA212F975FFB00E52036 /* mulyam_new.xlsx */; };
 		18F547212F8CDAD900B1CE13 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 18F547202F8CDAD900B1CE13 /* GoogleService-Info.plist */; };
 		761780ED2CA45674006654EE /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 761780EC2CA45674006654EE /* AppDelegate.swift */; };
 		81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */; };
@@ -20,6 +21,7 @@
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = mulyam/Images.xcassets; sourceTree = "<group>"; };
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = mulyam/Info.plist; sourceTree = "<group>"; };
 		13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = PrivacyInfo.xcprivacy; path = mulyam/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		180EDA212F975FFB00E52036 /* mulyam_new.xlsx */ = {isa = PBXFileReference; lastKnownFileType = file; path = mulyam_new.xlsx; sourceTree = "<group>"; };
 		18F5471F2F8CD7CD00B1CE13 /* mulyamRelease.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; name = mulyamRelease.entitlements; path = mulyam/mulyamRelease.entitlements; sourceTree = "<group>"; };
 		18F547202F8CDAD900B1CE13 /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 		283C0AFC353DA0D4834AEBD1 /* libPods-mulyam.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-mulyam.a"; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -45,6 +47,7 @@
 		13B07FAE1A68108700A75B9A /* mulyam */ = {
 			isa = PBXGroup;
 			children = (
+				180EDA212F975FFB00E52036 /* mulyam_new.xlsx */,
 				18F547202F8CDAD900B1CE13 /* GoogleService-Info.plist */,
 				18F5471F2F8CD7CD00B1CE13 /* mulyamRelease.entitlements */,
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
@@ -165,6 +168,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */,
+				180EDA222F975FFB00E52036 /* mulyam_new.xlsx in Resources */,
 				18F547212F8CDAD900B1CE13 /* GoogleService-Info.plist in Resources */,
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				DD191C42CF46E44E2068CC2F /* PrivacyInfo.xcprivacy in Resources */,
