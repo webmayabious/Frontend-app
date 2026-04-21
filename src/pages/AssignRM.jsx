@@ -321,28 +321,89 @@ const AssignRM = () => {
   });
 
   // ── Upload ──
+  // const handleDownloadFormat = async () => {
+  //   const fileName = 'mulyam_new.xlsx';
+  //   const destPath = `${RNFS.ExternalDirectoryPath}/${fileName}`;
+  //   try {
+  //     if (Platform.OS === 'android' && Platform.Version < 33) {
+  //       const granted = await PermissionsAndroid.request(
+  //         PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
+  //       );
+  //       if (granted !== PermissionsAndroid.RESULTS.GRANTED) return;
+  //     }
+  //     await RNFS.copyFileAssets(fileName, destPath);
+  //     await notifee.createChannel({ id: 'download', name: 'Downloads', importance: AndroidImportance.HIGH });
+  //     await notifee.displayNotification({
+  //       title: 'Download Complete ✅',
+  //       body: 'Tap to open file',
+  //       android: { channelId: 'download', pressAction: { id: 'open-file' } },
+  //       data: { path: destPath },
+  //     });
+  //   } catch (err) {
+  //     console.log('Download Error:', err);
+  //   }
+  // };
   const handleDownloadFormat = async () => {
-    const fileName = 'mulyam_new.xlsx';
-    const destPath = `${RNFS.ExternalDirectoryPath}/${fileName}`;
-    try {
-      if (Platform.OS === 'android' && Platform.Version < 33) {
+  const fileName = 'mulyam_new.xlsx';
+
+  try {
+    if (Platform.OS === 'android') {
+      // ── Android: আগের logic ──
+      if (Platform.Version < 33) {
         const granted = await PermissionsAndroid.request(
           PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
         );
-        if (granted !== PermissionsAndroid.RESULTS.GRANTED) return;
+        if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+          Alert.alert('Permission Denied', 'Storage permission is required.');
+          return;
+        }
       }
+
+      const destPath = `${RNFS.ExternalDirectoryPath}/${fileName}`;
       await RNFS.copyFileAssets(fileName, destPath);
-      await notifee.createChannel({ id: 'download', name: 'Downloads', importance: AndroidImportance.HIGH });
+
+      await notifee.createChannel({
+        id: 'download',
+        name: 'Downloads',
+        importance: AndroidImportance.HIGH,
+      });
       await notifee.displayNotification({
         title: 'Download Complete ✅',
-        body: 'Tap to open file',
-        android: { channelId: 'download', pressAction: { id: 'open-file' } },
-        data: { path: destPath },
+        body: 'File saved to Downloads folder',
+        android: { channelId: 'download' },
       });
-    } catch (err) {
-      console.log('Download Error:', err);
+
+      Alert.alert('Success', `File saved to: ${destPath}`);
+
+    } else {
+   
+      const destPath = `${RNFS.DocumentDirectoryPath}/${fileName}`;
+
+     
+      const assetPath = `${RNFS.MainBundlePath}/${fileName}`;
+      const assetExists = await RNFS.exists(assetPath);
+
+      if (!assetExists) {
+        Alert.alert('Error', 'Template file not found in app bundle.');
+        return;
+      }
+
+      await RNFS.copyFile(assetPath, destPath);
+      const { default: Share } = await import('react-native').then(
+        m => ({ default: m.Share }),
+      );
+
+      await Share.share({
+        title: fileName,
+        url: `file://${destPath}`, 
+      });
     }
-  };
+
+  } catch (err) {
+    console.log('Download Error:', err);
+    Alert.alert('Error', 'Could not download the file.');
+  }
+};
 
   const pickExcelFile = async () => {
     try {
