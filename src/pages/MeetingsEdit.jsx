@@ -410,6 +410,7 @@ export default function MeetingsEdit({ route }) {
               'SiteVisitandBookingsData',
               'TodaysFollowUpsandMeetings',
               'AllPropertyLeads',
+              'leads_infinite',
               'Uploadleads',
               'Leads Assigned',
               'AssignRm'

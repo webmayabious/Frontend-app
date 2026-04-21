@@ -229,16 +229,16 @@ const LeadsListScreen = () => {
     }
   };
 
-  const { data: Lead, isLoading, fetchNextPage,
+  const {  data: Lead = [], isLoading, fetchNextPage,
     hasNextPage,
     isFetchingNextPage, refetch: leadrefetch } = useInfiniteQuery({
-    queryKey: ['AllPropertyLeads', appliedFilters, searchText],
+    queryKey: ['leads_infinite', appliedFilters, searchText],
     queryFn: async ({ pageParam = 1 }) => {
       const res = await api.get('/api/pm/getAllPropertyLeads', {
         params: {
            page: pageParam,
           search: searchText || undefined,
-          company_id: filters.company_id || undefined,
+          // company_id: filters.company_id || undefined,
           rm_id: filters.rm_id || undefined,
           fromDate: filters.fromDate || undefined,
           toDate: filters.toDate || undefined,
@@ -259,6 +259,7 @@ const LeadsListScreen = () => {
   // useEffect(() => {
   //   leadrefetch();
   // }, [searchText]);
+
  const leads = Lead?.pages?.flatMap(page => page.data) || [];
 
   // ✅ Infinite scroll handler — scroll position দেখে trigger করে

@@ -198,7 +198,7 @@ const ChangeRM = () => {
 
   // ── Leads ──
   const { data: Lead = [], refetch: leadrefetch, isLoading } = useQuery({
-    queryKey: ['AllPropertyLeads', appliedFilters, searchText],
+    queryKey: ['rm_leads', appliedFilters, searchText],
     queryFn: async () => {
       try {
         const res = await api.get('/api/pm/getAllPropertyLeads', {
@@ -284,6 +284,7 @@ const ChangeRM = () => {
       });
     },
     onSuccess: () => {
+       Alert.alert('RM Changed Successfully!');
       setSelected([]);
       setrms(null);
       setShowrmModal(false);
@@ -693,7 +694,7 @@ const ChangeRM = () => {
                 </View>
               </View>
 
-              <DropdownField
+             {/* <DropdownField
                 label="Project"
                 data={projectOptions}
                 placeholder="Select project"
@@ -724,7 +725,7 @@ const ChangeRM = () => {
                     </TouchableOpacity>
                   );
                 })}
-              </View>
+              </View> */}
             </ScrollView>
 
             {showFromPicker && (
