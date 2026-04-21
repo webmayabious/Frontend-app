@@ -12,7 +12,7 @@ import {
   Linking,
   Alert,
   ActivityIndicator,
-  Image
+  Image,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import Header from '../Layout/Header';
@@ -108,7 +108,7 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
           onPress={() => {
             setRemarksText(
               data?.propertyfeedbacks?.map(x => x?.remarks).join(', ') ||
-              'No remarks available',
+                'No remarks available',
             );
             setShowRemarks(true);
           }}
@@ -211,37 +211,35 @@ const TotalLeadScreen = () => {
   const isScrollingToTop = useRef(false);
 
   /* ================= INFINITE QUERY ================= */
-  const {
-    data,
-    fetchNextPage,
-    hasNextPage,
-    isFetchingNextPage,
-    isLoading,
-  } = useInfiniteQuery({
-    queryKey: ['TotalLead', filters, searchText],
-    queryFn: async ({ pageParam = 1 }) => {
-      const res = await api.get('/api/pm/getAllPropertyLeadsWithAndWihoutRM', {
-        params: {
-          page: pageParam,
-          limit: 20,
-          search: searchText || undefined,
-          company_id: filters.company_id || undefined,
-          rm_id: filters.rm_id || undefined,
-          fromDate: filters.fromDate || undefined,
-          toDate: filters.toDate || undefined,
-          project: filters.project || undefined,
-          location: filters.location || undefined,
-          status: filters.status || undefined,
-        },
-      });
-      return res.data;
-    },
-    getNextPageParam: lastPage => {
-      const { currentPage, totalPages } = lastPage;
-      return currentPage < totalPages ? currentPage + 1 : undefined;
-    },
-    initialPageParam: 1,
-  });
+  const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } =
+    useInfiniteQuery({
+      queryKey: ['TotalLead', filters, searchText],
+      queryFn: async ({ pageParam = 1 }) => {
+        const res = await api.get(
+          '/api/pm/getAllPropertyLeadsWithAndWihoutRM',
+          {
+            params: {
+              page: pageParam,
+              limit: 20,
+              search: searchText || undefined,
+              company_id: filters.company_id || undefined,
+              rm_id: filters.rm_id || undefined,
+              fromDate: filters.fromDate || undefined,
+              toDate: filters.toDate || undefined,
+              project: filters.project || undefined,
+              location: filters.location || undefined,
+              status: filters.status || undefined,
+            },
+          },
+        );
+        return res.data;
+      },
+      getNextPageParam: lastPage => {
+        const { currentPage, totalPages } = lastPage;
+        return currentPage < totalPages ? currentPage + 1 : undefined;
+      },
+      initialPageParam: 1,
+    });
 
   // ✅ সব pages থেকে data flatten করো
   const leads = data?.pages?.flatMap(page => page.data) || [];
@@ -371,7 +369,6 @@ const TotalLeadScreen = () => {
         </View>
       </View>
 
-
       <ScrollView
         ref={scrollRef}
         showsVerticalScrollIndicator={false}
@@ -383,7 +380,6 @@ const TotalLeadScreen = () => {
           // Scroll to top button
           setShowTopBtn(y > 200);
           if (isScrollingToTop.current) return;
-
 
           const isNearBottom =
             layoutMeasurement.height + y >= contentSize.height - 150;
@@ -402,7 +398,10 @@ const TotalLeadScreen = () => {
             value={searchText}
             onChangeText={setSearchText}
             style={{
-              marginLeft: 8, color: '#fff', flex: 1, height: '100%',
+              marginLeft: 8,
+              color: '#fff',
+              flex: 1,
+              height: '100%',
               paddingVertical: 0,
             }}
           />
@@ -438,7 +437,6 @@ const TotalLeadScreen = () => {
             }}
           />
         )}
-
 
         {/* ✅ End of list message */}
         {!hasNextPage && leads.length > 0 && (
@@ -479,6 +477,7 @@ const TotalLeadScreen = () => {
       {showFilterModal && (
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
+             <View style={styles.dragHandle} />
             <Text style={styles.modalTitle}>Filter Leads</Text>
 
             <ScrollView
@@ -660,11 +659,12 @@ const styles = StyleSheet.create({
   },
 
   label: {
-    color: '#FFB85D',
+    color: '#a0b4e8',
     fontSize: 12,
+    marginBottom: 5,
+    fontWeight: '500',
     flex: 1,
-    flexWrap: 'wrap',
-    paddingTop: 2,
+    flexShrink: 1,
   },
 
   value: {
@@ -719,11 +719,14 @@ const styles = StyleSheet.create({
   },
 
   modalCard: {
-    width: '85%',
-    backgroundColor: '#2f2f8f',
-    borderRadius: 12,
+    width: '88%',
+    backgroundColor: '#1a1f6b', // deep navy base
+    borderWidth: 1,
+    borderColor: '#3d45b0', // soft blue border
+    borderRadius: 18,
     padding: 20,
     alignItems: 'center',
+    maxHeight: '88%',
   },
 
   checkIcon: {
@@ -740,6 +743,7 @@ const styles = StyleSheet.create({
     color: '#00e5ff',
     fontSize: 18,
     marginBottom: 10,
+    fontWeight: 'bold',
   },
 
   modalText: {
@@ -751,24 +755,34 @@ const styles = StyleSheet.create({
   modalCloseBtn: {
     backgroundColor: '#00acc1',
     paddingHorizontal: 20,
-    paddingVertical: 6,
-    borderRadius: 20,
+    paddingVertical: 10,
+    borderRadius: 24,
+    marginTop: 6,
+    width: '100%',
+    alignItems: 'center',
   },
 
   modalCloseText: {
     color: '#fff',
     fontWeight: '600',
+    fontSize: 14,
   },
 
   inputWrapper: { width: '100%', marginBottom: 12 },
-
+  dragHandle: {
+    width: 36,
+    height: 4,
+    backgroundColor: '#3d55cc',
+    borderRadius: 2,
+    marginBottom: 14,
+  },
   dropdown: {
     height: 40,
-    backgroundColor: '#ffffff10',
+    backgroundColor: '#ffffff12',
     borderRadius: 8,
-    paddingHorizontal: 8,
+    paddingHorizontal: 10,
     borderWidth: 1,
-    borderColor: '#444',
+    borderColor: '#3d55cc',
   },
   backButton: {
     flexDirection: 'row',
