@@ -583,6 +583,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     paddingHorizontal: 10,
     marginTop: 0,
+    height: Platform.OS === 'ios' ? 45 : 45,
   },
 
   card: {
@@ -781,7 +782,7 @@ modalTitle: {
     flex: 1,
     color: '#fff',
     fontSize: 13,
-    paddingVertical: 0,
+    paddingVertical: 0,paddingVertical: Platform.OS === 'ios' ? 0 : 6,   height: '100%',     
   },
    inputWrapper: { width: '100%', marginBottom: 12 },
   dropdown: {

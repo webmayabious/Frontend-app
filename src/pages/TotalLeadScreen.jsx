@@ -11,7 +11,7 @@ import {
   Platform,
   Linking,
   Alert,
-  ActivityIndicator, 
+  ActivityIndicator,
   Image
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
@@ -108,7 +108,7 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
           onPress={() => {
             setRemarksText(
               data?.propertyfeedbacks?.map(x => x?.remarks).join(', ') ||
-                'No remarks available',
+              'No remarks available',
             );
             setShowRemarks(true);
           }}
@@ -208,7 +208,7 @@ const TotalLeadScreen = () => {
 
   const [showTopBtn, setShowTopBtn] = useState(false);
   const scrollRef = useRef();
-  const isScrollingToTop = useRef(false); 
+  const isScrollingToTop = useRef(false);
 
   /* ================= INFINITE QUERY ================= */
   const {
@@ -321,7 +321,7 @@ const TotalLeadScreen = () => {
     isScrollingToTop.current = true;
     scrollRef.current?.scrollTo({ y: 0, animated: true });
     setTimeout(() => {
-      isScrollingToTop.current = false; 
+      isScrollingToTop.current = false;
     }, 600);
   };
 
@@ -359,19 +359,19 @@ const TotalLeadScreen = () => {
               style={styles.backBtn}
               onPress={() => navigation.navigate('Dashboard')}
             >
-               <View style={styles.backButton}>
-                             <Image
-                               source={require('../asset/image/icon/Arrow.png')}
-                               style={{ width:12, height: 12, marginRight: 6 }}
-                             />
-                             <Text style={styles.backText}>Back</Text>
-                           </View>
+              <View style={styles.backButton}>
+                <Image
+                  source={require('../asset/image/icon/Arrow.png')}
+                  style={{ width: 12, height: 12, marginRight: 6 }}
+                />
+                <Text style={styles.backText}>Back</Text>
+              </View>
             </TouchableOpacity>
           </View>
         </View>
       </View>
 
-    
+
       <ScrollView
         ref={scrollRef}
         showsVerticalScrollIndicator={false}
@@ -384,7 +384,7 @@ const TotalLeadScreen = () => {
           setShowTopBtn(y > 200);
           if (isScrollingToTop.current) return;
 
-         
+
           const isNearBottom =
             layoutMeasurement.height + y >= contentSize.height - 150;
           if (isNearBottom) {
@@ -401,7 +401,10 @@ const TotalLeadScreen = () => {
             placeholderTextColor="#aaa"
             value={searchText}
             onChangeText={setSearchText}
-            style={{ marginLeft: 8, color: '#fff', flex: 1 }}
+            style={{
+              marginLeft: 8, color: '#fff', flex: 1, height: '100%',
+              paddingVertical: 0,
+            }}
           />
         </View>
 
@@ -425,17 +428,17 @@ const TotalLeadScreen = () => {
           </Text>
         )}
 
-       {isFetchingNextPage && (
-  <ActivityIndicator
-    size="small"
-    color="#999"
-    style={{
-      marginVertical: 12,
-      alignSelf: 'center',
-    }}
-  />
-)}
-      
+        {isFetchingNextPage && (
+          <ActivityIndicator
+            size="small"
+            color="#999"
+            style={{
+              marginVertical: 12,
+              alignSelf: 'center',
+            }}
+          />
+        )}
+
 
         {/* ✅ End of list message */}
         {!hasNextPage && leads.length > 0 && (
@@ -591,6 +594,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     paddingHorizontal: 10,
     marginTop: 0,
+    height: 45,
   },
 
   card: {
@@ -767,9 +771,9 @@ const styles = StyleSheet.create({
     borderColor: '#444',
   },
   backButton: {
-  flexDirection: 'row',
-  alignItems: 'center',
-},
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   dropdownContainer: { backgroundColor: '#fff', borderRadius: 8 },
   placeholderStyle: { color: '#aaa', fontSize: 14 },
   selectedTextStyle: { color: '#fff', fontSize: 14 },

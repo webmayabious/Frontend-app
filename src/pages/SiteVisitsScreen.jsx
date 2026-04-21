@@ -367,7 +367,7 @@ const SiteVisitsScreen = () => {
             placeholderTextColor="#aaa"
             value={searchText}
             onChangeText={setSearchText}
-            style={{ marginLeft: 8, color: '#fff', flex: 1 }}
+            style={{ marginLeft: 8, color: '#fff', flex: 1, height: '100%', paddingVertical: Platform.OS === 'ios' ? 0 : 6,}}
           />
         </View>
 
@@ -565,6 +565,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     paddingHorizontal: 10,
     marginTop: 0,
+    height: Platform.OS === 'ios' ? 45 : 45,
   },
 
   card: {
