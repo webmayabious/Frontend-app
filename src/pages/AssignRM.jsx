@@ -16,6 +16,7 @@ import {
   Image,
   Platform,
   Linking,
+  Share
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -343,12 +344,11 @@ const AssignRM = () => {
   //     console.log('Download Error:', err);
   //   }
   // };
-  const handleDownloadFormat = async () => {
+const handleDownloadFormat = async () => {
   const fileName = 'mulyam_new.xlsx';
 
   try {
     if (Platform.OS === 'android') {
-      // ── Android: আগের logic ──
       if (Platform.Version < 33) {
         const granted = await PermissionsAndroid.request(
           PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
@@ -358,10 +358,8 @@ const AssignRM = () => {
           return;
         }
       }
-
       const destPath = `${RNFS.ExternalDirectoryPath}/${fileName}`;
       await RNFS.copyFileAssets(fileName, destPath);
-
       await notifee.createChannel({
         id: 'download',
         name: 'Downloads',
@@ -373,35 +371,32 @@ const AssignRM = () => {
         android: { channelId: 'download' },
       });
 
-      Alert.alert('Success', `File saved to: ${destPath}`);
-
     } else {
-   
+      // ── iOS ──
       const destPath = `${RNFS.DocumentDirectoryPath}/${fileName}`;
+      const sourcePath = `${RNFS.MainBundlePath}/${fileName}`;
 
-     
-      const assetPath = `${RNFS.MainBundlePath}/${fileName}`;
-      const assetExists = await RNFS.exists(assetPath);
-
-      if (!assetExists) {
-        Alert.alert('Error', 'Template file not found in app bundle.');
+      const sourceExists = await RNFS.exists(sourcePath);
+      if (!sourceExists) {
+        Alert.alert('Error', 'Template file not found in bundle.');
         return;
       }
 
-      await RNFS.copyFile(assetPath, destPath);
-      const { default: Share } = await import('react-native').then(
-        m => ({ default: m.Share }),
-      );
+      // আগের copy থাকলে মুছে দাও
+      const destExists = await RNFS.exists(destPath);
+      if (destExists) await RNFS.unlink(destPath);
 
+      await RNFS.copyFile(sourcePath, destPath);
+
+      // ✅ static import করা Share use করো
       await Share.share({
-        title: fileName,
-        url: `file://${destPath}`, 
+        url: `file://${destPath}`,
       });
     }
 
   } catch (err) {
-    console.log('Download Error:', err);
-    Alert.alert('Error', 'Could not download the file.');
+    console.log('❌ Download Error:', err);
+    Alert.alert('Error', err.message || 'Could not download the file.');
   }
 };
 
