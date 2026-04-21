@@ -7,154 +7,205 @@ import {
   TouchableOpacity,
   StatusBar,
   Platform,
+  Dimensions,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Header from '../Layout/Header';
 import BottomNav from '../navigations/BottomNav';
 import { useNavigation } from '@react-navigation/native';
 import api from '../api/AxiosInstance';
 import { useQuery } from '@tanstack/react-query';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-/* ================= Reusable Card ================= */
-const Card = ({ title, subtitle, value, onPress }) => (
-  <TouchableOpacity style={styles.card} onPress={onPress}>
-    <View style={styles.cardLeft}>
-      <Icon name="calendar-today" size={18} color="#9be7a1" />
 
-      <View style={styles.textContainer}>
-        <Text style={styles.cardTitle} numberOfLines={1}>
-          {title}
-        </Text>
-        <Text style={styles.cardSubtitle} numberOfLines={1}>
-          {subtitle}
-        </Text>
-      </View>
+const { width } = Dimensions.get('window');
+
+/* ─────────────────────────────────────────
+   Card data config
+───────────────────────────────────────── */
+const CARDS = (d, nav) => [
+  {
+    icon: 'phone-callback',
+    label: 'Follow-ups / Meetings',
+    period: 'Today',
+    accent: '#4ade80',
+    value: `${d?.todays_callbacks ?? 0}  /  ${d?.todays_meetings ?? 0}`,
+    route: 'FollowUpsScreen',
+  },
+  {
+    icon: 'place',
+    label: 'Site Visits / Bookings',
+    period: 'Today',
+    accent: '#60a5fa',
+    value: `${d?.todays_site_visits ?? 0}  /  ${d?.todays_booking ?? 0}`,
+    route: 'SiteVisitsScreen',
+  },
+  {
+    icon: 'people',
+    label: 'Active Leads / Total Leads',
+    period: 'Month',
+    accent: '#f472b6',
+    value: `${d?.total_active_leads ?? 0}  /  ${d?.total_leads_count ?? 0}`,
+    route: 'TotalLeadScreen',
+  },
+  {
+    icon: 'receipt-long',
+    label: 'Bookings / Agreements',
+    period: 'Month',
+    accent: '#fb923c',
+    value: `${d?.total_bookings_per_month ?? 0}  /  ₹${d?.total_agreement_value_per_month ?? 0}`,
+    route: 'TotalBookingsAgreementsPerMonth',
+  },
+  {
+    icon: 'history',
+    label: 'Bookings / Agreements',
+    period: 'Till Date',
+    accent: '#a78bfa',
+    value: `${d?.total_booking_till_date ?? 0}  /  ₹${d?.total_agreement_value_till_date ?? 0}`,
+    route: 'TotalBookingsAgreementsTillDateScreen',
+  },
+  {
+    icon: 'notifications-off',
+    label: 'Missed Follow Up',
+    period: 'Till Date',
+    accent: '#f87171',
+    value: `${d?.total_missed_callback ?? 0}`,
+    route: 'MissedFollowup',
+  },
+  {
+    icon: 'upload',
+    label: 'Uploaded Leads',
+    period: 'Today',
+    accent: '#34d399',
+    value: `${d?.total_leads_uploaded_today ?? 0}`,
+    route: 'UploadedLeads',
+  },
+  {
+    icon: 'assignment-ind',
+    label: 'Leads Assigned',
+    period: 'Today',
+    accent: '#fbbf24',
+    value: `${d?.total_assigned_lead ?? 0}`,
+    route: 'LeadsassignedScreen',
+  },
+  {
+    icon: 'list-alt',
+    label: 'Leads List',
+    period: 'Till Date',
+    accent: '#67e8f9',
+    value: '—',
+    route: 'LeadsListScreen',
+  },
+];
+
+/* ─────────────────────────────────────────
+   Reusable Card
+───────────────────────────────────────── */
+const Card = ({ icon, label, period, accent, value, onPress }) => (
+  <TouchableOpacity
+    activeOpacity={0.75}
+    style={styles.card}
+    onPress={onPress}
+  >
+    {/* Left accent bar */}
+    <View style={[styles.accentBar, { backgroundColor: accent }]} />
+
+    {/* Icon bubble */}
+    <View style={[styles.iconBubble, { backgroundColor: accent + '22' }]}>
+      <Icon name={icon} size={20} color={accent} />
     </View>
 
-    <View style={styles.valueContainer}>
-      <Text style={styles.cardValue} numberOfLines={1}>
+    {/* Text */}
+    <View style={styles.cardBody}>
+      <Text style={styles.cardLabel} numberOfLines={1}>
+        {label}
+      </Text>
+      <Text style={[styles.cardPeriod, { color: accent }]}>{period}</Text>
+    </View>
+
+    {/* Value */}
+    <View style={styles.cardValueWrap}>
+      <Text style={[styles.cardValue, { color: accent }]} numberOfLines={1}>
         {value}
       </Text>
+      <Icon name="chevron-right" size={18} color={accent + '88'} />
     </View>
   </TouchableOpacity>
 );
 
-/* ================= Main Screen ================= */
+/* ─────────────────────────────────────────
+   Main Screen
+───────────────────────────────────────── */
 const Dashboard = () => {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
-  const { data: dashboardCards,refetch:dashboardrefetch } = useQuery({
+
+  const { data: dashboardCards, refetch: dashboardRefetch } = useQuery({
     queryKey: ['dashboardCards'],
     queryFn: async () => {
       const res = await api.get('/api/pm/PropertyCrmDashboardData');
       return res.data?.data;
     },
   });
-useEffect(() => {
-  dashboardrefetch();
-}, []);
-  return (
-    <View style={styles.container}>
-      <StatusBar
-        translucent
-        backgroundColor="transparent"
-        barStyle="light-content"
-      />
 
+  useEffect(() => {
+    dashboardRefetch();
+  }, []);
+
+  // BottomNav height: 60px + device bottom inset
+  const bottomNavHeight = 5 + insets.bottom;
+
+  return (
+    <View style={styles.root}>
+      <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
+
+      {/* Fixed Header — sits above content */}
       <Header />
 
-      <SafeAreaView style={{ flex: 1 }} edges={['bottom']}>
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ padding: 15 , paddingBottom: insets.bottom + 70, }}
-          
-        >
-          {/* Header */}
-          <View style={styles.dashboardHeader}>
-            <Icon name="dashboard" size={18} color="#cfd8dc" />
-            <Text style={styles.dashboardText}>Dashboard</Text>
+      {/* Scrollable content */}
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[
+          styles.scroll,
+          // ✅ iOS fix: add bottom padding = bottomNav height so last card is not hidden
+          { paddingBottom: bottomNavHeight },
+        ]}
+      >
+        {/* Section heading */}
+        <View style={styles.sectionHeader}>
+          <View style={styles.sectionDot} />
+          <Text style={styles.sectionTitle}>Dashboard</Text>
+          <View style={styles.sectionLine} />
+        </View>
+
+        {/* Stat summary strip */}
+        <View style={styles.summaryStrip}>
+          <View style={styles.summaryItem}>
+            <Text style={styles.summaryVal}>{dashboardCards?.total_leads_count ?? '—'}</Text>
+            <Text style={styles.summaryLbl}>Total Leads</Text>
           </View>
+          <View style={styles.summaryDivider} />
+          <View style={styles.summaryItem}>
+            <Text style={styles.summaryVal}>{dashboardCards?.total_booking_till_date ?? '—'}</Text>
+            <Text style={styles.summaryLbl}>Bookings</Text>
+          </View>
+          <View style={styles.summaryDivider} />
+          <View style={styles.summaryItem}>
+            <Text style={styles.summaryVal}>{dashboardCards?.total_missed_callback ?? '—'}</Text>
+            <Text style={styles.summaryLbl}>Missed</Text>
+          </View>
+        </View>
 
-          {/* Cards */}
+        {/* Cards */}
+        {CARDS(dashboardCards, navigation).map((card, i) => (
           <Card
-            title="Follow-ups / Meetings"
-            subtitle="Today"
-            value={`${dashboardCards?.todays_callbacks || 0} / ${
-              dashboardCards?.todays_meetings || 0
-            }`}
-            onPress={() => navigation.navigate('FollowUpsScreen')}
+            key={i}
+            {...card}
+            onPress={() => navigation.navigate(card.route)}
           />
+        ))}
+      </ScrollView>
 
-          <Card
-            title="Site Visits / Bookings"
-            subtitle="Today"
-            value={`${dashboardCards?.todays_site_visits || 0} / ${
-              dashboardCards?.todays_booking || 0
-            }`}
-            onPress={() => navigation.navigate('SiteVisitsScreen')}
-          />
-
-          <Card
-            title="Active Leave / Total Leads"
-            subtitle="Month"
-            value={`${dashboardCards?.total_active_leads || 0} / ${
-              dashboardCards?.total_leads_count || 0
-            }`}
-            onPress={() => navigation.navigate('TotalLeadScreen')}
-          />
-
-          <Card
-            title="Total Bookings / Agreements"
-            subtitle="Month"
-            value={`${dashboardCards?.total_bookings_per_month || 0} / ₹${
-              dashboardCards?.total_agreement_value_per_month || 0
-            }`}
-            onPress={() =>
-              navigation.navigate('TotalBookingsAgreementsPerMonth')
-            }
-          />
-
-          <Card
-            title="Total Bookings / Agreements"
-            subtitle="Till Date"
-            value={`${dashboardCards?.total_booking_till_date || 0} / ₹${
-              dashboardCards?.total_agreement_value_till_date || 0
-            }`}
-            onPress={() =>
-              navigation.navigate('TotalBookingsAgreementsTillDateScreen')
-            }
-          />
-
-          <Card
-            title="Missed Follow Up"
-            subtitle="Till Date"
-            value={`${dashboardCards?.total_missed_callback || 0}`}
-            onPress={() => navigation.navigate('MissedFollowup')}
-          />
-
-          <Card
-            title="Uploaded Leads"
-            subtitle="Today"
-            value={`${dashboardCards?.total_leads_uploaded_today || 0}`}
-            onPress={() => navigation.navigate('UploadedLeads')}
-          />
-          <Card
-            title="Leads Assigned"
-            subtitle="Today"
-            value={`${dashboardCards?.total_assigned_lead || 0}`}
-            onPress={() => navigation.navigate('LeadsassignedScreen')}
-            
-          />
-          <Card
-            title="Leads List"
-            subtitle="Till Date"
-            value="-"
-            onPress={() => navigation.navigate('LeadsListScreen')}
-          />
-        </ScrollView>
-      </SafeAreaView>
-
+      {/* BottomNav pinned at the very bottom, respects safe area */}
       <BottomNav />
     </View>
   );
@@ -162,77 +213,130 @@ useEffect(() => {
 
 export default Dashboard;
 
-/* ================= Styles ================= */
-
-const STATUSBAR_HEIGHT =
-  Platform.OS === 'android' ? StatusBar.currentHeight : 44;
-
+/* ─────────────────────────────────────────
+   Styles
+───────────────────────────────────────── */
 const styles = StyleSheet.create({
-  container: {
+  root: {
     flex: 1,
-    backgroundColor: '#070c4d',
+    backgroundColor: '#080d5a',
+  },
+
+  scroll: {
+    paddingHorizontal: 16,
+    paddingTop: 14,
+  },
+
+  /* Section heading */
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  sectionDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#4ade80',
+    marginRight: 8,
+  },
+  sectionTitle: {
+    color: '#94a3b8',
+    fontSize: 13,
+    fontWeight: '600',
+    letterSpacing: 1.4,
+    textTransform: 'uppercase',
+  },
+  sectionLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    marginLeft: 10,
+  },
+
+  /* Summary strip */
+  summaryStrip: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    paddingVertical: 14,
+    marginBottom: 20,
+  },
+  summaryItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  summaryVal: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  summaryLbl: {
+    color: '#64748b',
+    fontSize: 11,
+    marginTop: 2,
+    letterSpacing: 0.4,
+  },
+  summaryDivider: {
+    width: 1,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    marginVertical: 4,
   },
 
   /* Card */
   card: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: 'rgba(233, 225, 225, 0.41)',
-    padding: 15,
-    borderRadius: 15,
-    marginBottom: 12,
+    backgroundColor: 'rgba(233, 225, 225, 0.36)',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.07)',
+    marginBottom: 10,
+    overflow: 'hidden',
+    paddingVertical: 14,
+    paddingRight: 12,
   },
-
-  cardLeft: {
-    flexDirection: 'row',
+  accentBar: {
+    width: 3,
+    alignSelf: 'stretch',
+    borderRadius: 2,
+    marginRight: 12,
+  },
+  iconBubble: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    justifyContent: 'center',
     alignItems: 'center',
+    marginRight: 12,
+  },
+  cardBody: {
     flex: 1,
   },
-
-  textContainer: {
-    marginLeft: 10,
-    flex: 1,
+  cardLabel: {
+    color: '#e2e8f0',
+    fontSize: 13.5,
+    fontWeight: '600',
+    letterSpacing: 0.2,
   },
-
-  cardTitle: {
-    color: '#fff',
-    fontSize: 14,
-    flexShrink: 1,
-  },
-
-  cardSubtitle: {
-    color: '#fbc02d',
-    fontSize: 12,
-  },
-
-  valueContainer: {
-    marginLeft: 10,
-    maxWidth: 100,
-    alignItems: 'flex-end',
-  },
-
-  cardValue: {
-    color: '#fbc02d',
-    fontWeight: 'bold',
-    textAlign: 'right',
-  },
-
-  /* Header */
-  dashboardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 20,
-    marginBottom: 15,
-  },
-
-  dashboardText: {
-    color: '#cfd8dc',
-    fontSize: 14,
-    marginLeft: 8,
+  cardPeriod: {
+    fontSize: 11,
+    marginTop: 3,
     fontWeight: '500',
+    letterSpacing: 0.3,
+  },
+  cardValueWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 8,
+  },
+  cardValue: {
+    fontSize: 13.5,
+    fontWeight: '700',
+    letterSpacing: 0.4,
+    marginRight: 2,
   },
 });

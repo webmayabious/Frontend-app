@@ -183,7 +183,7 @@ const AllInteractionsScreen = ({ route }) => {
   });
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <View  style={styles.safeArea}>
       <StatusBar barStyle="light-content" backgroundColor="#0A0F2E" />
 
       {/* ── Header pinned to top ── */}
@@ -222,7 +222,7 @@ const AllInteractionsScreen = ({ route }) => {
 
       {/* ── Bottom Nav pinned to bottom ── */}
       <BottomNav />
-    </SafeAreaView>
+    </View >
   );
 };
 

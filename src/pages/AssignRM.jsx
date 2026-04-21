@@ -396,7 +396,7 @@ const AssignRM = () => {
   // ─── RENDER ───────────────────────────────────────────────────────────────
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -854,7 +854,7 @@ const AssignRM = () => {
         {/* ── Bottom Nav pinned to bottom ── */}
         <BottomNav style={{ paddingBottom: insets.bottom }} />
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </View>
   );
 };
 

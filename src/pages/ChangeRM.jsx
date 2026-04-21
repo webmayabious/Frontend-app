@@ -323,7 +323,7 @@ const ChangeRM = () => {
   // ─── RENDER ───────────────────────────────────────────────────────────────
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#0A0F2E" />
 
       {/* ── Header pinned to top ── */}
@@ -768,7 +768,7 @@ const ChangeRM = () => {
 
       {/* ── Bottom Nav pinned to bottom ── */}
       <BottomNav />
-    </SafeAreaView>
+    </View>
   );
 };
 
