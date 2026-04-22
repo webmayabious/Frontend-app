@@ -194,10 +194,10 @@ const BookingDetailScreen = ({ navigation, route }) => {
                 ? 'Pending'
                 : data?.booking_approval_status == 1
                 ? 'Approved By City Head'
-                : data?.booking_approval_status == 2
-                ? isAdmin
-                  ? 'Approved By Admin'
-                  : 'Approved By Business Head'
+                : data?.booking_approval_status == 2?
+                
+                  'Approved By Admin/Approved By Business Head'
+                  
                 : 'N/A'
             }
           />

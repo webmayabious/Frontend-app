@@ -145,11 +145,12 @@ const AssignRM = () => {
   const [assigning, setAssigning] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
+  const [uploading, setUploading] = useState(false);
   const [searchText, setSearchText] = useState('');
   const [uploadProspect, setUploadProspect] = useState({
-    reference: '',
-    com_id: '',
-    location: '',
+    reference: null,
+    com_id: null,
+    location: null,
   });
 
   const [showFilterModal, setShowFilterModal] = useState(false);
@@ -165,8 +166,11 @@ const AssignRM = () => {
 
   const filterAnim = useRef(new Animated.Value(screenHeight)).current;
 
+  // ✅ Role check — adjust based on your Redux state shape
   const userRole = useSelector(state => state.userRole);
   const isAdmin = userRole?.includes('ADMIN');
+  // ✅ Business role = NOT admin
+  const isBusiness = !isAdmin;
 
   useEffect(() => { fetchRMList(); }, []);
 
@@ -321,58 +325,48 @@ const AssignRM = () => {
     onSuccess: () => rmrefetch(),
   });
 
-  // ── Upload ──
-  // const handleDownloadFormat = async () => {
-  //   const fileName = 'mulyam_new.xlsx';
-  //   const destPath = `${RNFS.ExternalDirectoryPath}/${fileName}`;
-  //   try {
-  //     if (Platform.OS === 'android' && Platform.Version < 33) {
-  //       const granted = await PermissionsAndroid.request(
-  //         PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
-  //       );
-  //       if (granted !== PermissionsAndroid.RESULTS.GRANTED) return;
-  //     }
-  //     await RNFS.copyFileAssets(fileName, destPath);
-  //     await notifee.createChannel({ id: 'download', name: 'Downloads', importance: AndroidImportance.HIGH });
-  //     await notifee.displayNotification({
-  //       title: 'Download Complete ✅',
-  //       body: 'Tap to open file',
-  //       android: { channelId: 'download', pressAction: { id: 'open-file' } },
-  //       data: { path: destPath },
-  //     });
-  //   } catch (err) {
-  //     console.log('Download Error:', err);
-  //   }
-  // };
-const handleDownloadFormat = async () => {
+  // ── Download Format ──
+ const handleDownloadFormat = async () => {
   const fileName = 'mulyam_new.xlsx';
 
   try {
     if (Platform.OS === 'android') {
-      if (Platform.Version < 33) {
+      // Android 9 (API 28) এর নিচে permission দরকার
+      if (Platform.Version < 29) {
         const granted = await PermissionsAndroid.request(
-          PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
+          PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE
         );
         if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
           Alert.alert('Permission Denied', 'Storage permission is required.');
           return;
         }
       }
-      const destPath = `${RNFS.ExternalDirectoryPath}/${fileName}`;
-      await RNFS.copyFileAssets(fileName, destPath);
+
+      // Assets থেকে read করো
+      const assetContent = await RNFS.readFileAssets(fileName, 'base64');
+
+      // Downloads folder এ save করো (সবাই দেখতে পাবে)
+      const destPath = `${RNFS.DownloadDirectoryPath}/${fileName}`;
+
+      await RNFS.writeFile(destPath, assetContent, 'base64');
+
+      // Notification
       await notifee.createChannel({
         id: 'download',
         name: 'Downloads',
         importance: AndroidImportance.HIGH,
       });
+
       await notifee.displayNotification({
         title: 'Download Complete ✅',
-        body: 'File saved to Downloads folder',
+        body: `File saved: ${destPath}`,
         android: { channelId: 'download' },
       });
 
+      Alert.alert('Success', 'File saved to Downloads folder!');
+
     } else {
-      // ── iOS ──
+      // iOS — আগের মতোই
       const destPath = `${RNFS.DocumentDirectoryPath}/${fileName}`;
       const sourcePath = `${RNFS.MainBundlePath}/${fileName}`;
 
@@ -382,16 +376,11 @@ const handleDownloadFormat = async () => {
         return;
       }
 
-      // আগের copy থাকলে মুছে দাও
       const destExists = await RNFS.exists(destPath);
       if (destExists) await RNFS.unlink(destPath);
 
       await RNFS.copyFile(sourcePath, destPath);
-
-      // ✅ static import করা Share use করো
-      await Share.share({
-        url: `file://${destPath}`,
-      });
+      await Share.share({ url: `file://${destPath}` });
     }
 
   } catch (err) {
@@ -400,6 +389,7 @@ const handleDownloadFormat = async () => {
   }
 };
 
+  // ── Pick File ──
   const pickExcelFile = async () => {
     try {
       const [file] = await pick({ type: [types.xls, types.xlsx, types.csv] });
@@ -409,27 +399,65 @@ const handleDownloadFormat = async () => {
     }
   };
 
+  // ✅ FIXED: Upload — Business শুধু location + reference + file দরকার
+  //           Admin এর জন্য company + reference + file দরকার
   const handleUpload = async () => {
-    if (!uploadProspect.reference || !uploadProspect.com_id || !selectedFile) {
-      Alert.alert('Error', 'Please select Reference, Company and File');
-      return;
+    // ✅ Validation — role অনুযায়ী আলাদা
+    if (isAdmin) {
+      if (!uploadProspect.reference || !uploadProspect.com_id || !selectedFile) {
+        Alert.alert('Error', 'Please select Reference, Company and File');
+        return;
+      }
+    } else {
+      // Business role — location + reference + file
+      if (!uploadProspect.reference || !uploadProspect.location || !selectedFile) {
+        Alert.alert('Error', 'Please select Location, Reference and File');
+        return;
+      }
     }
-    const formData = new FormData();
-    formData.append('excelUpload', { uri: selectedFile.uri, type: selectedFile.type, name: selectedFile.name });
-    formData.append('reference', String(uploadProspect.reference));
-    formData.append('com_id', String(uploadProspect.com_id));
-    formData.append('location', String(uploadProspect.location || ''));
+
+    setUploading(true);
     try {
-      await api.post('/api/pm/uploadPropertyLeadFromExcel', formData, {
+      const formData = new FormData();
+      formData.append('excelUpload', {
+        uri: selectedFile.uri,
+        type: selectedFile.type,
+        name: selectedFile.name,
+      });
+      formData.append('reference', String(uploadProspect.reference));
+      formData.append('location', String(uploadProspect.location || ''));
+
+      // ✅ com_id — admin হলেই পাঠাও, business হলে পাঠাও না
+      if (isAdmin && uploadProspect.com_id) {
+        formData.append('com_id', String(uploadProspect.com_id));
+      }
+
+      const res = await api.post('/api/pm/uploadPropertyLeadFromExcel', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
-      setUploadProspect({ reference: '', com_id: '', location: '' });
-      setSelectedFile(null);
-      setShowUploadModal(false);
-      rmrefetch();
+
+      if (res?.data?.success || res?.status === 200) {
+        Alert.alert('Success', res?.data?.message || 'File uploaded successfully!');
+        setUploadProspect({ reference: null, com_id: null, location: null });
+        setSelectedFile(null);
+        setShowUploadModal(false);
+        rmrefetch();
+      } else {
+        Alert.alert('Error', res?.data?.message || 'Upload failed. Please try again.');
+      }
     } catch (err) {
       console.log('UPLOAD ERROR:', err?.response?.data || err);
+      Alert.alert('Error', err?.response?.data?.message || 'Something went wrong during upload.');
+    } finally {
+      setUploading(false);
     }
+  };
+
+  // ── Reset upload modal ──
+  const closeUploadModal = () => {
+    setUploadProspect({ reference: null, com_id: null, location: null });
+    setSelectedFile(null);
+    setShowUploadModal(false);
   };
 
   const onChange = (key, value) => {
@@ -459,7 +487,6 @@ const handleDownloadFormat = async () => {
       >
         <StatusBar barStyle="light-content" backgroundColor="#0A0F2E" />
 
-        {/* ── Header pinned to top ── */}
         <Header />
 
         {/* ── Section Header ── */}
@@ -585,7 +612,6 @@ const handleDownloadFormat = async () => {
                   key={item.id}
                   style={[styles.card, isChecked && styles.cardSelected]}
                 >
-                  {/* Card Top */}
                   <View style={styles.cardTop}>
                     <View style={styles.nameRow}>
                       <TouchableOpacity
@@ -598,7 +624,8 @@ const handleDownloadFormat = async () => {
                       <Text style={styles.cardName}>{item.name} |{' '}
                         <Text style={styles.section}>
                           {item?.propertyproject?.project_name}
-                        </Text></Text>
+                        </Text>
+                      </Text>
                     </View>
                     <View style={styles.iconRow}>
                       <TouchableOpacity
@@ -734,68 +761,119 @@ const handleDownloadFormat = async () => {
           </View>
         )}
 
-        {/* ── Upload Modal ── */}
+        {/* ✅ FIXED Upload Modal ── */}
         {showUploadModal && (
           <View style={styles.modalOverlay}>
             <View style={styles.uploadModalContainer}>
               <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Upload Files</Text>
-                <TouchableOpacity onPress={() => setShowUploadModal(false)}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Icon name="upload-file" size={16} color={COLORS.accent} />
+                  <Text style={styles.modalTitle}>Upload Leads</Text>
+                </View>
+                <TouchableOpacity onPress={closeUploadModal}>
                   <Icon name="close" size={20} color={COLORS.mutedText} />
                 </TouchableOpacity>
               </View>
 
-              <View style={styles.formBox}>
-                <DropdownField
-                  label="Location of Property *"
-                  data={Property}
-                  placeholder="Select"
-                  value={uploadProspect.location}
-                  onChange={value => onChange('location', value)}
+              {/* ✅ Role Badge */}
+              <View style={styles.roleBadge}>
+                <Icon
+                  name={isAdmin ? 'admin-panel-settings' : 'business'}
+                  size={12}
+                  color={isAdmin ? COLORS.gold : COLORS.accent}
                 />
-                <DropdownField
-                  label="Reference *"
-                  data={References}
-                  placeholder="Select"
-                  value={uploadProspect.reference}
-                  onChange={value => onChange('reference', value)}
-                />
-                {isAdmin && (
-                  <DropdownField
-                    label="Company *"
-                    data={Company}
-                    placeholder="Select"
-                    value={uploadProspect.com_id}
-                    onChange={value => onChange('com_id', value)}
-                  />
-                )}
-                <View style={styles.uploadRow}>
-                  <TouchableOpacity style={styles.browseBtn} onPress={pickExcelFile}>
-                    <Icon name="folder-open" size={15} color="#fff" />
-                    <Text style={styles.browseText} numberOfLines={1}>
-                      {selectedFile ? selectedFile.name : 'Browse file...'}
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.uploadBtn} onPress={handleUpload}>
-                    <Text style={styles.uploadBtnText}>Upload</Text>
-                  </TouchableOpacity>
-                </View>
+                <Text style={[styles.roleBadgeText, { color: isAdmin ? COLORS.gold : COLORS.accent }]}>
+                  {isAdmin ? 'Admin Upload' : 'Business Upload'}
+                </Text>
               </View>
 
-              <View style={styles.downloadCard}>
-                <Text style={styles.downloadTitle}>Download Format</Text>
-                <Text style={styles.downloadDesc}>
-                  Download the template file to prepare your lead data for upload.
-                </Text>
-                <TouchableOpacity style={styles.downloadBtn} onPress={handleDownloadFormat}>
-                  <Icon name="download" size={15} color="#000" />
-                  <Text style={styles.downloadBtnText}>Download</Text>
-                </TouchableOpacity>
-              </View>
+              <ScrollView
+                style={{ width: '100%' }}
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+              >
+                <View style={styles.formBox}>
+
+                  {/* ✅ Location — সবার জন্য */}
+                  <DropdownField
+                    label="Location of Property *"
+                    data={Property}
+                    placeholder="Select location"
+                    value={uploadProspect.location}
+                    onChange={value => onChange('location', value)}
+                  />
+
+                  {/* ✅ Reference — সবার জন্য */}
+                  <DropdownField
+                    label="Reference *"
+                    data={References}
+                    placeholder="Select reference"
+                    value={uploadProspect.reference}
+                    onChange={value => onChange('reference', value)}
+                  />
+
+                  {/* ✅ Company — শুধু Admin এর জন্য */}
+                  {isAdmin && (
+                    <DropdownField
+                      label="Company *"
+                      data={Company}
+                      placeholder="Select company"
+                      value={uploadProspect.com_id}
+                      onChange={value => onChange('com_id', value)}
+                    />
+                  )}
+
+                  {/* ✅ File Picker + Upload Button */}
+                  <Text style={styles.dropLabel}>Excel / CSV File *</Text>
+                  <View style={styles.uploadRow}>
+                    <TouchableOpacity style={styles.browseBtn} onPress={pickExcelFile}>
+                      <Icon name="folder-open" size={15} color="#fff" />
+                      <Text style={styles.browseText} numberOfLines={1}>
+                        {selectedFile ? selectedFile.name : 'Browse file...'}
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.uploadBtn, uploading && { opacity: 0.6 }]}
+                      onPress={handleUpload}
+                      disabled={uploading}
+                    >
+                      {uploading
+                        ? <ActivityIndicator size="small" color="#fff" />
+                        : <Text style={styles.uploadBtnText}>Upload</Text>
+                      }
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* ✅ Selected file info */}
+                  {selectedFile && (
+                    <View style={styles.fileInfoRow}>
+                      <Icon name="insert-drive-file" size={13} color={COLORS.green} />
+                      <Text style={styles.fileInfoText} numberOfLines={1}>
+                        {selectedFile.name}
+                      </Text>
+                      <TouchableOpacity onPress={() => setSelectedFile(null)}>
+                        <Icon name="close" size={13} color={COLORS.red} />
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
+
+                {/* ✅ Download Format Card */}
+                <View style={styles.downloadCard}>
+                  <Text style={styles.downloadTitle}>📄 Download Format</Text>
+                  <Text style={styles.downloadDesc}>
+                    Download the template file to prepare your lead data for upload.
+                  </Text>
+                  <TouchableOpacity style={styles.downloadBtn} onPress={handleDownloadFormat}>
+                    <Icon name="download" size={15} color="#000" />
+                    <Text style={styles.downloadBtnText}>Download Template</Text>
+                  </TouchableOpacity>
+                </View>
+              </ScrollView>
 
               <TouchableOpacity
                 style={styles.cancelBtnBottom}
-                onPress={() => setShowUploadModal(false)}
+                onPress={closeUploadModal}
               >
                 <Text style={styles.cancelBtnBottomText}>Cancel</Text>
               </TouchableOpacity>
@@ -907,7 +985,6 @@ const handleDownloadFormat = async () => {
           </View>
         )}
 
-        {/* ── Bottom Nav pinned to bottom ── */}
         <BottomNav style={{ paddingBottom: insets.bottom }} />
       </KeyboardAvoidingView>
     </View>
@@ -920,18 +997,9 @@ export default AssignRM;
 
 const styles = StyleSheet.create({
 
-  // ── Layout ──
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.bg,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingHorizontal: 12,
-    paddingBottom: 16,
-  },
+  container: { flex: 1, backgroundColor: COLORS.bg },
+  scrollView: { flex: 1 },
+  scrollContent: { paddingHorizontal: 12, paddingBottom: 16 },
   centeredText: {
     color: COLORS.white,
     textAlign: 'center',
@@ -940,7 +1008,6 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
 
-  // ── Section Header ──
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -961,11 +1028,7 @@ const styles = StyleSheet.create({
     gap: 7,
     flex: 1,
   },
-  sectionTitle: {
-    color: COLORS.white,
-    fontSize: 14,
-    fontWeight: '700',
-  },
+  sectionTitle: { color: COLORS.white, fontSize: 14, fontWeight: '700' },
   recordBadge: {
     backgroundColor: COLORS.goldDim,
     borderWidth: 1,
@@ -974,11 +1037,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 9,
     paddingVertical: 2,
   },
-  recordText: {
-    color: COLORS.gold,
-    fontSize: 10,
-    fontWeight: '600',
-  },
+  recordText: { color: COLORS.gold, fontSize: 10, fontWeight: '600' },
   closeBtn: {
     backgroundColor: 'rgba(255,255,255,0.1)',
     borderRadius: 16,
@@ -987,17 +1046,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.22)',
   },
-  closeBtnText: {
-    color: COLORS.white,
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  backButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
+  closeBtnText: { color: COLORS.white, fontSize: 11, fontWeight: '600' },
+  backButton: { flexDirection: 'row', alignItems: 'center' },
 
-  // ── Action Buttons ──
   buttonRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1019,14 +1070,8 @@ const styles = StyleSheet.create({
     borderColor: COLORS.borderColor,
     minHeight: 36,
   },
-  actionBtnText: {
-    color: COLORS.white,
-    fontSize: 11,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
+  actionBtnText: { color: COLORS.white, fontSize: 11, fontWeight: '600', textAlign: 'center' },
 
-  // ── Search ──
   searchBox: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1044,10 +1089,9 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     fontSize: 13,
     flex: 1,
-    paddingVertical: Platform.OS === 'ios' ? 0 : 0,
+    paddingVertical: 0,
   },
 
-  // ── Select All Row ──
   selectAllRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1062,11 +1106,7 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     gap: 8,
   },
-  selectAllText: {
-    color: COLORS.white,
-    fontSize: 13,
-    fontWeight: '500',
-  },
+  selectAllText: { color: COLORS.white, fontSize: 13, fontWeight: '500' },
   selectedBadge: {
     backgroundColor: COLORS.accentDim,
     borderWidth: 1,
@@ -1075,11 +1115,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 3,
   },
-  selectedBadgeText: {
-    color: COLORS.accent,
-    fontSize: 11,
-    fontWeight: '600',
-  },
+  selectedBadgeText: { color: COLORS.accent, fontSize: 11, fontWeight: '600' },
   filterBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1092,13 +1128,8 @@ const styles = StyleSheet.create({
     borderColor: COLORS.borderColor,
     flexShrink: 0,
   },
-  filterBtnText: {
-    color: COLORS.white,
-    fontSize: 11,
-    fontWeight: '500',
-  },
+  filterBtnText: { color: COLORS.white, fontSize: 11, fontWeight: '500' },
 
-  // ── Checkbox ──
   checkbox: {
     width: 17,
     height: 17,
@@ -1109,12 +1140,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: 'transparent',
   },
-  checkboxChecked: {
-    backgroundColor: COLORS.accent,
-    borderColor: COLORS.accent,
-  },
+  checkboxChecked: { backgroundColor: COLORS.accent, borderColor: COLORS.accent },
 
-  // ── Lead Card ──
   card: {
     backgroundColor: COLORS.cardBg,
     borderRadius: 12,
@@ -1133,33 +1160,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 8,
   },
-  nameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    flex: 1,
-  },
-  nameIndicator: {
-    width: 3,
-    height: 15,
-    backgroundColor: COLORS.accent,
-    borderRadius: 3,
-  },
-  cardName: {
-    color: COLORS.white,
-    fontWeight: '800',
-    fontSize: 13,
-    flex: 1,
-  },
-  iconRow: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  divider: {
-    height: 0.5,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    marginBottom: 8,
-  },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 },
+  nameIndicator: { width: 3, height: 15, backgroundColor: COLORS.accent, borderRadius: 3 },
+  cardName: { color: COLORS.white, fontWeight: '800', fontSize: 13, flex: 1 },
+  iconRow: { flexDirection: 'row', gap: 12 },
+  divider: { height: 0.5, backgroundColor: 'rgba(255,255,255,0.12)', marginBottom: 8 },
   sectionLabel: {
     color: COLORS.gold,
     fontSize: 11,
@@ -1174,45 +1179,16 @@ const styles = StyleSheet.create({
     marginBottom: 5,
     gap: 8,
   },
-  contactItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    flex: 1,
-  },
-  infoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    marginBottom: 4,
-  },
-  infoText: {
-    color: COLORS.mutedText,
-    fontSize: 11,
-    flexShrink: 1,
-  },
-  refRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 2,
-  },
-  refLabel: {
-    color: COLORS.labelText,
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  refValue: {
-    color: COLORS.white,
-    fontSize: 11,
-  },
+  contactItem: { flexDirection: 'row', alignItems: 'center', gap: 5, flex: 1 },
+  infoRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 4 },
+  infoText: { color: COLORS.mutedText, fontSize: 11, flexShrink: 1 },
+  refRow: { flexDirection: 'row', alignItems: 'center', marginTop: 2 },
+  refLabel: { color: COLORS.labelText, fontSize: 11, fontWeight: '600' },
+  refValue: { color: COLORS.white, fontSize: 11 },
 
-  // ── Assign RM Modal ──
   modalOverlay: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    top: 0, left: 0, right: 0, bottom: 0,
     backgroundColor: 'rgba(0,0,0,0.7)',
     justifyContent: 'center',
     alignItems: 'center',
@@ -1233,11 +1209,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 12,
   },
-  modalTitle: {
-    color: COLORS.accent,
-    fontSize: 15,
-    fontWeight: '700',
-  },
+  modalTitle: { color: COLORS.accent, fontSize: 15, fontWeight: '700' },
   infoBox: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1250,17 +1222,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.goldBorder,
   },
-  infoBoxText: {
-    color: COLORS.gold,
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  rmLabel: {
-    color: COLORS.white,
-    marginBottom: 6,
-    fontSize: 13,
-    fontWeight: '500',
-  },
+  infoBoxText: { color: COLORS.gold, fontSize: 12, fontWeight: '500' },
+  rmLabel: { color: COLORS.white, marginBottom: 6, fontSize: 13, fontWeight: '500' },
   dropdownList: {
     maxHeight: 200,
     borderWidth: 1,
@@ -1278,44 +1241,20 @@ const styles = StyleSheet.create({
     borderBottomWidth: 0.5,
     borderBottomColor: 'rgba(255,255,255,0.08)',
   },
-  dropdownItemSelected: {
-    backgroundColor: COLORS.accentDim,
-  },
-  rmItemLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
+  dropdownItemSelected: { backgroundColor: COLORS.accentDim },
+  rmItemLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   rmRadio: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
+    width: 16, height: 16, borderRadius: 8,
     borderWidth: 1.5,
     borderColor: 'rgba(255,255,255,0.3)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   rmRadioSelected: { borderColor: COLORS.accent },
-  rmRadioInner: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: COLORS.accent,
-  },
-  dropdownItemText: {
-    color: COLORS.mutedText,
-    fontSize: 13,
-  },
-  dropdownItemTextSelected: {
-    color: COLORS.accent,
-    fontWeight: '600',
-  },
-  noRMText: {
-    color: COLORS.mutedText,
-    textAlign: 'center',
-    padding: 20,
-    fontSize: 13,
-  },
+  rmRadioInner: { width: 8, height: 8, borderRadius: 4, backgroundColor: COLORS.accent },
+  dropdownItemText: { color: COLORS.mutedText, fontSize: 13 },
+  dropdownItemTextSelected: { color: COLORS.accent, fontWeight: '600' },
+  noRMText: { color: COLORS.mutedText, textAlign: 'center', padding: 20, fontSize: 13 },
   selectedRMBadge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1328,16 +1267,8 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
     marginBottom: 14,
   },
-  selectedRMText: {
-    color: COLORS.accent,
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  modalBtnRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 10,
-  },
+  selectedRMText: { color: COLORS.accent, fontSize: 12, fontWeight: '600' },
+  modalBtnRow: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10 },
   cancelBtn: {
     backgroundColor: 'rgba(255,255,255,0.08)',
     paddingHorizontal: 18,
@@ -1346,11 +1277,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.borderColor,
   },
-  cancelBtnText: {
-    color: COLORS.white,
-    fontWeight: '500',
-    fontSize: 13,
-  },
+  cancelBtnText: { color: COLORS.white, fontWeight: '500', fontSize: 13 },
   assignBtn: {
     backgroundColor: COLORS.accent,
     paddingHorizontal: 18,
@@ -1360,21 +1287,35 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   assignBtnDisabled: { backgroundColor: 'rgba(0,207,255,0.3)' },
-  assignBtnText: {
-    color: '#fff',
-    fontWeight: '700',
-    fontSize: 13,
-  },
+  assignBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
 
-  // ── Upload Modal ──
+  // ✅ Upload Modal
   uploadModalContainer: {
-    width: '90%',
+    width: '92%',
     backgroundColor: COLORS.modalBg,
     borderRadius: 16,
     padding: 18,
     borderWidth: 1,
     borderColor: COLORS.borderColor,
+    maxHeight: '88%',
   },
+
+  // ✅ Role Badge
+  roleBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: COLORS.borderColor,
+  },
+  roleBadgeText: { fontSize: 11, fontWeight: '600' },
+
   formBox: {
     backgroundColor: 'rgba(0,0,0,0.3)',
     borderRadius: 12,
@@ -1400,22 +1341,32 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     flex: 1,
   },
-  browseText: {
-    color: '#fff',
-    fontSize: 11,
-    flex: 1,
-  },
+  browseText: { color: '#fff', fontSize: 11, flex: 1 },
   uploadBtn: {
     backgroundColor: '#22c55e',
     paddingHorizontal: 18,
     paddingVertical: 8,
     borderRadius: 20,
+    minWidth: 75,
+    alignItems: 'center',
   },
-  uploadBtnText: {
-    color: '#fff',
-    fontWeight: '700',
-    fontSize: 13,
+  uploadBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
+
+  // ✅ File info row
+  fileInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 8,
+    backgroundColor: 'rgba(0,196,140,0.1)',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderWidth: 0.5,
+    borderColor: 'rgba(0,196,140,0.3)',
   },
+  fileInfoText: { color: COLORS.green, fontSize: 11, flex: 1 },
+
   downloadCard: {
     backgroundColor: 'rgba(0,0,0,0.3)',
     borderRadius: 12,
@@ -1424,18 +1375,8 @@ const styles = StyleSheet.create({
     borderWidth: 0.5,
     borderColor: COLORS.borderColor,
   },
-  downloadTitle: {
-    color: COLORS.gold,
-    fontSize: 13,
-    fontWeight: '700',
-    marginBottom: 4,
-  },
-  downloadDesc: {
-    color: COLORS.mutedText,
-    fontSize: 11,
-    marginBottom: 10,
-    lineHeight: 16,
-  },
+  downloadTitle: { color: COLORS.gold, fontSize: 13, fontWeight: '700', marginBottom: 4 },
+  downloadDesc: { color: COLORS.mutedText, fontSize: 11, marginBottom: 10, lineHeight: 16 },
   downloadBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1446,11 +1387,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     alignSelf: 'flex-start',
   },
-  downloadBtnText: {
-    color: '#000',
-    fontWeight: '600',
-    fontSize: 12,
-  },
+  downloadBtnText: { color: '#000', fontWeight: '600', fontSize: 12 },
   cancelBtnBottom: {
     alignSelf: 'flex-end',
     backgroundColor: 'rgba(239,68,68,0.2)',
@@ -1459,20 +1396,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingVertical: 7,
     borderRadius: 20,
+    marginTop: 4,
   },
-  cancelBtnBottomText: {
-    color: COLORS.red,
-    fontWeight: '600',
-    fontSize: 13,
-  },
+  cancelBtnBottomText: { color: COLORS.red, fontWeight: '600', fontSize: 13 },
 
-  // ── Filter Bottom Sheet ──
   bottomSheetOverlay: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    top: 0, left: 0, right: 0, bottom: 0,
     backgroundColor: 'rgba(0,0,0,0.55)',
     justifyContent: 'flex-end',
     zIndex: 1000,
@@ -1496,16 +1426,8 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     marginBottom: 14,
   },
-  filterModalTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  filterDivider: {
-    height: 0.5,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    marginVertical: 12,
-  },
+  filterModalTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  filterDivider: { height: 0.5, backgroundColor: 'rgba(255,255,255,0.12)', marginVertical: 12 },
   filterLabel: {
     color: COLORS.accent,
     fontSize: 11,
@@ -1515,18 +1437,9 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     marginTop: 4,
   },
-  dateRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 4,
-  },
+  dateRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
   dateField: { flex: 1 },
-  dateSubLabel: {
-    color: COLORS.mutedText,
-    fontSize: 11,
-    marginBottom: 4,
-  },
+  dateSubLabel: { color: COLORS.mutedText, fontSize: 11, marginBottom: 4 },
   dateSeparator: { paddingTop: 18 },
   filterBtnRow: {
     flexDirection: 'row',
@@ -1545,15 +1458,8 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,82,82,0.35)',
     backgroundColor: 'rgba(255,82,82,0.1)',
   },
-  resetBtnText: {
-    color: COLORS.red,
-    fontSize: 13,
-    fontWeight: '500',
-  },
-  filterActionBtns: {
-    flexDirection: 'row',
-    gap: 10,
-  },
+  resetBtnText: { color: COLORS.red, fontSize: 13, fontWeight: '500' },
+  filterActionBtns: { flexDirection: 'row', gap: 10 },
   applyBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1565,17 +1471,9 @@ const styles = StyleSheet.create({
     minWidth: 80,
     justifyContent: 'center',
   },
-  applyBtnText: {
-    color: '#fff',
-    fontWeight: '700',
-    fontSize: 13,
-  },
+  applyBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
 
-  // ── Dropdown Field ──
-  inputWrapper: {
-    marginBottom: 10,
-    width: '100%',
-  },
+  inputWrapper: { marginBottom: 10, width: '100%' },
   dropLabel: {
     color: COLORS.accent,
     fontSize: 10,
@@ -1592,26 +1490,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.borderColor,
   },
-  dropdownContainer: {
-    backgroundColor: '#fff',
-    borderRadius: 10,
-  },
-  placeholderStyle: {
-    color: COLORS.mutedText,
-    fontSize: 13,
-  },
-  selectedTextStyle: {
-    color: COLORS.white,
-    fontSize: 13,
-  },
-  itemContainer: {
-    paddingVertical: 0,
-  },
+  dropdownContainer: { backgroundColor: '#fff', borderRadius: 10 },
+  placeholderStyle: { color: COLORS.mutedText, fontSize: 13 },
+  selectedTextStyle: { color: COLORS.white, fontSize: 13 },
+  itemContainer: { paddingVertical: 0 },
 
-  // ── Input Field ──
-  field: {
-    marginBottom: 10,
-  },
+  field: { marginBottom: 10 },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1622,12 +1506,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     height: 42,
   },
-  input: {
-    color: COLORS.white,
-    flex: 1,
-    fontSize: 13,
-  },
-   section:{
-    color:'rgba(0, 208, 255, 0.84)'
-  }
+  input: { color: COLORS.white, flex: 1, fontSize: 13 },
+  section: { color: 'rgba(0, 208, 255, 0.84)' },
 });
