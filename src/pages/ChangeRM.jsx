@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -6,7 +6,7 @@ import {
   SafeAreaView,
   TouchableOpacity,
   TextInput,
-  ScrollView,
+  FlatList,
   Alert,
   Linking,
   Animated,
@@ -14,7 +14,9 @@ import {
   StatusBar,
   Platform,
   Image,
+  ActivityIndicator,
 } from 'react-native';
+import { ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -27,6 +29,7 @@ import { Dropdown } from 'react-native-element-dropdown';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
 const screenHeight = Dimensions.get('window').height;
+const PAGE_SIZE = 20; // প্রতি page-এ কতটা item লোড হবে
 
 // ─── COLORS ──────────────────────────────────────────────────────────────────
 
@@ -136,6 +139,13 @@ const ChangeRM = () => {
   const [showToPicker, setShowToPicker] = useState(false);
   const [appliedFilters, setAppliedFilters] = useState();
 
+  // ── Infinite Scroll State ──
+  const [leads, setLeads] = useState([]);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [isFetchingMore, setIsFetchingMore] = useState(false);
+  const [isInitialLoading, setIsInitialLoading] = useState(false);
+
   const [filters, setFilters] = useState({
     company_id: null,
     rm_id: null,
@@ -196,10 +206,15 @@ const ChangeRM = () => {
 
   const Rm = allRmList?.map(item => ({ label: item.name, value: item.id }));
 
-  // ── Leads ──
-  const { data: Lead = [], refetch: leadrefetch, isLoading } = useQuery({
-    queryKey: ['rm_leads', appliedFilters, searchText],
-    queryFn: async () => {
+  // ── Fetch Leads (with pagination) ──
+  const fetchLeads = useCallback(
+    async (pageNum = 1, isReset = false) => {
+      if (pageNum === 1) {
+        setIsInitialLoading(true);
+      } else {
+        setIsFetchingMore(true);
+      }
+
       try {
         const res = await api.get('/api/pm/getAllPropertyLeads', {
           params: {
@@ -211,18 +226,54 @@ const ChangeRM = () => {
             project: filters.project || undefined,
             location: filters.location || undefined,
             active: filters.active || undefined,
+            page: pageNum,
+            limit: PAGE_SIZE,
           },
         });
-        return res?.data?.data ?? [];
+
+        const newData = res?.data?.data ?? [];
+
+        if (isReset || pageNum === 1) {
+          setLeads(newData);
+        } else {
+          setLeads(prev => {
+  const combined = [...prev, ...newData];
+
+  // 🔥 duplicate remove
+  const unique = combined.filter(
+    (item, index, self) =>
+      index === self.findIndex(i => i.id === item.id)
+  );
+
+  return unique;
+});
+        }
+
+        // যদি PAGE_SIZE-এর কম data আসে, মানে আর data নেই
+        setHasMore(newData.length === PAGE_SIZE);
+        setPage(pageNum);
       } catch {
-        return [];
+        // error হলে list ঠিক রাখো
+      } finally {
+        setIsInitialLoading(false);
+        setIsFetchingMore(false);
       }
     },
-  });
+    [searchText, filters],
+  );
 
+  // ── Reset & reload যখন filters বা search পরিবর্তন হয় ──
   useEffect(() => {
-    leadrefetch();
-  }, [searchText]);
+    setPage(1);
+    setHasMore(true);
+    fetchLeads(1, true);
+  }, [searchText, appliedFilters]);
+
+  // ── Load more (next page) ──
+  const loadMore = () => {
+    if (!hasMore || isFetchingMore || isInitialLoading) return;
+    fetchLeads(page + 1);
+  };
 
   // ── Locations ──
   const { data: AllProperty } = useQuery({
@@ -264,14 +315,14 @@ const ChangeRM = () => {
   };
 
   const toggleSelectAll = () => {
-    if (selected.length === Lead.length) {
+    if (selected.length === leads.length) {
       setSelected([]);
     } else {
-      setSelected(Lead.map(d => d.id));
+      setSelected(leads.map(d => d.id));
     }
   };
 
-  const isAllSelected = selected.length === Lead.length && Lead.length > 0;
+  const isAllSelected = selected.length === leads.length && leads.length > 0;
 
   // ── Assign RM ──
   const { mutate: handleAssignRm } = useMutation({
@@ -284,11 +335,12 @@ const ChangeRM = () => {
       });
     },
     onSuccess: () => {
-       Alert.alert('RM Changed Successfully!');
+      Alert.alert('RM Changed Successfully!');
       setSelected([]);
       setrms(null);
       setShowrmModal(false);
-      leadrefetch();
+      // Reset করে আবার load করো
+      fetchLeads(1, true);
     },
     onError: error => {
       Alert.alert('Error', error?.message || 'Something went wrong');
@@ -318,6 +370,131 @@ const ChangeRM = () => {
     setFilters(cleared);
     setAppliedFilters(cleared);
     closeFilterModal();
+  };
+
+  // ─── LEAD CARD (FlatList renderItem) ───────────────────────────────────────
+
+  const renderLeadCard = useCallback(
+    ({ item }) => {
+      const isChecked = selected.includes(item.id);
+      return (
+        <View style={[styles.card, isChecked && styles.cardSelected]}>
+          {/* Card Top */}
+          <View style={styles.cardTop}>
+            <View style={styles.nameRow}>
+              <TouchableOpacity
+                onPress={() => toggleSelect(item.id)}
+                style={[styles.checkbox, isChecked && styles.checkboxChecked]}
+              >
+                {isChecked && <Icon name="check" size={11} color="#fff" />}
+              </TouchableOpacity>
+              <Text style={styles.cardName}>
+                {item?.name || 'N/A'} |{' '}
+                <Text style={styles.section}>
+                  {item?.propertyproject?.project_name}
+                </Text>
+              </Text>
+              <View
+                style={[
+                  styles.statusBadge,
+                  {
+                    backgroundColor:
+                      item?.active === '1' ? '#00C48C22' : '#FF6B6B22',
+                    borderColor:
+                      item?.active === '1' ? '#00C48C60' : '#FF6B6B60',
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.statusText,
+                    { color: item?.active === '1' ? COLORS.green : COLORS.red },
+                  ]}
+                >
+                  {item?.active === '1' ? 'Active' : 'Inactive'}
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          <View style={styles.divider} />
+
+          {/* Card Body */}
+          <View style={styles.cardBody}>
+            <View style={styles.leftCol}>
+              <View style={styles.infoRow}>
+                <Icon name="call" size={12} color={COLORS.accent} />
+                <Text
+                  style={[styles.infoText, { color: COLORS.accent }]}
+                  onPress={() => makeCall(item?.phone)}
+                >
+                  {item?.phone || 'N/A'}
+                </Text>
+              </View>
+              <View style={styles.infoRow}>
+                <MaterialCommunityIcons
+                  name="file-document-outline"
+                  size={12}
+                  color={COLORS.accent}
+                />
+                <Text style={styles.infoText}>
+                  {item?.company?.com_name || 'N/A'}
+                </Text>
+              </View>
+              <View style={styles.infoRow}>
+                <Icon name="email" size={12} color={COLORS.accent} />
+                <Text style={styles.infoText}>{item?.email || 'N/A'}</Text>
+              </View>
+            </View>
+
+            <View style={styles.rightCol}>
+              <View style={styles.infoRow}>
+                <Text style={styles.rmLabelCard}>RM: </Text>
+                <Text style={styles.rmValue}>
+                  {item?.relationshipManager
+                    ? `${item.relationshipManager.usr_fname} ${item.relationshipManager.usr_lname}`
+                    : 'N/A'}
+                </Text>
+              </View>
+              <View style={styles.infoRow}>
+                <Icon name="location-on" size={12} color={COLORS.gold} />
+                <Text style={styles.infoText}>
+                  {item?.propertylocation?.name || 'N/A'}
+                </Text>
+              </View>
+              <View style={styles.infoRow}>
+                <Text style={styles.refLabel}>Reference: </Text>
+                <Text style={styles.refValue}>
+                  {item?.mrreference?.mrf_name || 'N/A'}
+                </Text>
+              </View>
+            </View>
+          </View>
+        </View>
+      );
+    },
+    [selected],
+  );
+
+  // ─── Footer: loading spinner বা "no more data" ─────────────────────────────
+
+  const renderFooter = () => {
+    if (isFetchingMore) {
+      return (
+        <View style={styles.footerLoader}>
+          <ActivityIndicator size="small" color={COLORS.accent} />
+          <Text style={styles.footerText}>Loading more...</Text>
+        </View>
+      );
+    }
+    if (!hasMore && leads.length > 0) {
+      return (
+        <View style={styles.footerLoader}>
+          <Text style={styles.footerEndText}>✓ All leads loaded</Text>
+        </View>
+      );
+    }
+    return null;
   };
 
   // ─── RENDER ───────────────────────────────────────────────────────────────
@@ -365,160 +542,73 @@ const ChangeRM = () => {
         </View>
       </View>
 
-      {/* ── Scrollable List ── */}
-      <ScrollView
-        style={styles.scrollView}
+      {/* ── FlatList with Infinite Scroll ── */}
+      <FlatList
+        data={leads}
+        keyExtractor={item => String(item.id)}
+        renderItem={renderLeadCard}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
-      >
-        {/* Search Bar */}
-        <View style={styles.searchRow}>
-          <View style={styles.searchBox}>
-            <Icon name="search" size={16} color={COLORS.mutedText} />
-            <TextInput
-              placeholder="Search name / phone / email..."
-              placeholderTextColor={COLORS.mutedText}
-              value={searchText}
-              onChangeText={setSearchText}
-              style={styles.searchInput}
-            />
-            {searchText ? (
-              <TouchableOpacity onPress={() => setSearchText('')}>
-                <Icon name="close" size={15} color={COLORS.mutedText} />
-              </TouchableOpacity>
-            ) : null}
-          </View>
-        </View>
-
-        {/* Select All + Filter Row */}
-        <View style={styles.selectAllRow}>
-          <TouchableOpacity style={styles.selectAllLeft} onPress={toggleSelectAll}>
-            <View style={[styles.checkbox, isAllSelected && styles.checkboxChecked]}>
-              {isAllSelected && <Icon name="check" size={11} color="#fff" />}
-            </View>
-            <Text style={styles.selectAllText}>Select All</Text>
-          </TouchableOpacity>
-
-          {selected.length > 0 && (
-            <View style={styles.selectedBadge}>
-              <Text style={styles.selectedBadgeText}>{selected.length} selected</Text>
-            </View>
-          )}
-
-          <TouchableOpacity style={styles.filterBtn} onPress={openFilterModal}>
-            <Icon name="filter-list" size={13} color="#fff" />
-            <Text style={styles.filterBtnText}>By Details</Text>
-            <Icon name="keyboard-arrow-down" size={13} color="#fff" />
-          </TouchableOpacity>
-        </View>
-
-        {/* Lead Cards */}
-        {isLoading ? (
-          <Text style={styles.centeredText}>Loading...</Text>
-        ) : Lead.length === 0 ? (
-          <Text style={styles.centeredText}>No leads found</Text>
-        ) : (
-         (Array.isArray(Lead) ? Lead : []).map(item => {
-            const isChecked = selected.includes(item.id);
-            return (
-              <View
-                key={item.id}
-                style={[styles.card, isChecked && styles.cardSelected]}
-              >
-                {/* Card Top */}
-                <View style={styles.cardTop}>
-                  <View style={styles.nameRow}>
-                    <TouchableOpacity
-                      onPress={() => toggleSelect(item.id)}
-                      style={[styles.checkbox, isChecked && styles.checkboxChecked]}
-                    >
-                      {isChecked && <Icon name="check" size={11} color="#fff" />}
-                    </TouchableOpacity>
-                    <Text style={styles.cardName}>{item?.name || 'N/A' } |{' '}
-                        <Text style={styles.section}>
-                          {item?.propertyproject?.project_name}
-                        </Text></Text>
-                    <View
-                      style={[
-                        styles.statusBadge,
-                        {
-                          backgroundColor:
-                            item?.active === '1' ? '#00C48C22' : '#FF6B6B22',
-                          borderColor:
-                            item?.active === '1' ? '#00C48C60' : '#FF6B6B60',
-                        },
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.statusText,
-                          { color: item?.active === '1' ? COLORS.green : COLORS.red },
-                        ]}
-                      >
-                        {item?.active === '1' ? 'Active' : 'Inactive'}
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-
-                <View style={styles.divider} />
-
-                {/* Card Body */}
-                <View style={styles.cardBody}>
-                  <View style={styles.leftCol}>
-                    <View style={styles.infoRow}>
-                      <Icon name="call" size={12} color={COLORS.accent} />
-                      <Text
-                        style={[styles.infoText, { color: COLORS.accent }]}
-                        onPress={() => makeCall(item?.phone)}
-                      >
-                        {item?.phone || 'N/A'}
-                      </Text>
-                    </View>
-                    <View style={styles.infoRow}>
-                      <MaterialCommunityIcons
-                        name="file-document-outline"
-                        size={12}
-                        color={COLORS.accent}
-                      />
-                      <Text style={styles.infoText}>
-                        {item?.company?.com_name || 'N/A'}
-                      </Text>
-                    </View>
-                    <View style={styles.infoRow}>
-                      <Icon name="email" size={12} color={COLORS.accent} />
-                      <Text style={styles.infoText}>{item?.email || 'N/A'}</Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.rightCol}>
-                    <View style={styles.infoRow}>
-                      <Text style={styles.rmLabelCard}>RM: </Text>
-                      <Text style={styles.rmValue}>
-                        {item?.relationshipManager
-                          ? `${item.relationshipManager.usr_fname} ${item.relationshipManager.usr_lname}`
-                          : 'N/A'}
-                      </Text>
-                    </View>
-                    <View style={styles.infoRow}>
-                      <Icon name="location-on" size={12} color={COLORS.gold} />
-                      <Text style={styles.infoText}>
-                        {item?.propertylocation?.name || 'N/A'}
-                      </Text>
-                    </View>
-                    <View style={styles.infoRow}>
-                      <Text style={styles.refLabel}>Reference: </Text>
-                      <Text style={styles.refValue}>
-                        {item?.mrreference?.mrf_name || 'N/A'}
-                      </Text>
-                    </View>
-                  </View>
-                </View>
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.4}      // ৪০% বাকি থাকলেই পরের page fetch শুরু
+        ListFooterComponent={renderFooter}
+        ListHeaderComponent={
+          <>
+            {/* Search Bar */}
+            <View style={styles.searchRow}>
+              <View style={styles.searchBox}>
+                <Icon name="search" size={16} color={COLORS.mutedText} />
+                <TextInput
+                  placeholder="Search name / phone / email..."
+                  placeholderTextColor={COLORS.mutedText}
+                  value={searchText}
+                  onChangeText={setSearchText}
+                  style={styles.searchInput}
+                />
+                {searchText ? (
+                  <TouchableOpacity onPress={() => setSearchText('')}>
+                    <Icon name="close" size={15} color={COLORS.mutedText} />
+                  </TouchableOpacity>
+                ) : null}
               </View>
-            );
-          })
-        )}
-      </ScrollView>
+            </View>
+
+            {/* Select All + Filter Row */}
+            <View style={styles.selectAllRow}>
+              <TouchableOpacity style={styles.selectAllLeft} onPress={toggleSelectAll}>
+                <View style={[styles.checkbox, isAllSelected && styles.checkboxChecked]}>
+                  {isAllSelected && <Icon name="check" size={11} color="#fff" />}
+                </View>
+                <Text style={styles.selectAllText}>Select All</Text>
+              </TouchableOpacity>
+
+              {selected.length > 0 && (
+                <View style={styles.selectedBadge}>
+                  <Text style={styles.selectedBadgeText}>{selected.length} selected</Text>
+                </View>
+              )}
+
+              <TouchableOpacity style={styles.filterBtn} onPress={openFilterModal}>
+                <Icon name="filter-list" size={13} color="#fff" />
+                <Text style={styles.filterBtnText}>By Details</Text>
+                <Icon name="keyboard-arrow-down" size={13} color="#fff" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Initial Loading */}
+            {isInitialLoading && (
+              <View style={styles.initialLoader}>
+                <ActivityIndicator size="large" color={COLORS.accent} />
+              </View>
+            )}
+
+            {/* Empty State */}
+            {!isInitialLoading && leads.length === 0 && (
+              <Text style={styles.centeredText}>No leads found</Text>
+            )}
+          </>
+        }
+      />
 
       {/* ── Change RM Modal (center) ── */}
       {showrmModal && (
@@ -693,39 +783,6 @@ const ChangeRM = () => {
                   />
                 </View>
               </View>
-
-             {/* <DropdownField
-                label="Project"
-                data={projectOptions}
-                placeholder="Select project"
-                value={filters.project}
-                onChange={value => onChange('project', value)}
-              />
-
-              <Text style={styles.filterLabel}>Lead Status</Text>
-              <View style={styles.statusChipRow}>
-                {LeadStatus.map(status => {
-                  const isActive = filters.active === status.value;
-                  return (
-                    <TouchableOpacity
-                      key={status.value}
-                      style={[styles.statusChip, isActive && styles.statusChipActive]}
-                      onPress={() =>
-                        onChange('active', isActive ? null : status.value)
-                      }
-                    >
-                      <Text
-                        style={[
-                          styles.statusChipText,
-                          isActive && styles.statusChipTextActive,
-                        ]}
-                      >
-                        {status.label}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View> */}
             </ScrollView>
 
             {showFromPicker && (
@@ -783,9 +840,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.bg,
   },
-  scrollView: {
-    flex: 1,
-  },
   scrollContent: {
     paddingHorizontal: 12,
     paddingBottom: 16,
@@ -797,8 +851,27 @@ const styles = StyleSheet.create({
     fontSize: 14,
     opacity: 0.7,
   },
+  initialLoader: {
+    paddingVertical: 32,
+    alignItems: 'center',
+  },
+  footerLoader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 16,
+  },
+  footerText: {
+    color: COLORS.accent,
+    fontSize: 12,
+  },
+  footerEndText: {
+    color: COLORS.mutedText,
+    fontSize: 12,
+  },
 
-  // ── Section Header (same as AllInteractions) ──
+  // ── Section Header ──
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1371,7 +1444,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 13,
   },
-  section:{
-    color:'rgba(0, 208, 255, 0.84)'
-  }
+  section: {
+    color: 'rgba(0, 208, 255, 0.84)',
+  },
 });

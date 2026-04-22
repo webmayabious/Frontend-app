@@ -290,7 +290,10 @@ const styles = StyleSheet.create({
   card: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(233, 225, 225, 0.36)',
+    backgroundColor:
+  Platform.OS === 'ios'
+    ? 'rgba(255,255,255,0.22)'
+    : 'rgba(233,225,225,0.36)',
     borderRadius: 16,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.07)',
