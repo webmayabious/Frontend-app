@@ -266,8 +266,8 @@ const AssignRM = () => {
     const search = searchText.toLowerCase();
     return (
       (item?.name?.toLowerCase() || '').includes(search) ||
-      (item?.propertylead?.phone || '').includes(search) ||
-      (item?.propertylead?.email?.toLowerCase() || '').includes(search)
+      (item?.phone || '').includes(search) ||
+      (item?.email?.toLowerCase() || '').includes(search)
     );
   });
 
@@ -275,25 +275,61 @@ const AssignRM = () => {
 
   // ── Assign RM ──
   const handleAssignRM = async () => {
-    if (!selectedRM) { Alert.alert('Please select an RM'); return; }
-    if (selectedLeadIds.length === 0) { Alert.alert('No leads selected'); return; }
+    if (!selectedRM) {
+      Alert.alert(
+        '⚠️ No RM Selected',
+        'Please select a Relationship Manager before assigning.',
+        [{ text: 'OK', style: 'default' }]
+      );
+      return;
+    }
+
+    if (selectedLeadIds.length === 0) {
+      Alert.alert(
+        '⚠️ No Leads Selected',
+        'Please select at least one lead to assign.',
+        [{ text: 'OK', style: 'default' }]
+      );
+      return;
+    }
     setAssigning(true);
     try {
       const res = await api.put('/api/pm/assignRM', {
         rm_id: selectedRM,
         property_lead_id: selectedLeadIds,
       });
+
       if (res?.data?.status) {
-        Alert.alert(res?.data?.message || 'RM Assigned Successfully!');
-        setShowModal(false);
-        setSelected([]);
-        setSelectedRM(null);
-        rmrefetch();
+        Alert.alert(
+          '✅ Assigned Successfully',
+          res?.data?.message || 'RM has been assigned to the selected leads.',
+          [
+            {
+              text: 'OK',
+              style: 'default',
+              onPress: () => {
+                setShowModal(false);
+                setSelected([]);
+                setSelectedRM(null);
+                rmrefetch();
+              },
+            },
+          ],
+          { cancelable: false }
+        );
       } else {
-        Alert.alert(res?.data?.message || 'Failed to assign RM');
+        Alert.alert(
+          '❌ Assignment Failed',
+          res?.data?.message || 'Failed to assign RM. Please try again.',
+          [{ text: 'OK', style: 'cancel' }]
+        );
       }
     } catch (error) {
-      Alert.alert('Something went wrong');
+      Alert.alert(
+        '❌ Error',
+        'Something went wrong. Please try again.',
+        [{ text: 'OK', style: 'cancel' }]
+      );
     } finally {
       setAssigning(false);
     }
@@ -326,68 +362,68 @@ const AssignRM = () => {
   });
 
   // ── Download Format ──
- const handleDownloadFormat = async () => {
-  const fileName = 'mulyam_new.xlsx';
+  const handleDownloadFormat = async () => {
+    const fileName = 'mulyam_new.xlsx';
 
-  try {
-    if (Platform.OS === 'android') {
-      // Android 9 (API 28) এর নিচে permission দরকার
-      if (Platform.Version < 29) {
-        const granted = await PermissionsAndroid.request(
-          PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE
-        );
-        if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
-          Alert.alert('Permission Denied', 'Storage permission is required.');
+    try {
+      if (Platform.OS === 'android') {
+        // Android 9 (API 28) এর নিচে permission দরকার
+        if (Platform.Version < 29) {
+          const granted = await PermissionsAndroid.request(
+            PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE
+          );
+          if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+            Alert.alert('Permission Denied', 'Storage permission is required.');
+            return;
+          }
+        }
+
+        // Assets থেকে read করো
+        const assetContent = await RNFS.readFileAssets(fileName, 'base64');
+
+        // Downloads folder এ save করো (সবাই দেখতে পাবে)
+        const destPath = `${RNFS.DownloadDirectoryPath}/${fileName}`;
+
+        await RNFS.writeFile(destPath, assetContent, 'base64');
+
+        // Notification
+        await notifee.createChannel({
+          id: 'download',
+          name: 'Downloads',
+          importance: AndroidImportance.HIGH,
+        });
+
+        await notifee.displayNotification({
+          title: 'Download Complete ✅',
+          body: `File saved: ${destPath}`,
+          android: { channelId: 'download' },
+        });
+
+        Alert.alert('Success', 'File saved to Downloads folder!');
+
+      } else {
+        // iOS — আগের মতোই
+        const destPath = `${RNFS.DocumentDirectoryPath}/${fileName}`;
+        const sourcePath = `${RNFS.MainBundlePath}/${fileName}`;
+
+        const sourceExists = await RNFS.exists(sourcePath);
+        if (!sourceExists) {
+          Alert.alert('Error', 'Template file not found in bundle.');
           return;
         }
+
+        const destExists = await RNFS.exists(destPath);
+        if (destExists) await RNFS.unlink(destPath);
+
+        await RNFS.copyFile(sourcePath, destPath);
+        await Share.share({ url: `file://${destPath}` });
       }
 
-      // Assets থেকে read করো
-      const assetContent = await RNFS.readFileAssets(fileName, 'base64');
-
-      // Downloads folder এ save করো (সবাই দেখতে পাবে)
-      const destPath = `${RNFS.DownloadDirectoryPath}/${fileName}`;
-
-      await RNFS.writeFile(destPath, assetContent, 'base64');
-
-      // Notification
-      await notifee.createChannel({
-        id: 'download',
-        name: 'Downloads',
-        importance: AndroidImportance.HIGH,
-      });
-
-      await notifee.displayNotification({
-        title: 'Download Complete ✅',
-        body: `File saved: ${destPath}`,
-        android: { channelId: 'download' },
-      });
-
-      Alert.alert('Success', 'File saved to Downloads folder!');
-
-    } else {
-      // iOS — আগের মতোই
-      const destPath = `${RNFS.DocumentDirectoryPath}/${fileName}`;
-      const sourcePath = `${RNFS.MainBundlePath}/${fileName}`;
-
-      const sourceExists = await RNFS.exists(sourcePath);
-      if (!sourceExists) {
-        Alert.alert('Error', 'Template file not found in bundle.');
-        return;
-      }
-
-      const destExists = await RNFS.exists(destPath);
-      if (destExists) await RNFS.unlink(destPath);
-
-      await RNFS.copyFile(sourcePath, destPath);
-      await Share.share({ url: `file://${destPath}` });
+    } catch (err) {
+      console.log('❌ Download Error:', err);
+      Alert.alert('Error', err.message || 'Could not download the file.');
     }
-
-  } catch (err) {
-    console.log('❌ Download Error:', err);
-    Alert.alert('Error', err.message || 'Could not download the file.');
-  }
-};
+  };
 
   // ── Pick File ──
   const pickExcelFile = async () => {
@@ -399,19 +435,25 @@ const AssignRM = () => {
     }
   };
 
-  // ✅ FIXED: Upload — Business শুধু location + reference + file দরকার
-  //           Admin এর জন্য company + reference + file দরকার
+
   const handleUpload = async () => {
-    // ✅ Validation — role অনুযায়ী আলাদা
+    // ── Validation ──
     if (isAdmin) {
       if (!uploadProspect.reference || !uploadProspect.com_id || !selectedFile) {
-        Alert.alert('Error', 'Please select Reference, Company and File');
+        Alert.alert(
+          '⚠️ Missing Fields',
+          'Please select Reference, Company and File',
+          [{ text: 'OK', style: 'default' }]
+        );
         return;
       }
     } else {
-      // Business role — location + reference + file
       if (!uploadProspect.reference || !uploadProspect.location || !selectedFile) {
-        Alert.alert('Error', 'Please select Location, Reference and File');
+        Alert.alert(
+          '⚠️ Missing Fields',
+          'Please select Location, Reference and File',
+          [{ text: 'OK', style: 'default' }]
+        );
         return;
       }
     }
@@ -427,7 +469,6 @@ const AssignRM = () => {
       formData.append('reference', String(uploadProspect.reference));
       formData.append('location', String(uploadProspect.location || ''));
 
-      // ✅ com_id — admin হলেই পাঠাও, business হলে পাঠাও না
       if (isAdmin && uploadProspect.com_id) {
         formData.append('com_id', String(uploadProspect.com_id));
       }
@@ -436,18 +477,105 @@ const AssignRM = () => {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
 
-      if (res?.data?.success || res?.status === 200) {
-        Alert.alert('Success', res?.data?.message || 'File uploaded successfully!');
-        setUploadProspect({ reference: null, com_id: null, location: null });
+      console.log('UPLOAD RES:', JSON.stringify(res?.data));
+
+      const resData = res?.data;
+      const insertedCount = resData?.insertedCount ?? 0;
+      const skippedCount = resData?.skippedCount ?? 0;
+      const errorRows = resData?.errorRows ?? [];
+
+      // ── সব duplicate, কিছুই insert হয়নি ──
+      if (resData?.status === true && insertedCount === 0 && errorRows.length > 0) {
+        const duplicateDetails = errorRows
+          .map((e, i) => `${i + 1}. ${e.row?.name} (${e.row?.phone})\n    ↳ ${e.reason}`)
+          .join('\n');
+
+        Alert.alert(
+          '⚠️ Duplicate Entries Found',
+          `All ${skippedCount} entries already exist in the system.\n\n${duplicateDetails}\n\nPlease remove duplicates and try again.`,
+          [{ text: 'OK', style: 'default' }]
+        );
         setSelectedFile(null);
-        setShowUploadModal(false);
-        rmrefetch();
+
+        // ── কিছু insert হয়েছে, কিছু duplicate ──
+      } else if (resData?.status === true && insertedCount > 0 && errorRows.length > 0) {
+        const duplicateDetails = errorRows
+          .map((e, i) => `${i + 1}. ${e.row?.name} (${e.row?.phone})\n    ↳ ${e.reason}`)
+          .join('\n');
+
+        Alert.alert(
+          '⚠️ Partial Upload',
+          `✅ ${insertedCount} leads uploaded successfully.\n⚠️ ${skippedCount} entries skipped:\n\n${duplicateDetails}`,
+          [
+            {
+              text: 'OK',
+              style: 'default',
+              onPress: () => {
+                setUploadProspect({ reference: null, com_id: null, location: null });
+                setSelectedFile(null);
+                setShowUploadModal(false);
+                rmrefetch();
+              },
+            },
+          ]
+        );
+
+        // ── সব successfully insert হয়েছে ──
+      } else if (resData?.status === true && insertedCount > 0 && errorRows.length === 0) {
+        Alert.alert(
+          '✅ Upload Successful',
+          `${insertedCount} leads uploaded successfully!`,
+          [
+            {
+              text: 'OK',
+              style: 'default',
+              onPress: () => {
+                setUploadProspect({ reference: null, com_id: null, location: null });
+                setSelectedFile(null);
+                setShowUploadModal(false);
+                rmrefetch();
+              },
+            },
+          ]
+        );
+
+        // ── status false ──
       } else {
-        Alert.alert('Error', res?.data?.message || 'Upload failed. Please try again.');
+        Alert.alert(
+          '❌ Upload Failed',
+          resData?.message || 'Upload failed. Please try again.',
+          [{ text: 'OK', style: 'cancel' }]
+        );
       }
+
     } catch (err) {
       console.log('UPLOAD ERROR:', err?.response?.data || err);
-      Alert.alert('Error', err?.response?.data?.message || 'Something went wrong during upload.');
+
+      const errMsg = err?.response?.data?.message || '';
+      const errStatus = err?.response?.status;
+
+      if (
+        errStatus === 409 ||
+        errMsg.toLowerCase().includes('duplicate') ||
+        errMsg.toLowerCase().includes('already exists') ||
+        errMsg.toLowerCase().includes('already exist') ||
+        errMsg.toLowerCase().includes('phone') ||
+        errMsg.toLowerCase().includes('exist')
+      ) {
+        Alert.alert(
+          '⚠️ Duplicate Entries Found',
+          `${errMsg || 'Some entries already exist in the system.'}\n\nPlease remove duplicate phone numbers or names and try again.`,
+          [{ text: 'OK', style: 'default' }]
+        );
+        setSelectedFile(null);
+      } else {
+        Alert.alert(
+          '❌ Something Went Wrong',
+          errMsg || 'An unexpected error occurred. Please try again.',
+          [{ text: 'OK', style: 'cancel' }]
+        );
+      }
+
     } finally {
       setUploading(false);
     }
@@ -520,7 +648,14 @@ const AssignRM = () => {
           <TouchableOpacity
             style={styles.actionBtn}
             onPress={() => {
-              if (selected.length === 0) { Alert.alert('Please select at least one lead'); return; }
+              if (selected.length === 0) {
+                Alert.alert(
+                  '⚠️ No Leads Selected',
+                  'Please select at least one lead to assign an RM.',
+                  [{ text: 'OK', style: 'default' }]
+                );
+                return;
+              }
               setShowModal(true);
             }}
             activeOpacity={0.75}

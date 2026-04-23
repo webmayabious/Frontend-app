@@ -134,20 +134,23 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
           <Text style={styles.value}>{data?.propertylead?.phone || 'N/A'}</Text>
         </Text>
       </TouchableOpacity>
-      <Text style={styles.label}>
-        Email:{' '}
-        <Text style={styles.value}>{data?.propertylead?.email || 'N/A'}</Text>
-      </Text>
-    </View>
-    <View style={styles.rowBetween}>
-      <Text style={styles.label}>
-        <Text style={styles.label}>
+         <Text style={styles.label}>
           Site Visit Date:
           <Text style={styles.value}> {data?.site_visit_date}</Text>
         </Text>
+    </View>
+    <View style={styles.rowBetween}>
+      <Text style={styles.label}>
+     
+           <Text style={styles.label}>
+        Email:{' '}
+        <Text style={styles.value}>{data?.propertylead?.email || 'N/A'}</Text>
+      </Text>
       </Text>
 
-      <Text style={styles.label}>
+     
+    </View>
+    <Text style={styles.label}>
         RM:{' '}
         <Text style={styles.value}>
           {data?.propertylead?.relationshipManager
@@ -155,8 +158,6 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
             : 'N/A'}
         </Text>
       </Text>
-    </View>
-
     <Text style={{ color: '#fb9e08', fontSize: 12, marginTop: 4 }}>
       Lead Source:{' '}
       <Text style={styles.value}>

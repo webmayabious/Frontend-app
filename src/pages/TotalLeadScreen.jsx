@@ -213,7 +213,7 @@ const TotalLeadScreen = () => {
   /* ================= INFINITE QUERY ================= */
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } =
     useInfiniteQuery({
-      queryKey: ['TotalLead', filters, searchText],
+      queryKey: ['TotalLead', filters],
       queryFn: async ({ pageParam = 1 }) => {
         const res = await api.get(
           '/api/pm/getAllPropertyLeadsWithAndWihoutRM',
@@ -243,7 +243,19 @@ const TotalLeadScreen = () => {
 
   // ✅ সব pages থেকে data flatten করো
   const leads = data?.pages?.flatMap(page => page.data) || [];
+    const filteredleads = leads?.filter(item => {
+  const name = item?.name?.toLowerCase() || '';
+  const phone = item?.phone?.toString() || '';
+  const email = item?.email?.toLowerCase() || '';
 
+  const search = searchText.toLowerCase().trim();
+
+  return (
+    name.includes(search) ||
+    phone.includes(search) ||
+    email.includes(search)
+  );
+});
   // ✅ Infinite scroll handler — scroll position দেখে trigger করে
   const handleLoadMore = () => {
     if (hasNextPage && !isFetchingNextPage) {
@@ -411,8 +423,8 @@ const TotalLeadScreen = () => {
           <Text style={{ color: '#fff', textAlign: 'center', marginTop: 20 }}>
             Loading...
           </Text>
-        ) : leads?.length > 0 ? (
-          leads.map((visit, i) => (
+        ) : filteredleads?.length > 0 ? (
+          filteredleads?.map((visit, i) => (
             <SiteCard
               key={visit.id || i}
               data={visit}

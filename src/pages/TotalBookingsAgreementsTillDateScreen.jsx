@@ -192,7 +192,7 @@ const TotalBookingsAgreementsTillDateScreen = () => {
   });
   const filteredfollowUps = (Lead || [])?.filter(item => {
     const name = item?.name?.toLowerCase() || '';
-    const phone = item?.phone || '';
+    const phone = item?.mobile || '';
     const email = item?.email?.toLowerCase() || '';
 
     const search = searchText.toLowerCase();

@@ -197,7 +197,7 @@ const TotalBookingsAgreementsPerMonth = () => {
   //   const bookings = data?.todays_bookings || [];
   const filteredfollowUps = (Lead || [])?.filter(item => {
     const name = item?.name?.toLowerCase() || '';
-    const phone = item?.phone || '';
+    const phone = item?.mobile || '';
     const email = item?.email?.toLowerCase() || '';
     const office_location = item?.office_location.toLowerCase() || '';
 
