@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   ScrollView,
   Image,
+  Alert 
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { Dropdown } from 'react-native-element-dropdown';
@@ -223,24 +224,36 @@ const onChangeTime = (event, selectedTime) => {
 
     console.log('API response:', res.data);
 
-    if (res.data.status === true) {
-      // reset form
-      setinteraction({
-        call_status_id: '',
-        lead_qualification_id: '',
-        lead_status_id: '',
-        lead_sub_status_id: '',
-        rating_id: '',
-        site_visit_date: '',
-        call_back_date: '',
-        call_back_time: '',
-        expected_closure_date: '',
-        remarks: '',
-      });
+  if (res.data.status === true) {
+  // ✅ show success alert
+  Alert.alert(
+    "Success",
+    "Interaction added successfully!",
+    [
+      {
+        text: "OK",
+        onPress: () => {
+          // reset form
+          setinteraction({
+            call_status_id: '',
+            lead_qualification_id: '',
+            lead_status_id: '',
+            lead_sub_status_id: '',
+            rating_id: '',
+            site_visit_date: '',
+            call_back_date: '',
+            call_back_time: '',
+            expected_closure_date: '',
+            remarks: '',
+          });
 
-      // navigate immediately
-      navigation.replace('AllInteractionsScreen', { id: route.params.id });
-    }
+          // navigate after alert
+          navigation.replace('AllInteractionsScreen', { id: route.params.id });
+        }
+      }
+    ]
+  );
+}
   } catch (err) {
     console.log('handleCreate error:', err);
   } finally {

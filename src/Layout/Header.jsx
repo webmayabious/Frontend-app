@@ -38,9 +38,9 @@ const Header = () => {
       await messaging().deleteToken();
 
       // ✅ Socket Disconnect
-      if (socket.connected) {
-        socket.disconnect();
-      }
+      // if (socket.connected) {
+      //   socket.disconnect();
+      // }
 
       // ✅ AsyncStorage Clear
       await AsyncStorage.removeItem('PM_TOKEN');
@@ -81,7 +81,7 @@ const Header = () => {
           source={
             userInfo?.image
               ? { uri: userInfo.image }
-              : { uri: "https://i.pravatar.cc/100" }
+              : { uri: "https://cdn-icons-png.flaticon.com/512/5951/5951752.png" }
           }
           style={styles.avatar}
         />

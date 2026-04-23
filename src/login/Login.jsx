@@ -124,10 +124,10 @@ const LoginUI = () => {
       dispatch({ type: 'setRole', payload: data.roles });
 
       // ✅ Socket Connect
-      if (!socket.connected) {
-        socket.auth = { token: data.token };
-        socket.connect();
-      }
+      // if (!socket.connected) {
+      //   socket.auth = { token: data.token };
+      //   socket.connect();
+      // }
 
       navigation.replace('Dashboard', {
         screen: 'Dashboard',
