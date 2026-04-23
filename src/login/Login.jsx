@@ -42,7 +42,7 @@ const LoginUI = () => {
        await new Promise(resolve => setTimeout(resolve, 2000));
       const token = await AsyncStorage.getItem('PM_TOKEN');
       const user = await AsyncStorage.getItem('PM_USER');
-      const roles = await AsyncStorage.getItem('PM_ROLES'); // 👈 add this
+      const roles = await AsyncStorage.getItem('PM_ROLES'); 
 
       if (token && user) {
         dispatch({ type: 'setToken', payload: token });

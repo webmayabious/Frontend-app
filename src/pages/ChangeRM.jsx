@@ -249,11 +249,10 @@ const ChangeRM = () => {
 });
         }
 
-        // যদি PAGE_SIZE-এর কম data আসে, মানে আর data নেই
         setHasMore(newData.length === PAGE_SIZE);
         setPage(pageNum);
       } catch {
-        // error হলে list ঠিক রাখো
+        // error 
       } finally {
         setIsInitialLoading(false);
         setIsFetchingMore(false);
@@ -262,7 +261,7 @@ const ChangeRM = () => {
     [searchText, filters],
   );
 
-  // ── Reset & reload যখন filters বা search পরিবর্তন হয় ──
+  // ── Reset & reload
   useEffect(() => {
     setPage(1);
     setHasMore(true);
