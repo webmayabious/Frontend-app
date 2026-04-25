@@ -711,7 +711,7 @@ const styles = StyleSheet.create({
 
   topButton: {
     position: 'absolute',
-    bottom: 100,
+    bottom: Platform.OS === 'ios' ? 125 : 100, 
     right: 20,
     backgroundColor: '#00acc1',
     width: 50,

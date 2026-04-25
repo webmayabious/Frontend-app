@@ -29,7 +29,7 @@ import { Dropdown } from 'react-native-element-dropdown';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
 const screenHeight = Dimensions.get('window').height;
-const PAGE_SIZE = 20; 
+const PAGE_SIZE = 20;
 
 // ─── COLORS ──────────────────────────────────────────────────────────────────
 
@@ -237,16 +237,16 @@ const ChangeRM = () => {
           setLeads(newData);
         } else {
           setLeads(prev => {
-  const combined = [...prev, ...newData];
+            const combined = [...prev, ...newData];
 
-  // 🔥 duplicate remove
-  const unique = combined.filter(
-    (item, index, self) =>
-      index === self.findIndex(i => i.id === item.id)
-  );
+            // 🔥 duplicate remove
+            const unique = combined.filter(
+              (item, index, self) =>
+                index === self.findIndex(i => i.id === item.id)
+            );
 
-  return unique;
-});
+            return unique;
+          });
         }
 
         setHasMore(newData.length === PAGE_SIZE);
@@ -334,7 +334,16 @@ const ChangeRM = () => {
       });
     },
     onSuccess: () => {
-      Alert.alert('RM Changed Successfully!');
+      Alert.alert(
+        '🎉 Success',
+        'RM has been changed successfully.',
+        [
+          {
+            text: 'OK',
+            onPress: () => console.log('Done'),
+          },
+        ]
+      );
       setSelected([]);
       setrms(null);
       setShowrmModal(false);
@@ -516,7 +525,23 @@ const ChangeRM = () => {
             style={styles.changeBtn}
             onPress={() => {
               if (selected.length === 0) {
-                Alert.alert('', 'Please select at least one lead');
+                Alert.alert(
+                  '⚠️ Warning',
+                  'Please select at least one lead',
+                  [
+                    {
+                      text: 'Cancel',
+                      style: 'cancel',
+                    },
+                    {
+                      text: 'OK',
+                      onPress: () => console.log('OK pressed'),
+                    },
+                  ],
+                  {
+                    cancelable: true,
+                  }
+                );
                 return;
               }
               setShowrmModal(true);
