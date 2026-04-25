@@ -234,7 +234,7 @@ const TotalBookingsAgreementsTillDateScreen = () => {
             {/* <Icon name="filter-alt" size={18} color="#00e5ff" /> */}
             <TouchableOpacity
               style={styles.backBtn}
-              onPress={() => navigation.navigate('Dashboard')}
+              onPress={() => navigation.goBack()}
             >
               <View style={styles.backButton}>
                 <Image

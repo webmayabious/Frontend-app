@@ -248,7 +248,7 @@ const handleCreate = async () => {
 
     setLoading(true);
 
-    // ✅ empty string গুলো null করে দাও
+   
     const payload = {
       ...interaction,
       site_visit_date: interaction.site_visit_date || null,
@@ -262,7 +262,7 @@ const handleCreate = async () => {
     try {
       const res = await api.post(
         `/api/pm/createPropertyLeadFeedback/${id}`,
-        payload,  // ← interaction এর বদলে payload
+        payload, 
       );
 
       if (res.data.status === true) {

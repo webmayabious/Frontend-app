@@ -358,7 +358,7 @@ const MissedFollowup = () => {
               <Icon name="filter-alt" size={18} color="#00e5ff" />
             </TouchableOpacity>
             <TouchableOpacity
-              onPress={() => navigation.navigate('Dashboard')}
+              onPress={() => navigation.goBack()}
               style={styles.backBtn}
             >
             <View style={styles.backButton}>

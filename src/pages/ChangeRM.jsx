@@ -29,7 +29,7 @@ import { Dropdown } from 'react-native-element-dropdown';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
 const screenHeight = Dimensions.get('window').height;
-const PAGE_SIZE = 20; // প্রতি page-এ কতটা item লোড হবে
+const PAGE_SIZE = 20; 
 
 // ─── COLORS ──────────────────────────────────────────────────────────────────
 

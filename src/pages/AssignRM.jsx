@@ -630,7 +630,7 @@ const AssignRM = () => {
           </View>
           <TouchableOpacity
             style={styles.closeBtn}
-            onPress={() => navigation.navigate('Dashboard')}
+            onPress={() => navigation.goBack()}
             activeOpacity={0.75}
           >
             <View style={styles.backButton}>

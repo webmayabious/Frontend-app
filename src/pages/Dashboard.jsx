@@ -23,7 +23,7 @@ const { width } = Dimensions.get('window');
    Card data config
 ───────────────────────────────────────── */
 const CARDS = (d, nav) => [
-  {
+   {
     icon: 'phone-callback',
     label: 'Follow-ups / Meetings',
     period: 'Today',
@@ -35,10 +35,27 @@ const CARDS = (d, nav) => [
     icon: 'place',
     label: 'Site Visits / Bookings',
     period: 'Today',
-    accent: '#60a5fa',
+    accent: '#4ade80',
     value: `${d?.todays_site_visits ?? 0}  /  ${d?.todays_booking ?? 0}`,
     route: 'SiteVisitsScreen',
   },
+  {
+    icon: 'upload',
+    label: 'Uploaded Leads',
+    period: 'Today',
+    accent: '#4ade80',
+    value: `${d?.total_leads_uploaded_today ?? 0}`,
+    route: 'UploadedLeads',
+  },
+  {
+    icon: 'assignment-ind',
+    label: 'Leads Assigned',
+    period: 'Today',
+    accent: '#4ade80',
+    value: `${d?.total_assigned_lead ?? 0}`,
+    route: 'LeadsassignedScreen',
+  },
+
   {
     icon: 'people',
     label: 'Active Leads / Total Leads',
@@ -51,11 +68,12 @@ const CARDS = (d, nav) => [
     icon: 'receipt-long',
     label: 'Bookings / Agreements',
     period: 'Month',
-    accent: '#fb923c',
+    accent: '#f472b6',
     value: `${d?.total_bookings_per_month ?? 0}  /  ₹${d?.total_agreement_value_per_month ?? 0}`,
     route: 'TotalBookingsAgreementsPerMonth',
   },
-  {
+ 
+      {
     icon: 'history',
     label: 'Bookings / Agreements',
     period: 'Till Date',
@@ -67,34 +85,20 @@ const CARDS = (d, nav) => [
     icon: 'notifications-off',
     label: 'Missed Follow Up',
     period: 'Till Date',
-    accent: '#f87171',
+    accent: '#a78bfa',
     value: `${d?.total_missed_callback ?? 0}`,
     route: 'MissedFollowup',
   },
-  {
-    icon: 'upload',
-    label: 'Uploaded Leads',
-    period: 'Today',
-    accent: '#34d399',
-    value: `${d?.total_leads_uploaded_today ?? 0}`,
-    route: 'UploadedLeads',
-  },
-  {
-    icon: 'assignment-ind',
-    label: 'Leads Assigned',
-    period: 'Today',
-    accent: '#fbbf24',
-    value: `${d?.total_assigned_lead ?? 0}`,
-    route: 'LeadsassignedScreen',
-  },
+  
   {
     icon: 'list-alt',
     label: 'Leads List',
     period: 'Till Date',
-    accent: '#67e8f9',
+    accent: '#a78bfa',
     value: '—',
     route: 'LeadsListScreen',
   },
+
 ];
 
 /* ─────────────────────────────────────────

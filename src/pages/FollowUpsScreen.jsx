@@ -382,7 +382,7 @@ const FollowUpsScreen = () => {
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.backBtn}
-              onPress={() => navigation.navigate('Dashboard')}
+              onPress={() => navigation.goBack()}
             >
               <View style={styles.backButton}>
                             <Image
