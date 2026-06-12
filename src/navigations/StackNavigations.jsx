@@ -142,10 +142,10 @@ export default function StackNavigations() {
         setIsReady(true);
         setCurrentRoute(navigationRef.getCurrentRoute()?.name || '');
       }}
-    onStateChange={() => {
-  const route = navigationRef.getCurrentRoute();
-  setCurrentRoute(route?.name || '');
-}}
+      onStateChange={() => {
+        const route = navigationRef.getCurrentRoute();
+        setCurrentRoute(route?.name || '');
+      }}
     >
       <View style={{ flex: 1, backgroundColor: '#070c4d' }}>
         {/* HEADER */}
@@ -164,7 +164,13 @@ export default function StackNavigations() {
                 <ChangeRM {...props} setHideBottomNav={setHideBottomNav} />
               )}
             </Stack.Screen>
-            <Stack.Screen name="AssignRM" component={AssignRM} />
+            <Stack.Screen name="AssignRM">
+              {props => {
+                return (
+                  <AssignRM {...props} setHideBottomNav={setHideBottomNav} />
+                );
+              }}
+            </Stack.Screen>
             <Stack.Screen name="FollowUpsScreen" component={FollowUpsScreen} />
             <Stack.Screen
               name="AllInteractionsScreen"

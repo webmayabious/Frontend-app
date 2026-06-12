@@ -125,7 +125,7 @@ const BookingDetailScreen = ({ navigation, route }) => {
   const isAdmin = userRole?.includes('ADMIN');
 
   return (
-    <View style={[styles.container, { paddingTop: STATUSBAR_HEIGHT }]}>
+    <View style={[styles.container, { paddingTop: 6 }]}>
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
       <ScrollView showsVerticalScrollIndicator={false}>
@@ -244,7 +244,7 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: '#ffffff20',
     borderColor: '#ffffff6e',
-    margin: 12,
+    margin: 8,
     padding: 12,
     borderRadius: 12,
   },

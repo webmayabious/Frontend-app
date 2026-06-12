@@ -127,7 +127,7 @@ const makeCall = phoneNumber => {
 
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
 
-const ChangeRM = () => {
+const ChangeRM = ({setHideBottomNav}) => {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const [showrmModal, setShowrmModal] = useState(false);
@@ -159,24 +159,47 @@ const ChangeRM = () => {
   // ── Bottom Sheet Animation ──
   const filterAnim = useRef(new Animated.Value(screenHeight)).current;
 
-  const openFilterModal = () => {
-    setShowFilterModal(true);
+  // const openFilterModal = () => {
+  //   setShowFilterModal(true);
+  //   Animated.spring(filterAnim, {
+  //     toValue: 0,
+  //     useNativeDriver: true,
+  //     bounciness: 4,
+  //   }).start();
+  // };
+const openFilterModal = () => {
+  setHideBottomNav(true);   // 👈 instant hide
+  setShowFilterModal(true);
+
+  filterAnim.setValue(screenHeight);
+
+  requestAnimationFrame(() => {
     Animated.spring(filterAnim, {
       toValue: 0,
       useNativeDriver: true,
-      bounciness: 4,
+      damping: 18,
     }).start();
-  };
-
-  const closeFilterModal = () => {
-    Animated.timing(filterAnim, {
-      toValue: screenHeight,
-      duration: 280,
-      useNativeDriver: true,
-    }).start(() => setShowFilterModal(false));
-  };
+  });
+};
+  // const closeFilterModal = () => {
+  //   Animated.timing(filterAnim, {
+  //     toValue: screenHeight,
+  //     duration: 280,
+  //     useNativeDriver: true,
+  //   }).start(() => setShowFilterModal(false));
+  // };
 
   // ── Date ──
+ const closeFilterModal = () => {
+  Animated.timing(filterAnim, {
+    toValue: screenHeight,
+    duration: 250,
+    useNativeDriver: true,
+  }).start(() => {
+    setShowFilterModal(false);
+    setHideBottomNav(false);   // 🔥 IMPORTANT
+  });
+};
   const formatDate = date => {
     if (!date) return '';
     const d = new Date(date);
@@ -1294,14 +1317,13 @@ const styles = StyleSheet.create({
   },
 
   // ── Filter Bottom Sheet ──
-  bottomSheetOverlay: {
-    position: 'absolute',
-    width: '100%',
-    height: '100%',
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    justifyContent: 'flex-end',
-    zIndex: 1000,
-  },
+bottomSheetOverlay: {
+  ...StyleSheet.absoluteFillObject,
+  backgroundColor: 'rgba(0,0,0,0.6)',
+  justifyContent: 'flex-end',
+  zIndex: 99999,
+  elevation: 99999,
+},
   bottomSheet: {
     backgroundColor: COLORS.modalBg,
     borderTopLeftRadius: 22,

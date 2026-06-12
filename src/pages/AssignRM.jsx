@@ -134,7 +134,7 @@ const makeCall = phoneNumber => {
 
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
 
-const AssignRM = () => {
+const AssignRM = ({setHideBottomNav}) => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const [selected, setSelected] = useState([]);
@@ -175,16 +175,39 @@ const AssignRM = () => {
   useEffect(() => { fetchRMList(); }, []);
 
   // ── Bottom Sheet ──
-  const openFilterModal = () => {
-    setShowFilterModal(true);
-    Animated.spring(filterAnim, { toValue: 0, useNativeDriver: true, damping: 15 }).start();
-  };
+  // const openFilterModal = () => {
+  //   setShowFilterModal(true);
+  //   Animated.spring(filterAnim, { toValue: 0, useNativeDriver: true, damping: 15 }).start();
+  // };
 
-  const closeFilterModal = () => {
-    Animated.timing(filterAnim, { toValue: screenHeight, duration: 280, useNativeDriver: true })
-      .start(() => setShowFilterModal(false));
-  };
+  // const closeFilterModal = () => {
+  //   Animated.timing(filterAnim, { toValue: screenHeight, duration: 280, useNativeDriver: true })
+  //     .start(() => setShowFilterModal(false));
+  // };
+const openFilterModal = () => {
+  setHideBottomNav(true);   // 👈 instant hide
+  setShowFilterModal(true);
 
+  filterAnim.setValue(screenHeight);
+
+  requestAnimationFrame(() => {
+    Animated.spring(filterAnim, {
+      toValue: 0,
+      useNativeDriver: true,
+      damping: 18,
+    }).start();
+  });
+};
+ const closeFilterModal = () => {
+  Animated.timing(filterAnim, {
+    toValue: screenHeight,
+    duration: 250,
+    useNativeDriver: true,
+  }).start(() => {
+    setShowFilterModal(false);
+    setHideBottomNav(false);   // 🔥 IMPORTANT
+  });
+};
   // ── Date ──
   const formatDate = date => {
     if (!date) return '';
@@ -606,7 +629,9 @@ const AssignRM = () => {
   };
 
   // ─── RENDER ───────────────────────────────────────────────────────────────
-
+useEffect(() => {
+  navigation.setParams({ hideBottomNav: showFilterModal });
+}, [showFilterModal]);
   return (
     <View style={styles.container}>
       <KeyboardAvoidingView

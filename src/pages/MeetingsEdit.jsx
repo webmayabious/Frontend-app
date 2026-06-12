@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   StatusBar,
   Platform,
+  Image,
 } from 'react-native';
 import Header from '../Layout/Header';
 import BottomNav from '../navigations/BottomNav';
@@ -451,6 +452,10 @@ export default function MeetingsEdit({ route }) {
                   navigation.goBack();
                 }}
               >
+                 <Image
+                                source={require('../asset/image/icon/Arrow.png')}
+                                style={{ width: 11, height: 11, marginRight: 4 }}
+                              />
                 <Text style={styles.backText}>Back</Text>
               </TouchableOpacity>
             </View>
