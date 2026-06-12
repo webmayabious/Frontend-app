@@ -36,7 +36,7 @@
 //             {/* <Stack.Screen
 //           name="Splash"
 //           component={SplashScreen}
-//             options={{ headerShown: false }} 
+//             options={{ headerShown: false }}
 //         /> */}
 //             <Stack.Screen name="Login" component={LoginUI} />
 //             <Stack.Screen name="Dashboard" component={Dashboard} />
@@ -123,36 +123,50 @@ const Stack = createNativeStackNavigator();
 export default function StackNavigations() {
   const navigationRef = createNavigationContainerRef();
 
+  const [isReady, setIsReady] = useState(false);
   const [currentRoute, setCurrentRoute] = useState('');
-
+  const [hideBottomNav, setHideBottomNav] = useState(false);
   return (
-    
+    // <NavigationContainer
+    //   ref={navigationRef}
+    //   onReady={() => {
+    //     setCurrentRoute(navigationRef.getCurrentRoute()?.name);
+    //   }}
+    //   onStateChange={() => {
+    //     setCurrentRoute(navigationRef.getCurrentRoute()?.name);
+    //   }}
+    // >
     <NavigationContainer
       ref={navigationRef}
       onReady={() => {
-        setCurrentRoute(navigationRef.getCurrentRoute()?.name);
+        setIsReady(true);
+        setCurrentRoute(navigationRef.getCurrentRoute()?.name || '');
       }}
-      onStateChange={() => {
-        setCurrentRoute(navigationRef.getCurrentRoute()?.name);
-      }}
+    onStateChange={() => {
+  const route = navigationRef.getCurrentRoute();
+  setCurrentRoute(route?.name || '');
+}}
     >
       <View style={{ flex: 1, backgroundColor: '#070c4d' }}>
-
         {/* HEADER */}
-        {currentRoute !== 'Login' && <Header routeName={currentRoute} />}
+        {/* {currentRoute !== 'Login' && <Header routeName={currentRoute} />} */}
+        {isReady && currentRoute !== 'Login' && (
+          <Header routeName={currentRoute} />
+        )}
 
         {/* SCREENS */}
         <View style={{ flex: 1 }}>
           <Stack.Navigator screenOptions={{ headerShown: false }}>
             <Stack.Screen name="Login" component={LoginUI} />
             <Stack.Screen name="Dashboard" component={Dashboard} />
-            <Stack.Screen name="ChangeRM" component={ChangeRM} />
+            <Stack.Screen name="ChangeRM">
+              {props => (
+                <ChangeRM {...props} setHideBottomNav={setHideBottomNav} />
+              )}
+            </Stack.Screen>
             <Stack.Screen name="AssignRM" component={AssignRM} />
+            <Stack.Screen name="FollowUpsScreen" component={FollowUpsScreen} />
             <Stack.Screen
-              name="FollowUpsScreen"
-              component={FollowUpsScreen}
-            />
-              <Stack.Screen
               name="AllInteractionsScreen"
               component={AllInteractionsScreen}
             />
@@ -178,7 +192,6 @@ export default function StackNavigations() {
               component={TotalBookingsAgreementsPerMonth}
             />
 
-          
             <Stack.Screen
               name="BookingDetailScreen"
               component={BookingDetailScreen}
@@ -192,8 +205,10 @@ export default function StackNavigations() {
         </View>
 
         {/* BOTTOM NAV */}
-        {currentRoute !== 'Login' && <BottomNav routeName={currentRoute} />}
-
+        {/* {currentRoute !== 'Login' && <BottomNav routeName={currentRoute} />} */}
+        {isReady && currentRoute !== 'Login' && !hideBottomNav && (
+          <BottomNav routeName={currentRoute} />
+        )}
       </View>
     </NavigationContainer>
   );

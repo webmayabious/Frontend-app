@@ -429,7 +429,7 @@ export default function MeetingsEdit({ route }) {
   };
   return (
     <View style={{ flex: 1, backgroundColor: '#1e2140' }}>
-      <Header />
+      {/* <Header /> */}
       <View style={styles.container}>
         <StatusBar barStyle="light-content" backgroundColor="#2B2E81" />
 
@@ -611,7 +611,7 @@ export default function MeetingsEdit({ route }) {
           </TouchableOpacity>
         </ScrollView>
         {/* Button */}
-        <BottomNav />
+        {/* <BottomNav /> */}
       </View>
     </View>
   );

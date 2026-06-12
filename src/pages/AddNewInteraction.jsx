@@ -301,7 +301,7 @@ const handleCreate = async () => {
   // ─────────────────────────────────────────
   return (
     <View style={{ flex: 1, backgroundColor: '#050a3a' }}>
-      <Header />
+      {/* <Header /> */}
 
       <View style={styles.container}>
         {/* Top Bar */}
@@ -470,7 +470,7 @@ const handleCreate = async () => {
         </ScrollView>
       </View>
 
-      <BottomNav />
+      {/* <BottomNav /> */}
     </View>
   );
 }

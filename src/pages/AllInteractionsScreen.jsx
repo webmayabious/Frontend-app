@@ -187,7 +187,7 @@ const AllInteractionsScreen = ({ route }) => {
       <StatusBar barStyle="light-content" backgroundColor="#0A0F2E" />
 
       {/* ── Header pinned to top ── */}
-      <Header />
+      {/* <Header /> */}
 
       {/* ── Scrollable content ── */}
       <ScrollView
@@ -221,7 +221,7 @@ const AllInteractionsScreen = ({ route }) => {
       />
 
       {/* ── Bottom Nav pinned to bottom ── */}
-      <BottomNav />
+      {/* <BottomNav /> */}
     </View >
   );
 };
