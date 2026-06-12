@@ -509,10 +509,10 @@ const ChangeRM = () => {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#0A0F2E" />
+   <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
       {/* ── Header pinned to top ── */}
-      <Header />
+      {/* <Header /> */}
 
       {/* ── Top Bar (title + actions) ── */}
       <View style={styles.sectionHeader}>
@@ -848,7 +848,7 @@ const ChangeRM = () => {
       )}
 
       {/* ── Bottom Nav pinned to bottom ── */}
-      <BottomNav />
+      {/* <BottomNav /> */}
     </View>
   );
 };

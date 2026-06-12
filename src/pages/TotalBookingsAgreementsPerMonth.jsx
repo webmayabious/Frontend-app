@@ -227,7 +227,7 @@ const TotalBookingsAgreementsPerMonth = () => {
       />
 
       {/* Header */}
-      <Header />
+      {/* <Header /> */}
 
       {/* Title Row */}
       <View style={styles.topBarContainer}>
@@ -326,7 +326,7 @@ const TotalBookingsAgreementsPerMonth = () => {
       )}
 
       {/* Bottom Nav */}
-      <BottomNav />
+      {/* <BottomNav /> */}
     </View>
   );
 };

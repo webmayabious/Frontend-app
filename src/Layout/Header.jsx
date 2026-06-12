@@ -21,40 +21,71 @@ import api from '../api/AxiosInstance';
 
 const STATUSBAR_HEIGHT = Platform.OS === "android" ? StatusBar.currentHeight : 44;
 
-const Header = () => {
+const Header = ({ routeName }) => {
+
   const userInfo = useSelector(state => state.userInfo);
   const [profileModalVisible, setProfileModalVisible] = useState(false);
   const [avatarLayout, setAvatarLayout] = useState(null);
   const navigation = useNavigation();
   const dispatch = useDispatch();  
 
-  const handleLogout = async () => {
-    try {
+  // const handleLogout = async () => {
+  //   try {
       
-      const fcmToken = await messaging().getToken();
-      await api.post('/api/pm/auth/logout', { fcm_token: fcmToken });
-      await messaging().deleteToken();
+  //     const fcmToken = await messaging().getToken();
+  //     await api.post('/api/pm/auth/logout', { fcm_token: fcmToken });
+  //     await messaging().deleteToken();
 
-      // ✅ Socket Disconnect
-      // if (socket.connected) {
-      //   socket.disconnect();
-      // }
+  //     // ✅ Socket Disconnect
+  //     // if (socket.connected) {
+  //     //   socket.disconnect();
+  //     // }
 
-      // ✅ AsyncStorage Clear
-      await AsyncStorage.removeItem('PM_TOKEN');
-      await AsyncStorage.removeItem('PM_USER');
-      await AsyncStorage.removeItem('PM_ROLES');
+  //     // ✅ AsyncStorage Clear
+  //     await AsyncStorage.removeItem('PM_TOKEN');
+  //     await AsyncStorage.removeItem('PM_USER');
+  //     await AsyncStorage.removeItem('PM_ROLES');
 
-      // ✅ Redux Clear
-      dispatch({ type: 'LOGOUT' });
-      setProfileModalVisible(false);
-      navigation.replace('Login');
+  //     // ✅ Redux Clear
+  //     dispatch({ type: 'LOGOUT' });
+  //     setProfileModalVisible(false);
+  //     navigation.replace('Login');
 
-    } catch (error) {
-      console.log('❌ LOGOUT ERROR:', error);
-      Alert.alert('Error', 'Logout failed');
-    }
-  };
+  //   } catch (error) {
+  //     console.log('❌ LOGOUT ERROR:', error);
+  //     Alert.alert('Error', 'Logout failed');
+  //   }
+  // };
+  const handleLogout = async () => {
+  try {
+    const fcmToken = await messaging().getToken();
+
+    // 1. ALWAYS clear app state first
+    await AsyncStorage.removeItem('PM_TOKEN');
+    await AsyncStorage.removeItem('PM_USER');
+    await AsyncStorage.removeItem('PM_ROLES');
+
+    dispatch({ type: 'LOGOUT' });
+
+    // 2. navigate immediately
+    navigation.reset({
+      index: 0,
+      routes: [{ name: 'Login' }],
+    });
+
+    // 3. then call API in background (non-blocking)
+    api.post('/api/pm/auth/logout', { fcm_token: fcmToken })
+      .catch(err => console.log('logout API failed (ignored)', err));
+
+    await messaging().deleteToken();
+
+    setProfileModalVisible(false);
+
+  } catch (error) {
+    console.log('Logout error:', error);
+    Alert.alert('Error', 'Logout failed');
+  }
+};
   return (
     <View style={styles.header}>
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
@@ -141,7 +172,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 15,
     paddingBottom: 12,
-    paddingTop: STATUSBAR_HEIGHT + 10,
+     paddingTop: STATUSBAR_HEIGHT + 10,
+    // paddingTop: insets.top,
     backgroundColor: "#2B2E81",
     borderBottomLeftRadius: 20,
     borderBottomRightRadius: 20,

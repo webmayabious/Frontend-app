@@ -358,7 +358,7 @@ const FollowUpsScreen = () => {
       />
 
       {/* Header */}
-      <Header />
+      {/* <Header /> */}
 
       {/* Title Row */}
       <View style={styles.topBarContainer}>
@@ -536,7 +536,7 @@ const FollowUpsScreen = () => {
       )}
 
       {/* Bottom Nav */}
-      <BottomNav />
+      {/* <BottomNav /> */}
     </View>
   );
 };

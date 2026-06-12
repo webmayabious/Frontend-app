@@ -338,7 +338,7 @@ const MissedFollowup = () => {
         barStyle="light-content"
       />
 
-      <Header />
+      {/* <Header /> */}
 
       {/* TOP BAR */}
       <View style={styles.topBarContainer}>
@@ -533,7 +533,7 @@ const MissedFollowup = () => {
         </TouchableOpacity>
       )}
 
-      <BottomNav />
+      {/* <BottomNav /> */}
     </View>
   );
 };

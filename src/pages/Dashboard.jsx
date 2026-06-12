@@ -163,7 +163,7 @@ const Dashboard = () => {
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
       {/* Fixed Header — sits above content */}
-      <Header />
+      {/* <Header /> */}
 
       {/* Scrollable content */}
       <ScrollView
@@ -210,7 +210,7 @@ const Dashboard = () => {
       </ScrollView>
 
       {/* BottomNav pinned at the very bottom, respects safe area */}
-      <BottomNav />
+      {/* <BottomNav /> */}
     </View>
   );
 };

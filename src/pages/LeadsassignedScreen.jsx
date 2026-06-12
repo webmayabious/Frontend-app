@@ -295,7 +295,7 @@ const isScrollingToTop = useRef(false);
         barStyle="light-content"
       />
 
-      <Header />
+      {/* <Header /> */}
 
       <View style={styles.topBarContainer}>
         <View style={styles.topBar}>
@@ -484,7 +484,7 @@ const isScrollingToTop = useRef(false);
         </TouchableOpacity>
       )}
 
-      <BottomNav />
+      {/* <BottomNav /> */}
     </View>
   );
 };

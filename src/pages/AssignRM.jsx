@@ -613,9 +613,9 @@ const AssignRM = () => {
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <StatusBar barStyle="light-content" backgroundColor="#0A0F2E" />
+       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
-        <Header />
+        {/* <Header /> */}
 
         {/* ── Section Header ── */}
         <View style={styles.sectionHeader}>
@@ -1120,7 +1120,7 @@ const AssignRM = () => {
           </View>
         )}
 
-        <BottomNav style={{ paddingBottom: insets.bottom }} />
+        {/* <BottomNav style={{ paddingBottom: insets.bottom }} /> */}
       </KeyboardAvoidingView>
     </View>
   );

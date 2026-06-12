@@ -334,7 +334,7 @@ const LeadsListScreen = () => {
   return (
     <View style={styles.container}>
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
-      <Header />
+      {/* <Header /> */}
 
       <View style={styles.topBarContainer}>
         <View style={styles.topBar}>
@@ -576,7 +576,7 @@ const LeadsListScreen = () => {
         </TouchableOpacity>
       )}
 
-      <BottomNav />
+      {/* <BottomNav /> */}
     </View>
   );
 };

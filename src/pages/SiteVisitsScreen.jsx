@@ -315,7 +315,7 @@ const SiteVisitsScreen = () => {
         barStyle="light-content"
       />
 
-      <Header />
+      {/* <Header /> */}
 
       {/* Top Bar */}
       <View style={styles.topBarContainer}>
@@ -500,7 +500,7 @@ const SiteVisitsScreen = () => {
         </TouchableOpacity>
       )}
 
-      <BottomNav />
+      {/* <BottomNav /> */}
     </View>
   );
 };

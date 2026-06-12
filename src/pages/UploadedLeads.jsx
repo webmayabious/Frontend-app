@@ -332,7 +332,7 @@ const Uploadleads = uploadleads?.pages?.flatMap(page => page.data) || [];
         barStyle="light-content"
       />
 
-      <Header />
+      {/* <Header /> */}
 
       {/* Top Bar */}
       <View style={styles.topBarContainer}>
@@ -527,7 +527,7 @@ const Uploadleads = uploadleads?.pages?.flatMap(page => page.data) || [];
         </TouchableOpacity>
       )}
 
-      <BottomNav />
+      {/* <BottomNav /> */}
     </View>
   );
 };

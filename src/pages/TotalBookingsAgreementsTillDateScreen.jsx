@@ -218,7 +218,7 @@ const TotalBookingsAgreementsTillDateScreen = () => {
       />
 
       {/* Header */}
-      <Header />
+      {/* <Header /> */}
 
       {/* Title Row */}
       <View style={styles.topBarContainer}>
@@ -318,7 +318,7 @@ const TotalBookingsAgreementsTillDateScreen = () => {
       )}
 
       {/* Bottom Nav */}
-      <BottomNav />
+      {/* <BottomNav /> */}
     </View>
   );
 };

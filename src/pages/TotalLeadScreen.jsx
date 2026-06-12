@@ -345,7 +345,7 @@ const TotalLeadScreen = () => {
       />
 
       {/* Header */}
-      <Header />
+      {/* <Header /> */}
 
       {/* Title Row */}
       <View style={styles.topBarContainer}>
@@ -557,7 +557,7 @@ const TotalLeadScreen = () => {
       )}
 
       {/* Bottom Nav */}
-      <BottomNav />
+      {/* <BottomNav /> */}
     </View>
   );
 };
