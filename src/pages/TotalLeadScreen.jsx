@@ -206,9 +206,11 @@ const TotalLeadScreen = () => {
     status: null,
   });
 
+  // const [showTopBtn, setShowTopBtn] = useState(false);
+  // const scrollRef = useRef();
+  // const isScrollingToTop = useRef(false);
   const [showTopBtn, setShowTopBtn] = useState(false);
-  const scrollRef = useRef();
-  const isScrollingToTop = useRef(false);
+  const scrollRef = useRef(null);
 
   /* ================= INFINITE QUERY ================= */
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } =
@@ -243,19 +245,17 @@ const TotalLeadScreen = () => {
 
   // ✅ সব pages থেকে data flatten করো
   const leads = data?.pages?.flatMap(page => page.data) || [];
-    const filteredleads = leads?.filter(item => {
-  const name = item?.name?.toLowerCase() || '';
-  const phone = item?.phone?.toString() || '';
-  const email = item?.email?.toLowerCase() || '';
+  const filteredleads = leads?.filter(item => {
+    const name = item?.name?.toLowerCase() || '';
+    const phone = item?.phone?.toString() || '';
+    const email = item?.email?.toLowerCase() || '';
 
-  const search = searchText.toLowerCase().trim();
+    const search = searchText.toLowerCase().trim();
 
-  return (
-    name.includes(search) ||
-    phone.includes(search) ||
-    email.includes(search)
-  );
-});
+    return (
+      name.includes(search) || phone.includes(search) || email.includes(search)
+    );
+  });
   // ✅ Infinite scroll handler — scroll position দেখে trigger করে
   const handleLoadMore = () => {
     if (hasNextPage && !isFetchingNextPage) {
@@ -327,14 +327,20 @@ const TotalLeadScreen = () => {
     setShowFilterModal(false);
   };
 
+  // const scrollToTop = () => {
+  //   isScrollingToTop.current = true;
+  //   scrollRef.current?.scrollTo({ y: 0, animated: true });
+  //   setTimeout(() => {
+  //     isScrollingToTop.current = false;
+  //   }, 600);
+  // };
   const scrollToTop = () => {
-    isScrollingToTop.current = true;
-    scrollRef.current?.scrollTo({ y: 0, animated: true });
-    setTimeout(() => {
-      isScrollingToTop.current = false;
-    }, 600);
+    scrollRef.current?.scrollTo({
+      x: 0,
+      y: 0,
+      animated: true,
+    });
   };
-
   /* ================= RENDER ================= */
   return (
     <View style={styles.container}>
@@ -387,19 +393,19 @@ const TotalLeadScreen = () => {
         onScroll={event => {
           const { layoutMeasurement, contentOffset, contentSize } =
             event.nativeEvent;
+
           const y = contentOffset.y;
 
-          // Scroll to top button
           setShowTopBtn(y > 200);
-          if (isScrollingToTop.current) return;
 
           const isNearBottom =
             layoutMeasurement.height + y >= contentSize.height - 150;
-          if (isNearBottom) {
-            handleLoadMore();
+
+          if (isNearBottom && hasNextPage && !isFetchingNextPage) {
+            fetchNextPage();
           }
         }}
-        scrollEventThrottle={400}
+        scrollEventThrottle={16}
       >
         {/* Search Box */}
         <View style={styles.searchBox}>
@@ -489,7 +495,7 @@ const TotalLeadScreen = () => {
       {showFilterModal && (
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
-             <View style={styles.dragHandle} />
+            <View style={styles.dragHandle} />
             <Text style={styles.modalTitle}>Filter Leads</Text>
 
             <ScrollView
@@ -711,7 +717,7 @@ const styles = StyleSheet.create({
 
   topButton: {
     position: 'absolute',
-    bottom: Platform.OS === 'ios' ? 125 : 100, 
+    bottom: Platform.OS === 'ios' ? 125 : 100,
     right: 20,
     backgroundColor: '#00acc1',
     width: 50,
