@@ -17,7 +17,6 @@ const BottomNav = ({ routeName }) => {
         <NavItem icon="view-dashboard" label="Dashboard" screen="Dashboard"  routeName={routeName}/>
          {(isAdmin || isBusinessHead||isCITYHEAD)&&(
           <>
-         
             <NavItem icon="account-switch" label="Change RM" screen="ChangeRM"  routeName={routeName}/>
             <NavItem icon="account-details" label="Assign RM" screen="AssignRM" routeName={routeName} />
           </>
