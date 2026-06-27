@@ -9,9 +9,8 @@ import {
   StatusBar,
   Platform,
   Alert,
+  KeyboardAvoidingView,
 } from 'react-native';
-import Header from '../Layout/Header';
-import BottomNav from '../navigations/BottomNav';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Dropdown } from 'react-native-element-dropdown';
@@ -103,7 +102,6 @@ const DobGenderRow = ({ form, onChange }) => {
 
   return (
     <View style={styles.row}>
-      {/* DOB */}
       <View style={{ flex: 1, marginRight: 10 }}>
         <Text style={styles.label}>Date of Birth</Text>
         <TouchableOpacity style={styles.inputWithIcon} onPress={() => setShow(true)}>
@@ -121,7 +119,6 @@ const DobGenderRow = ({ form, onChange }) => {
         )}
       </View>
 
-      {/* Gender */}
       <View style={{ flex: 1 }}>
         <Text style={styles.label}>Gender</Text>
         <View style={styles.genderRow}>
@@ -215,7 +212,6 @@ export default function Rmform() {
 
   const onChange = (key, value) => setForm(prev => ({ ...prev, [key]: value }));
 
-  // ── Fetch Projects ──
   useEffect(() => {
     const fetchProjects = async () => {
       const res = await api.get('/api/pm/getAllPropertyProjects');
@@ -226,7 +222,6 @@ export default function Rmform() {
 
   const projectOptions = projects?.map(item => ({ label: item.project_name, value: item.id }));
 
-  // ── Queries ──
   const { data: AllReferences } = useQuery({
     queryKey: ['AllReferences'],
     queryFn: async () => {
@@ -251,7 +246,6 @@ export default function Rmform() {
   });
   const Company = allOwnCompany?.data?.data?.map(item => ({ label: item.com_name, value: item.id }));
 
-  // ── Validation ──
   const validateForm = () => {
     let e = {};
     if (!form.reference) e.reference = 'Reference is required';
@@ -265,7 +259,6 @@ export default function Rmform() {
     return e;
   };
 
-  // ── Save ──
   const onSave = async () => {
     const err = validateForm();
     setErrors(err);
@@ -333,15 +326,16 @@ export default function Rmform() {
     }
   };
 
-  // ─── RENDER ───────────────────────────────────────────────────────────────
-
   return (
-    <View style={{ flex: 1, backgroundColor: '#1e2140' }}>
-      {/* <Header /> */}
+    <KeyboardAvoidingView
+      style={{ flex: 1, backgroundColor: '#1e2140' }}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}
+    >
       <View style={styles.container}>
         <StatusBar barStyle="light-content" backgroundColor="#2B2E81" />
 
-        {/* ── Top Bar ── */}
+        {/* Top Bar */}
         <View style={styles.topBarContainer}>
           <View style={styles.topBar}>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -355,11 +349,13 @@ export default function Rmform() {
           </View>
         </View>
 
-        <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-
-          {/* ── Personal Details ── */}
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={{ paddingBottom: 120 }}
+        >
+          {/* Personal Details */}
           <Section title="Personal Details" icon="person">
-
             <DropdownField
               label="Reference *"
               data={References}
@@ -451,12 +447,10 @@ export default function Rmform() {
               onChange={value => onChange('project_id', value)}
             />
             <ErrorText msg={errors.project_id} />
-
           </Section>
 
-          {/* ── Lead Profile ── */}
+          {/* Lead Profile */}
           <Section title="Lead Profile" icon="leaderboard">
-
             <DropdownField
               label="Location of Property *"
               data={Property}
@@ -514,10 +508,9 @@ export default function Rmform() {
               value={form.interested_in_site_visit}
               onChangeText={v => onChange('interested_in_site_visit', v)}
             />
-
           </Section>
 
-          {/* ── Submit Button ── */}
+          {/* Submit Button */}
           <TouchableOpacity
             style={[styles.button, saving && styles.buttonDisabled]}
             onPress={onSave}
@@ -529,12 +522,9 @@ export default function Rmform() {
               {saving ? 'Submitting...' : 'Submit Lead'}
             </Text>
           </TouchableOpacity>
-
         </ScrollView>
-{/* 
-        <BottomNav /> */}
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 

@@ -889,7 +889,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: 12,
-    paddingBottom: 16,
+    paddingBottom: 100,
   },
   centeredText: {
     color: COLORS.white,

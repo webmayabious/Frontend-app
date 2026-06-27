@@ -12,7 +12,7 @@ import { io } from "socket.io-client";
 // https://api.mokhsh.com
 // https://api.prolificdesigns.mokhsh.com
 
-const socket = io("https://api.mokhsh.info", {
+const socket = io("https://api.mokhsh.com", {
   path: "/api/socket.io/", 
    //transports: ["websocket"],
   transports: ["polling", "websocket"],

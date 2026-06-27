@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -10,8 +10,7 @@ import {
   Dimensions,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import Header from '../Layout/Header';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import BottomNav from '../navigations/BottomNav';
 import { useNavigation } from '@react-navigation/native';
 import api from '../api/AxiosInstance';
@@ -23,22 +22,22 @@ const { width } = Dimensions.get('window');
    Card data config
 ───────────────────────────────────────── */
 const CARDS = (d, nav) => [
-   {
-    icon: 'phone-callback',
-    label: 'Follow-ups / Meetings',
-    period: 'Today',
-    accent: '#4ade80',
-    value: `${d?.todays_callbacks ?? 0}  /  ${d?.todays_meetings ?? 0}`,
-    route: 'FollowUpsScreen',
-  },
-  {
-    icon: 'place',
-    label: 'Site Visits / Bookings',
-    period: 'Today',
-    accent: '#4ade80',
-    value: `${d?.todays_site_visits ?? 0}  /  ${d?.todays_booking ?? 0}`,
-    route: 'SiteVisitsScreen',
-  },
+{
+  icon: 'phone-callback',
+  label: 'Remaining Followups / Total Followups',
+  period: 'Today',
+  accent: '#4ade80',
+  value: ` ${d?.today_remaining_callbacks ?? 0}  / ${d?.todays_callbacks ?? 0} `,
+  route: 'FollowUpsScreen',
+},
+{
+  icon: 'place',
+  label: 'Site Visits / Bookings',
+  period: 'Month / Till Date',
+  accent: '#4ade80',
+  value: `${d?.monthly_site_visits ?? 0}  /  ${d?.site_visits_till_date ?? 0} `,
+  route: 'SiteVisitsScreen',
+},
   {
     icon: 'upload',
     label: 'Uploaded Leads',
@@ -55,7 +54,6 @@ const CARDS = (d, nav) => [
     value: `${d?.total_assigned_lead ?? 0}`,
     route: 'LeadsassignedScreen',
   },
-
   {
     icon: 'people',
     label: 'Active Leads / Total Leads',
@@ -66,19 +64,18 @@ const CARDS = (d, nav) => [
   },
   {
     icon: 'receipt-long',
-    label: 'Bookings / Agreements',
+    label: 'Total Bookings / Total Agreements (Rs.) / Total Basebrokerage (Rs.)',
     period: 'Month',
     accent: '#f472b6',
-    value: `${d?.total_bookings_per_month ?? 0}  /  ₹${d?.total_agreement_value_per_month ?? 0}`,
+    value: `${d?.total_bookings_per_month ?? 0}  /  ₹${d?.total_agreement_value_per_month ?? 0}  /  ₹${d?.total_basebrokerage_value_per_month ?? 0}`,
     route: 'TotalBookingsAgreementsPerMonth',
   },
- 
-      {
+  {
     icon: 'history',
-    label: 'Bookings / Agreements',
+    label: 'Total Bookings / Total Agreements (Rs.) / Total Basebrokerage (Rs.)',
     period: 'Till Date',
     accent: '#a78bfa',
-    value: `${d?.total_booking_till_date ?? 0}  /  ₹${d?.total_agreement_value_till_date ?? 0}`,
+    value: `${d?.total_booking_till_date ?? 0}  /  ₹${d?.total_agreement_value_till_date ?? 0}  /  ₹${d?.total_basebrokerage_value_till_date ?? 0}`,
     route: 'TotalBookingsAgreementsTillDateScreen',
   },
   {
@@ -89,7 +86,6 @@ const CARDS = (d, nav) => [
     value: `${d?.total_missed_callback ?? 0}`,
     route: 'MissedFollowup',
   },
-  
   {
     icon: 'list-alt',
     label: 'Leads List',
@@ -98,41 +94,37 @@ const CARDS = (d, nav) => [
     value: '—',
     route: 'LeadsListScreen',
   },
-
 ];
 
 /* ─────────────────────────────────────────
    Reusable Card
 ───────────────────────────────────────── */
 const Card = ({ icon, label, period, accent, value, onPress }) => (
-  <TouchableOpacity
-    activeOpacity={0.75}
-    style={styles.card}
-    onPress={onPress}
-  >
-    {/* Left accent bar */}
+  <TouchableOpacity activeOpacity={0.75} style={styles.card} onPress={onPress}>
     <View style={[styles.accentBar, { backgroundColor: accent }]} />
 
-    {/* Icon bubble */}
     <View style={[styles.iconBubble, { backgroundColor: accent + '22' }]}>
       <Icon name={icon} size={20} color={accent} />
     </View>
 
-    {/* Text */}
     <View style={styles.cardBody}>
-      <Text style={styles.cardLabel} numberOfLines={1}>
+      <Text style={styles.cardLabel} numberOfLines={2}>
         {label}
       </Text>
-      <Text style={[styles.cardPeriod, { color: accent }]}>{period}</Text>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
+        <Text style={[styles.cardPeriod, { color: accent }]}>{period}</Text>
+        <Text
+          style={[styles.cardValue, { color: accent, flexShrink: 1, textAlign: 'right', marginLeft: 8 }]}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.6}
+        >
+          {value}
+        </Text>
+      </View>
     </View>
 
-    {/* Value */}
-    <View style={styles.cardValueWrap}>
-      <Text style={[styles.cardValue, { color: accent }]} numberOfLines={1}>
-        {value}
-      </Text>
-      <Icon name="chevron-right" size={18} color={accent + '88'} />
-    </View>
+    <Icon name="chevron-right" size={18} color={accent + '88'} style={{ marginLeft: 4 }} />
   </TouchableOpacity>
 );
 
@@ -143,7 +135,7 @@ const Dashboard = () => {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
 
-  const { data: dashboardCards, refetch: dashboardRefetch } = useQuery({
+  const { data: dashboardCards } = useQuery({
     queryKey: ['dashboardCards'],
     queryFn: async () => {
       const res = await api.get('/api/pm/PropertyCrmDashboardData');
@@ -151,27 +143,22 @@ const Dashboard = () => {
     },
   });
 
-  useEffect(() => {
-    dashboardRefetch();
-  }, []);
+const paddingTop = Platform.OS === 'ios' ? insets.top + 14 : 14;
 
-  // BottomNav height: 60px + device bottom inset
-  const bottomNavHeight = 5 + insets.bottom;
+  const bottomNavHeight = 60 + insets.bottom;
 
   return (
     <View style={styles.root}>
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
-      {/* Fixed Header — sits above content */}
-      {/* <Header /> */}
-
-      {/* Scrollable content */}
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           styles.scroll,
-          // ✅ iOS fix: add bottom padding = bottomNav height so last card is not hidden
-          { paddingBottom: bottomNavHeight },
+          {
+            paddingTop: paddingTop + 10,
+            paddingBottom: bottomNavHeight + 10,
+          },
         ]}
       >
         {/* Section heading */}
@@ -209,8 +196,10 @@ const Dashboard = () => {
         ))}
       </ScrollView>
 
-      {/* BottomNav pinned at the very bottom, respects safe area */}
-      {/* <BottomNav /> */}
+      {/* ✅ BottomNav fixed at bottom — no glitch */}
+      {/* <View style={[styles.bottomNavFixed, { paddingBottom: insets.bottom }]}>
+        <BottomNav routeName="Dashboard" />
+      </View> */}
     </View>
   );
 };
@@ -228,7 +217,17 @@ const styles = StyleSheet.create({
 
   scroll: {
     paddingHorizontal: 16,
-    paddingTop: 14,
+  },
+
+  bottomNavFixed: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#2B2E81',
+    borderTopLeftRadius: 25,
+    borderTopRightRadius: 25,
+    overflow: 'hidden',
   },
 
   /* Section heading */
@@ -295,9 +294,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor:
-  Platform.OS === 'ios'
-    ? 'rgba(255,255,255,0.22)'
-    : 'rgba(233,225,225,0.36)',
+      Platform.OS === 'ios'
+        ? 'rgba(255,255,255,0.22)'
+        : 'rgba(233,225,225,0.36)',
     borderRadius: 16,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.07)',
@@ -334,11 +333,6 @@ const styles = StyleSheet.create({
     marginTop: 3,
     fontWeight: '500',
     letterSpacing: 0.3,
-  },
-  cardValueWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginLeft: 8,
   },
   cardValue: {
     fontSize: 13.5,

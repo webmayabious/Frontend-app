@@ -1159,7 +1159,7 @@ const styles = StyleSheet.create({
 
   container: { flex: 1, backgroundColor: COLORS.bg },
   scrollView: { flex: 1 },
-  scrollContent: { paddingHorizontal: 12, paddingBottom: 16 },
+  scrollContent: { paddingHorizontal: 12, paddingBottom: 100 },
   centeredText: {
     color: COLORS.white,
     textAlign: 'center',
@@ -1348,7 +1348,7 @@ const styles = StyleSheet.create({
 
   modalOverlay: {
     position: 'absolute',
-    top: 0, left: 0, right: 0, bottom: 0,
+    top: 0, left: 0, right: 0, bottom: 100,
     backgroundColor: 'rgba(0,0,0,0.7)',
     justifyContent: 'center',
     alignItems: 'center',

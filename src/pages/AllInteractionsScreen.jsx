@@ -211,6 +211,7 @@ const AllInteractionsScreen = ({ route }) => {
         ) : (
           <Text style={styles.centeredText}>No Data Found</Text>
         )}
+        <View style={{ height: 100 }} />
       </ScrollView>
 
       {/* ── Remarks Modal (absolute overlay) ── */}

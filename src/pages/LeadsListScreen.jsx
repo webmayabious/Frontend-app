@@ -430,6 +430,8 @@ const LeadsListScreen = () => {
             }}
           />
         )}
+
+        <View style={{ height: 100 }} />
               
         
                 {/* ✅ End of list message */}

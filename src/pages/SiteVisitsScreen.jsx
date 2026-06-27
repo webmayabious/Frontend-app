@@ -134,30 +134,30 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
           <Text style={styles.value}>{data?.propertylead?.phone || 'N/A'}</Text>
         </Text>
       </TouchableOpacity>
-         <Text style={styles.label}>
-          Site Visit Date:
-          <Text style={styles.value}> {data?.site_visit_date}</Text>
-        </Text>
+      <Text style={styles.label}>
+        Site Visit Date:
+        <Text style={styles.value}> {data?.site_visit_date}</Text>
+      </Text>
     </View>
     <View style={styles.rowBetween}>
       <Text style={styles.label}>
-     
-           <Text style={styles.label}>
-        Email:{' '}
-        <Text style={styles.value}>{data?.propertylead?.email || 'N/A'}</Text>
-      </Text>
-      </Text>
 
-     
-    </View>
-    <Text style={styles.label}>
-        RM:{' '}
-        <Text style={styles.value}>
-          {data?.propertylead?.relationshipManager
-            ? `${data.propertylead.relationshipManager.usr_fname} ${data.propertylead.relationshipManager.usr_lname}`
-            : 'N/A'}
+        <Text style={styles.label}>
+          Email:{' '}
+          <Text style={styles.value}>{data?.propertylead?.email || 'N/A'}</Text>
         </Text>
       </Text>
+
+
+    </View>
+    <Text style={styles.label}>
+      RM:{' '}
+      <Text style={styles.value}>
+        {data?.propertylead?.relationshipManager
+          ? `${data.propertylead.relationshipManager.usr_fname} ${data.propertylead.relationshipManager.usr_lname}`
+          : 'N/A'}
+      </Text>
+    </Text>
     <Text style={{ color: '#fb9e08', fontSize: 12, marginTop: 4 }}>
       Lead Source:{' '}
       <Text style={styles.value}>
@@ -201,9 +201,35 @@ const SiteVisitsScreen = () => {
     status: null,
   });
   const [appliedFilters, setAppliedFilters] = useState();
-  const { data, isLoading } = useQuery({
-    queryKey: ['SiteVisitandBookingsData', appliedFilters],
-    queryFn: async () => {
+    const [showTopBtn, setShowTopBtn] = useState(false);
+  const [page, setPage] = useState(1);
+  const [allData, setAllData] = useState([]);
+  const [hasMore, setHasMore] = useState(true);
+  const [isFetchingMore, setIsFetchingMore] = useState(false);
+  // const { data, isLoading } = useQuery({
+  //   queryKey: ['SiteVisitandBookingsData', appliedFilters],
+  //   queryFn: async () => {
+  //     const res = await api.get('/api/pm/siteVisitAndBookingsData', {
+  //       params: {
+  //         search: searchText || undefined,
+  //         company_id: filters.company_id || undefined,
+  //         rm_id: filters.rm_id || undefined,
+  //         fromDate: filters.fromDate || undefined,
+  //         toDate: filters.toDate || undefined,
+  //         project: filters.project || undefined,
+  //         location: filters.location || undefined,
+  //         status: filters.status || undefined,
+  //       },
+  //     });
+  //     console.log('res site visite', res.data);
+
+  //     return res.data.data;
+  //   },
+  // });
+  const fetchSiteVisits = async (pageNum = 1, reset = false) => {
+    if (isFetchingMore) return;
+    setIsFetchingMore(true);
+    try {
       const res = await api.get('/api/pm/siteVisitAndBookingsData', {
         params: {
           search: searchText || undefined,
@@ -214,15 +240,37 @@ const SiteVisitsScreen = () => {
           project: filters.project || undefined,
           location: filters.location || undefined,
           status: filters.status || undefined,
+          page: pageNum,
         },
       });
-      console.log('res site visite', res.data);
+      const newData = res.data.data?.site_visits_till_dates || [];
+      const totalPages = res.data.data?.pagination?.total_pages || 1;
 
-      return res.data.data;
-    },
-  });
+      setAllData(prev => (reset ? newData : [...prev, ...newData]));
+      setHasMore(pageNum < totalPages);
+      setPage(pageNum);
+    } catch (e) {
+      console.log('fetch error', e);
+    } finally {
+      setIsFetchingMore(false);
+    }
+  };
 
-  const siteVisits = data?.todays_siteVisit || [];
+  // Initial load & filter change
+  const [isLoading, setIsLoading] = useState(false);
+  React.useEffect(() => {
+    setIsLoading(true);
+    setAllData([]);
+    setPage(1);
+    setHasMore(true);
+    fetchSiteVisits(1, true).finally(() => setIsLoading(false));
+  }, [appliedFilters]);
+
+  const siteVisits = allData;
+
+
+  // const siteVisits = data?.todays_siteVisit || [];
+  // const siteVisits = data?.site_visits_till_dates || [];
   const filteredSiteVisits = siteVisits.filter(item => {
     const name = item?.propertylead?.name?.toLowerCase() || '';
     const phone = item?.propertylead?.phone || '';
@@ -305,7 +353,7 @@ const SiteVisitsScreen = () => {
     setAppliedFilters(cleared);
     setShowFilterModal(false);
   };
-  const [showTopBtn, setShowTopBtn] = useState(false);
+
 
   return (
     <View style={styles.container}>
@@ -338,13 +386,13 @@ const SiteVisitsScreen = () => {
               style={styles.backBtn}
               onPress={() => navigation.goBack()}
             >
-                <View style={styles.backButton}>
-                              <Image
-                                source={require('../asset/image/icon/Arrow.png')}
-                                style={{ width:12, height: 12, marginRight: 6 }}
-                              />
-                              <Text style={styles.backText}>Back</Text>
-                            </View>
+              <View style={styles.backButton}>
+                <Image
+                  source={require('../asset/image/icon/Arrow.png')}
+                  style={{ width: 12, height: 12, marginRight: 6 }}
+                />
+                <Text style={styles.backText}>Back</Text>
+              </View>
             </TouchableOpacity>
           </View>
         </View>
@@ -355,8 +403,16 @@ const SiteVisitsScreen = () => {
         ref={scrollRef}
         showsVerticalScrollIndicator={false}
         onScroll={e => {
-          const y = e.nativeEvent.contentOffset.y;
+          const { layoutMeasurement, contentOffset, contentSize } = e.nativeEvent;
+          const y = contentOffset.y;
           setShowTopBtn(y > 200);
+
+          // Infinite scroll trigger
+          const isNearBottom =
+            layoutMeasurement.height + y >= contentSize.height - 200;
+          if (isNearBottom && hasMore && !isFetchingMore) {
+            fetchSiteVisits(page + 1);
+          }
         }}
         scrollEventThrottle={16}
       >
@@ -368,7 +424,7 @@ const SiteVisitsScreen = () => {
             placeholderTextColor="#aaa"
             value={searchText}
             onChangeText={setSearchText}
-            style={{ marginLeft: 8, color: '#fff', flex: 1, height: '100%', paddingVertical: Platform.OS === 'ios' ? 0 : 6,}}
+            style={{ marginLeft: 8, color: '#fff', flex: 1, height: '100%', paddingVertical: Platform.OS === 'ios' ? 0 : 6, }}
           />
         </View>
 
@@ -380,7 +436,7 @@ const SiteVisitsScreen = () => {
         ) : filteredSiteVisits?.length > 0 ? (
           filteredSiteVisits.map((visit, i) => (
             <SiteCard
-              key={visit.id || i}
+              key={`${visit.id}-${i}`}
               data={visit}
               navigation={navigation}
               setShowRemarks={setShowRemarks}
@@ -394,6 +450,20 @@ const SiteVisitsScreen = () => {
             No data found
           </Text>
         )}
+
+        {/* {isFetchingMore && (
+          <Text style={{ color: '#aaa', textAlign: 'center', paddingVertical: 16 }}>
+            Loading more...
+          </Text>
+        )} */}
+        {!hasMore && allData.length > 0 && (
+          <Text style={{ color: '#555', textAlign: 'center', paddingVertical: 16 }}>
+            All data has been viewed ✓
+          </Text>
+        )}
+
+        <View style={{ height: 100 }} />
+
       </ScrollView>
 
       {/* ✅ REMARKS MODAL */}
@@ -417,11 +487,11 @@ const SiteVisitsScreen = () => {
           </View>
         </View>
       )}
-   {/* ✅ FILTER MODAL */}
+      {/* ✅ FILTER MODAL */}
       {showFilterModal && (
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
-             <View style={styles.dragHandle} />
+            <View style={styles.dragHandle} />
             <Text style={styles.modalTitle}>Filter Leads</Text>
 
             <ScrollView
@@ -538,16 +608,16 @@ const styles = StyleSheet.create({
   },
 
   backText: { color: '#fff', fontSize: 12 },
- inputWrapper: { width: '100%', marginBottom: 12 },
+  inputWrapper: { width: '100%', marginBottom: 12 },
   dropdown: {
-     height: 40,
+    height: 40,
     backgroundColor: '#ffffff12',
     borderRadius: 8,
     paddingHorizontal: 10,
     borderWidth: 1,
     borderColor: '#3d55cc',
   },
-    dragHandle: {
+  dragHandle: {
     width: 36,
     height: 4,
     backgroundColor: '#3d55cc',
@@ -585,9 +655,9 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   backButton: {
-  flexDirection: 'row',
-  alignItems: 'center',
-},
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   name: { color: '#fff', fontWeight: 'bold' },
 
   activeBadge: {
@@ -680,7 +750,7 @@ const styles = StyleSheet.create({
   },
 
   modalCard: {
-   width: '88%',
+    width: '88%',
     backgroundColor: '#1a1f6b',       // deep navy base
     borderWidth: 1,
     borderColor: '#3d45b0',            // soft blue border
@@ -714,7 +784,7 @@ const styles = StyleSheet.create({
   },
 
   modalCloseBtn: {
-     backgroundColor: '#00acc1',
+    backgroundColor: '#00acc1',
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 24,
@@ -724,7 +794,7 @@ const styles = StyleSheet.create({
   },
 
   modalCloseText: {
-  color: '#fff', fontWeight: '600', fontSize: 14 
+    color: '#fff', fontWeight: '600', fontSize: 14
   },
   nameRow: {
     flexDirection: 'row',

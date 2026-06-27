@@ -1,105 +1,80 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
-import { useNavigationState } from '@react-navigation/native';
+
 const BottomNav = ({ routeName }) => {
   const userRole = useSelector(state => state.userRole);
   const isAdmin = userRole?.includes('ADMIN');
   const isRM = userRole?.includes('RM');
-  const isBusinessHead=userRole?.includes('BUSINESS HEAD')
-  const isCITYHEAD=userRole?.includes('CITY HEAD')
+  const isBusinessHead = userRole?.includes('BUSINESS HEAD');
+  const isCITYHEAD = userRole?.includes('CITY HEAD');
+
   return (
-    <SafeAreaView edges={['bottom']} style={styles.safeArea}>
-      <View style={styles.bottomNav}>
-        <NavItem icon="view-dashboard" label="Dashboard" screen="Dashboard"  routeName={routeName}/>
-         {(isAdmin || isBusinessHead||isCITYHEAD)&&(
-          <>
-            <NavItem icon="account-switch" label="Change RM" screen="ChangeRM"  routeName={routeName}/>
-            <NavItem icon="account-details" label="Assign RM" screen="AssignRM" routeName={routeName} />
-          </>
-        )}
-
-
-
-        {/* COMMON */}
-        
-        <NavItem icon="bell" label="Notifications" screen="Notifications"  routeName={routeName}/>
-      </View>
-    </SafeAreaView>
+    <View style={styles.bottomNav}>
+      <NavItem icon="view-dashboard" label="Dashboard" screen="Dashboard" routeName={routeName} />
+      {(isAdmin || isBusinessHead || isCITYHEAD) && (
+        <>
+          <NavItem icon="account-switch" label="Change RM" screen="ChangeRM" routeName={routeName} />
+          <NavItem icon="account-details" label="Assign RM" screen="AssignRM" routeName={routeName} />
+        </>
+      )}
+      <NavItem icon="bell" label="Notifications" screen="Notifications" routeName={routeName} />
+    </View>
   );
 };
 
-// const NavItem = ({ icon, label, screen }) => {
-//   const navigation = useNavigation();
-//   const route = useRoute();
-//   const isActive = route.name === screen;
-
-//   return (
-//     <TouchableOpacity
-//       style={[styles.navItem, isActive && styles.navItemActive]}
-//       onPress={() => screen && navigation.navigate(screen)}
-//     >
-//       <View style={[styles.iconWrapper, isActive && styles.iconWrapperActive]}>
-//         <Icon name={icon} size={20} color={isActive ? '#00cfff' : '#cfd8dc'} />
-//       </View>
-//       <Text style={[styles.navText, isActive && styles.navTextActive]}>
-//         {label}
-//       </Text>
-//     </TouchableOpacity>
-//   );
-// };
 const NavItem = ({ icon, label, screen, routeName }) => {
   const navigation = useNavigation();
-
   const isActive = routeName === screen;
 
   return (
-    <TouchableOpacity onPress={() => navigation.navigate(screen)}>
+    <TouchableOpacity
+      style={styles.navItem}
+      onPress={() => navigation.navigate(screen)}
+    >
       <View style={[styles.iconWrapper, isActive && styles.iconWrapperActive]}>
         <Icon name={icon} size={20} color={isActive ? '#00cfff' : '#cfd8dc'} />
       </View>
-
       <Text style={[styles.navText, isActive && styles.navTextActive]}>
         {label}
       </Text>
     </TouchableOpacity>
   );
 };
+
 export default BottomNav;
 
 const styles = StyleSheet.create({
-  bottomNav: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-    paddingVertical: 8,
-    backgroundColor: '#2B2E81',
-    borderTopWidth: 1,
-    borderTopColor: '#ffffff15',
-    borderTopLeftRadius: 25,
-    borderTopRightRadius: 25,
-    elevation: 10,
-  },
-  navItem: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  navItemActive: {
-    // outer wrapper active style not needed
-  },
-  iconWrapper: {
-    width: 42,
-    height: 28,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 2,
-  },
+ bottomNav: {
+  flexDirection: 'row',
+  justifyContent: 'space-around',
+  alignItems: 'center',
+  paddingBottom:18,
+  paddingTop:10,
+  backgroundColor: '#2B2E81',
+  borderTopWidth: 1,
+  borderTopColor: '#ffffff15',
+  borderTopLeftRadius: 25,
+  borderTopRightRadius: 25,
+  elevation: 10,
+},
+ navItem: {
+  alignItems: 'center',
+  justifyContent: 'center',
+  paddingHorizontal: 10,
+  paddingVertical: 6,
+  minWidth: 60,
+},
+iconWrapper: {
+  width: 44,
+  height: 30,
+  borderRadius: 15,
+  alignItems: 'center',
+  justifyContent: 'center',
+  marginBottom: 4,
+},
   iconWrapperActive: {
     backgroundColor: '#ffffff18',
   },
@@ -111,11 +86,5 @@ const styles = StyleSheet.create({
   navTextActive: {
     color: '#00cfff',
     fontWeight: '600',
-  },
-  safeArea: {
-    backgroundColor: '#2B2E81',
-    borderTopLeftRadius: 25,
-    borderTopRightRadius: 25,
-    overflow: 'hidden',
   },
 });

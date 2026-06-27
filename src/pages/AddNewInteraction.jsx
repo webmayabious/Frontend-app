@@ -8,11 +8,11 @@ import {
   ScrollView,
   Image,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { Dropdown } from 'react-native-element-dropdown';
-import Header from '../Layout/Header';
-import BottomNav from '../navigations/BottomNav';
 import api from '../api/AxiosInstance';
 import { useQuery } from '@tanstack/react-query';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -88,7 +88,6 @@ export default function AddNewInteraction({ route }) {
     remarks: '',
   });
 
-  // ── Date / Time state ──
   const [siteVisitDate, setSiteVisitDate] = useState(new Date());
   const [callBackDate, setCallBackDate] = useState(new Date());
   const [expectedClosureDate, setExpectedClosureDate] = useState(new Date());
@@ -99,14 +98,12 @@ export default function AddNewInteraction({ route }) {
   const [showExpectedClosurePicker, setShowExpectedClosurePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
 
-  // ── Formatters ──
   const formatDate = d => {
     const day = String(d.getDate()).padStart(2, '0');
     const month = String(d.getMonth() + 1).padStart(2, '0');
     return `${d.getFullYear()}-${month}-${day}`;
   };
 
-  // ── Date / Time handlers ──
   const onChangeDate = (event, selectedDate, field) => {
     if (!selectedDate) return;
     const formatted = formatDate(selectedDate);
@@ -136,7 +133,6 @@ export default function AddNewInteraction({ route }) {
     setInteraction(prev => ({ ...prev, call_back_time: `${hours}:${minutes}` }));
   };
 
-  // ── API Queries ──
   const { data: AllCallStatus } = useQuery({
     queryKey: ['AllCallStatus'],
     queryFn: async () => (await api.get('/api/pm/getAllPropertyCallStatus')).data.data,
@@ -164,33 +160,24 @@ export default function AddNewInteraction({ route }) {
 
   const toOptions = arr => arr?.map(item => ({ label: item.name, value: item.id }));
 
-  // ── Validation ──
   const validate = () => {
     const newErrors = {};
-
     if (!interaction.call_status_id)
       newErrors.call_status_id = 'Call Status is required';
-
     if (!interaction.lead_qualification_id)
       newErrors.lead_qualification_id = 'Lead Qualification is required';
-
     if (!interaction.lead_status_id)
       newErrors.lead_status_id = 'Lead Status is required';
-
     if (!interaction.lead_sub_status_id)
       newErrors.lead_sub_status_id = 'Lead Sub Status is required';
-
     if (!interaction.rating_id)
       newErrors.rating_id = 'Rating is required';
-
     if (!interaction.remarks || interaction.remarks.trim() === '')
       newErrors.remarks = 'Remarks is required';
-
     setErrors(newErrors);
-    return Object.keys(newErrors).length === 0; // true = valid
+    return Object.keys(newErrors).length === 0;
   };
 
-  // ── Update field & clear its error ──
   const updateField = (field, val) => {
     setInteraction(prev => ({ ...prev, [field]: val }));
     if (errors[field]) {
@@ -198,57 +185,13 @@ export default function AddNewInteraction({ route }) {
     }
   };
 
-  // ── Submit ──
-  // const handleCreate = async () => {
-  //   if (loading) return;
-  //   if (!validate()) return; // stop if invalid
-
-  //   setLoading(true);
-  //   try {
-  //     const res = await api.post(
-  //       `/api/pm/createPropertyLeadFeedback/${id}`,
-  //       interaction,
-  //     );
-
-  //     if (res.data.status === true) {
-  //       Alert.alert('Success', 'Interaction added successfully!', [
-  //         {
-  //           text: 'OK',
-  //           onPress: () => {
-  //             setInteraction({
-  //               call_status_id: '',
-  //               lead_qualification_id: '',
-  //               lead_status_id: '',
-  //               lead_sub_status_id: '',
-  //               rating_id: '',
-  //               site_visit_date: '',
-  //               call_back_date: '',
-  //               call_back_time: '',
-  //               expected_closure_date: '',
-  //               remarks: '',
-  //             });
-  //             navigation.replace('AllInteractionsScreen', { id: route.params.id });
-  //           },
-  //         },
-  //       ]);
-  //     } else {
-  //       Alert.alert('Error', res.data.message || 'Something went wrong.');
-  //     }
-  //   } catch (err) {
-  //     console.log('handleCreate error:', err);
-  //     Alert.alert('Error', 'Failed to submit. Please try again.');
-  //   } finally {
-  //     setLoading(false);
-  //   }
-  // };
-const handleCreate = async () => {
+  const handleCreate = async () => {
     if (loading) return;
     const isValid = validate();
     if (!isValid) return;
 
     setLoading(true);
 
-   
     const payload = {
       ...interaction,
       site_visit_date: interaction.site_visit_date || null,
@@ -257,12 +200,10 @@ const handleCreate = async () => {
       expected_closure_date: interaction.expected_closure_date || null,
     };
 
-    console.log('Sending data:', JSON.stringify(payload));
-
     try {
       const res = await api.post(
         `/api/pm/createPropertyLeadFeedback/${id}`,
-        payload, 
+        payload,
       );
 
       if (res.data.status === true) {
@@ -296,13 +237,13 @@ const handleCreate = async () => {
       setLoading(false);
     }
   };
-  // ─────────────────────────────────────────
-  // Render
-  // ─────────────────────────────────────────
-  return (
-    <View style={{ flex: 1, backgroundColor: '#050a3a' }}>
-      {/* <Header /> */}
 
+  return (
+    <KeyboardAvoidingView
+      style={{ flex: 1, backgroundColor: '#050a3a' }}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}
+    >
       <View style={styles.container}>
         {/* Top Bar */}
         <View style={styles.topBarContainer}>
@@ -327,10 +268,13 @@ const handleCreate = async () => {
           </View>
         </View>
 
-        <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={{ paddingBottom: 120 }}
+        >
           <View style={styles.card}>
 
-            {/* ── Required Dropdowns ── */}
             <DropdownField
               label="Call Status *"
               data={toOptions(AllCallStatus)}
@@ -367,7 +311,6 @@ const handleCreate = async () => {
               error={errors.rating_id}
             />
 
-            {/* ── Optional Date / Time fields ── */}
             <InputField
               label="Site Visit Date"
               placeholder="dd-mm-yyyy"
@@ -433,7 +376,7 @@ const handleCreate = async () => {
               />
             )}
 
-            {/* ── Remarks (Required) ── */}
+            {/* Remarks */}
             <View style={styles.field}>
               <Text style={styles.label}>Remarks *</Text>
               <TextInput
@@ -449,7 +392,7 @@ const handleCreate = async () => {
               ) : null}
             </View>
 
-            {/* ── Buttons ── */}
+            {/* Buttons */}
             <View style={styles.buttonRow}>
               <TouchableOpacity
                 style={styles.cancelBtn}
@@ -469,15 +412,10 @@ const handleCreate = async () => {
           </View>
         </ScrollView>
       </View>
-
-      {/* <BottomNav /> */}
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
-// ─────────────────────────────────────────
-// Styles
-// ─────────────────────────────────────────
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -535,14 +473,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#2b2f66',
     borderRadius: 6,
     padding: 10,
-    height: 80,
+    minHeight: 80,
     color: '#fff',
     textAlignVertical: 'top',
     borderWidth: 1,
     borderColor: 'transparent',
   },
-
-  // ── Validation ──
   inputError: {
     borderColor: '#ff5252',
     borderWidth: 1,
@@ -553,8 +489,6 @@ const styles = StyleSheet.create({
     marginTop: 3,
     marginLeft: 2,
   },
-
-  // ── Buttons ──
   buttonRow: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
@@ -583,8 +517,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
-
-  // ── Top Bar ──
   topBarContainer: {
     marginTop: 10,
   },

@@ -444,7 +444,7 @@ const TotalLeadScreen = () => {
             No data found
           </Text>
         )}
-
+         
         {isFetchingNextPage && (
           <ActivityIndicator
             size="small"
@@ -470,6 +470,7 @@ const TotalLeadScreen = () => {
             You've reached the end of the list.
           </Text>
         )}
+        <View style={{ height: 100 }} />
       </ScrollView>
 
       {/* REMARKS MODAL */}

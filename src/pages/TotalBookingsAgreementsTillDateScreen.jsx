@@ -289,6 +289,7 @@ const TotalBookingsAgreementsTillDateScreen = () => {
             No data found
           </Text>
         )}
+         <View style={{ height: 100 }} />
       </ScrollView>
       {/* ✅ REMARKS MODAL */}
       {showRemarks && (
