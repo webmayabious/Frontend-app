@@ -42,17 +42,37 @@ const downloadFile = (url) => {
 
   const fileName = url.split('/').pop();
 
-  ReactNativeBlobUtil.config({
-    fileCache: true,
-    addAndroidDownloads: {
-      useDownloadManager: true,
-      notification: true,
-      path: `${ReactNativeBlobUtil.fs.dirs.DownloadDir}/${fileName}`,
-    },
-  })
-    .fetch('GET', url)
-    .then(() => console.log('Downloaded'))
-    .catch(err => console.log(err));
+  if (Platform.OS === 'ios') {
+    // iOS has no public "Downloads" folder or DownloadManager like Android.
+    // Save into the app's Documents directory, then hand it to
+    // previewDocument() so the user gets the native preview/share sheet
+    // and can save it to Files, AirDrop it, etc.
+    const path = `${ReactNativeBlobUtil.fs.dirs.DocumentDir}/${fileName}`;
+
+    ReactNativeBlobUtil.config({
+      fileCache: true,
+      path,
+    })
+      .fetch('GET', url)
+      .then((res) => {
+        const filePath = res.path();
+        ReactNativeBlobUtil.ios.previewDocument(filePath);
+      })
+      .catch((err) => console.log('iOS download error:', err));
+  } else {
+    ReactNativeBlobUtil.config({
+      fileCache: true,
+      addAndroidDownloads: {
+        useDownloadManager: true,
+        notification: true,
+        title: fileName,
+        path: `${ReactNativeBlobUtil.fs.dirs.DownloadDir}/${fileName}`,
+      },
+    })
+      .fetch('GET', url)
+      .then(() => console.log('Downloaded'))
+      .catch((err) => console.log('Android download error:', err));
+  }
 };
 
 /*  SAFE INFO ROW */

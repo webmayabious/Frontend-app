@@ -304,7 +304,7 @@ export default function MeetingsEdit({ route }) {
     <KeyboardAvoidingView
       style={{ flex: 1, backgroundColor: '#1e2140' }}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 120 : 100}
     >
       <View style={styles.container}>
         <StatusBar barStyle="light-content" backgroundColor="#2B2E81" />
