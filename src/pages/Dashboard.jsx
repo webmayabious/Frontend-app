@@ -130,7 +130,7 @@ const Card = ({ icon, label, period, accent, value, onPress }) => (
 );
 
 /* ─────────────────────────────────────────
-   Main Screen
+   Main Screen 
 ───────────────────────────────────────── */
 const Dashboard = () => {
   const navigation = useNavigation();
@@ -210,6 +210,7 @@ const Dashboard = () => {
             onPress={() => navigation.navigate(card.route)}
           />
         ))}
+        <View style={{paddingBottom:60}}/>
       </ScrollView>
 
       {/* ✅ BottomNav fixed at bottom — no glitch */}

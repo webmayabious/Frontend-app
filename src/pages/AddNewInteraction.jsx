@@ -255,7 +255,8 @@ export default function AddNewInteraction({ route }) {
             <TouchableOpacity
               style={styles.backBtn}
               onPress={() =>
-                navigation.replace('AllInteractionsScreen', { id: route.params.id })
+                //navigation.replace('AllInteractionsScreen', { id: route.params.id })
+                navigation.goBack()
               }>
               <View style={styles.backButton}>
                 <Image
