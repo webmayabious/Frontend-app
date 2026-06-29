@@ -263,12 +263,11 @@ const FollowUpsScreen = () => {
     const name = item?.propertylead?.name?.toLowerCase() || '';
     const phone = item?.propertylead?.phone || '';
     const email = item?.propertylead?.email?.toLowerCase() || '';
-
+  const project =item?.propertylead?.propertyproject?.project_name?.toLowerCase() || '';
     const search = searchText.toLowerCase();
 
     return (
-      name.includes(search) || phone.includes(search) || email.includes(search)
-    );
+      name.includes(search) || phone.includes(search) || email.includes(search)||project.includes(search))
   });
   const meetings = data?.todays_meetings || [];
   // console.log('followUps', followUps);

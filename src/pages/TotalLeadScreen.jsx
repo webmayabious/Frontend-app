@@ -249,11 +249,20 @@ const TotalLeadScreen = () => {
     const name = item?.name?.toLowerCase() || '';
     const phone = item?.phone?.toString() || '';
     const email = item?.email?.toLowerCase() || '';
-
+    const project = item?.propertyproject?.project_name?.toLowerCase() || '';
+    const address = item?.propertylocation?.name?.toLowerCase()||'';
+    const rm = `${item?.relationshipManager?.usr_fname || ''} ${item?.relationshipManager?.usr_lname || ''}`
+  .trim()
+  .toLowerCase();
     const search = searchText.toLowerCase().trim();
 
     return (
-      name.includes(search) || phone.includes(search) || email.includes(search)
+      name.includes(search) ||
+      phone.includes(search) ||
+      email.includes(search) ||
+      project.includes(search)||
+      address.includes(search)||
+      rm.includes(search)
     );
   });
   // ✅ Infinite scroll handler — scroll position দেখে trigger করে
@@ -444,7 +453,7 @@ const TotalLeadScreen = () => {
             No data found
           </Text>
         )}
-         
+
         {isFetchingNextPage && (
           <ActivityIndicator
             size="small"
@@ -457,7 +466,7 @@ const TotalLeadScreen = () => {
         )}
 
         {/* ✅ End of list message */}
-        {!hasNextPage && leads.length > 0 && (
+        {/* {!hasNextPage && leads.length > 0 && (
           <Text
             style={{
               color: '#06f65a',
@@ -469,7 +478,7 @@ const TotalLeadScreen = () => {
           >
             You've reached the end of the list.
           </Text>
-        )}
+        )} */}
         <View style={{ height: 100 }} />
       </ScrollView>
 

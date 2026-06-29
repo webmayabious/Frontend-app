@@ -141,14 +141,11 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
     </View>
     <View style={styles.rowBetween}>
       <Text style={styles.label}>
-
         <Text style={styles.label}>
           Email:{' '}
           <Text style={styles.value}>{data?.propertylead?.email || 'N/A'}</Text>
         </Text>
       </Text>
-
-
     </View>
     <Text style={styles.label}>
       RM:{' '}
@@ -201,7 +198,7 @@ const SiteVisitsScreen = () => {
     status: null,
   });
   const [appliedFilters, setAppliedFilters] = useState();
-    const [showTopBtn, setShowTopBtn] = useState(false);
+  const [showTopBtn, setShowTopBtn] = useState(false);
   const [page, setPage] = useState(1);
   const [allData, setAllData] = useState([]);
   const [hasMore, setHasMore] = useState(true);
@@ -268,18 +265,20 @@ const SiteVisitsScreen = () => {
 
   const siteVisits = allData;
 
-
   // const siteVisits = data?.todays_siteVisit || [];
   // const siteVisits = data?.site_visits_till_dates || [];
   const filteredSiteVisits = siteVisits.filter(item => {
     const name = item?.propertylead?.name?.toLowerCase() || '';
     const phone = item?.propertylead?.phone || '';
     const email = item?.propertylead?.email?.toLowerCase() || '';
-
+    const project =item?.propertylead?.propertyproject?.project_name?.toLowerCase() || '';
     const search = searchText.toLowerCase();
 
     return (
-      name.includes(search) || phone.includes(search) || email.includes(search)
+      name.includes(search) ||
+      phone.includes(search) ||
+      email.includes(search) ||
+      project.includes(search)
     );
   });
   const scrollRef = useRef();
@@ -354,7 +353,6 @@ const SiteVisitsScreen = () => {
     setShowFilterModal(false);
   };
 
-
   return (
     <View style={styles.container}>
       <StatusBar
@@ -403,7 +401,8 @@ const SiteVisitsScreen = () => {
         ref={scrollRef}
         showsVerticalScrollIndicator={false}
         onScroll={e => {
-          const { layoutMeasurement, contentOffset, contentSize } = e.nativeEvent;
+          const { layoutMeasurement, contentOffset, contentSize } =
+            e.nativeEvent;
           const y = contentOffset.y;
           setShowTopBtn(y > 200);
 
@@ -424,7 +423,13 @@ const SiteVisitsScreen = () => {
             placeholderTextColor="#aaa"
             value={searchText}
             onChangeText={setSearchText}
-            style={{ marginLeft: 8, color: '#fff', flex: 1, height: '100%', paddingVertical: Platform.OS === 'ios' ? 0 : 6, }}
+            style={{
+              marginLeft: 8,
+              color: '#fff',
+              flex: 1,
+              height: '100%',
+              paddingVertical: Platform.OS === 'ios' ? 0 : 6,
+            }}
           />
         </View>
 
@@ -457,13 +462,14 @@ const SiteVisitsScreen = () => {
           </Text>
         )} */}
         {!hasMore && allData.length > 0 && (
-          <Text style={{ color: '#555', textAlign: 'center', paddingVertical: 16 }}>
+          <Text
+            style={{ color: '#555', textAlign: 'center', paddingVertical: 16 }}
+          >
             All data has been viewed ✓
           </Text>
         )}
 
         <View style={{ height: 100 }} />
-
       </ScrollView>
 
       {/* ✅ REMARKS MODAL */}
@@ -694,7 +700,7 @@ const styles = StyleSheet.create({
   },
 
   label: {
-    color: '#a0b4e8',    // muted blue-white — better contrast on dark bg
+    color: '#a0b4e8', // muted blue-white — better contrast on dark bg
     fontSize: 12,
     marginBottom: 5,
     fontWeight: '500',
@@ -751,9 +757,9 @@ const styles = StyleSheet.create({
 
   modalCard: {
     width: '88%',
-    backgroundColor: '#1a1f6b',       // deep navy base
+    backgroundColor: '#1a1f6b', // deep navy base
     borderWidth: 1,
-    borderColor: '#3d45b0',            // soft blue border
+    borderColor: '#3d45b0', // soft blue border
     borderRadius: 18,
     padding: 20,
     alignItems: 'center',
@@ -794,7 +800,9 @@ const styles = StyleSheet.create({
   },
 
   modalCloseText: {
-    color: '#fff', fontWeight: '600', fontSize: 14
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 14,
   },
   nameRow: {
     flexDirection: 'row',

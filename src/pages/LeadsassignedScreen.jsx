@@ -218,9 +218,10 @@ const isScrollingToTop = useRef(false);
     const name = item?.name?.toLowerCase() || '';
     const phone = item?.phone || '';
     const email = item?.email?.toLowerCase() || '';
+     const project =item?.propertyproject?.project_name?.toLowerCase() || '';
     const search = searchText.toLowerCase();
     return (
-      name.includes(search) || phone.includes(search) || email.includes(search)
+      name.includes(search) || phone.includes(search) || email.includes(search) || project.includes(search)
     );
   });
 
