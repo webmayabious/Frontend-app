@@ -16,7 +16,9 @@ import {
   Image,
   Platform,
   Linking,
-  Share
+  Share,
+  Modal,
+  FlatList,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -59,7 +61,149 @@ const COLORS = {
   sectionBg: 'rgba(255,255,255,0.13)',
 };
 
-// ─── DROPDOWN FIELD ───────────────────────────────────────────────────────────
+// ─── SEARCHABLE DROPDOWN ─────────────────────────────────────────────────────
+
+const SearchableDropdown = ({ label, data = [], placeholder, value, onChange }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const searchRef = useRef(null);
+
+  const selectedItem = data.find(item => item.value === value);
+  const filtered = data.filter(item =>
+    item.label.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const handleOpen = () => {
+    setIsOpen(true);
+    setSearch('');
+    setTimeout(() => searchRef.current?.focus(), 150);
+  };
+
+  const handleSelect = (item) => {
+    onChange && onChange(item.value);
+    setIsOpen(false);
+    setSearch('');
+  };
+
+  const handleClear = () => {
+    onChange && onChange(null);
+    setIsOpen(false);
+    setSearch('');
+  };
+
+  return (
+    <View style={styles.inputWrapper}>
+      {label ? <Text style={styles.dropLabel}>{label}</Text> : null}
+
+      <TouchableOpacity activeOpacity={0.8} onPress={handleOpen} style={styles.sdTrigger}>
+        <Text
+          style={[styles.sdTriggerText, !selectedItem && { color: COLORS.mutedText }]}
+          numberOfLines={1}
+        >
+          {selectedItem ? selectedItem.label : placeholder}
+        </Text>
+        <View style={styles.sdTriggerIcons}>
+          {selectedItem ? (
+            <TouchableOpacity
+              onPress={handleClear}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Icon name="close" size={15} color={COLORS.mutedText} />
+            </TouchableOpacity>
+          ) : null}
+          <Icon name="keyboard-arrow-down" size={20} color={COLORS.accent} />
+        </View>
+      </TouchableOpacity>
+
+      <Modal
+        visible={isOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsOpen(false)}
+      >
+        <TouchableOpacity
+          style={styles.sdOverlay}
+          activeOpacity={1}
+          onPress={() => { setIsOpen(false); setSearch(''); }}
+        >
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={styles.sdKAV}
+          >
+            <TouchableOpacity activeOpacity={1}>
+              <View style={styles.sdContainer}>
+                {/* Header */}
+                <View style={styles.sdHeader}>
+                  <Text style={styles.sdTitle}>{label || placeholder}</Text>
+                  <TouchableOpacity onPress={() => { setIsOpen(false); setSearch(''); }}>
+                    <Icon name="close" size={20} color={COLORS.mutedText} />
+                  </TouchableOpacity>
+                </View>
+
+                {/* Search Box */}
+                <View style={styles.sdSearchBox}>
+                  <Icon name="search" size={16} color={COLORS.accent} />
+                  <TextInput
+                    ref={searchRef}
+                    style={styles.sdSearchInput}
+                    placeholder="Search..."
+                    placeholderTextColor={COLORS.mutedText}
+                    value={search}
+                    onChangeText={setSearch}
+                    autoCorrect={false}
+                  />
+                  {search ? (
+                    <TouchableOpacity onPress={() => setSearch('')}>
+                      <Icon name="close" size={14} color={COLORS.mutedText} />
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
+
+                {/* Count */}
+                <Text style={styles.sdCount}>
+                  {filtered.length} result{filtered.length !== 1 ? 's' : ''}
+                </Text>
+
+                {/* List */}
+                <FlatList
+                  data={filtered}
+                  keyExtractor={item => String(item.value)}
+                  style={styles.sdList}
+                  keyboardShouldPersistTaps="handled"
+                  renderItem={({ item }) => {
+                    const isSelected = item.value === value;
+                    return (
+                      <TouchableOpacity
+                        style={[styles.sdItem, isSelected && styles.sdItemSelected]}
+                        onPress={() => handleSelect(item)}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={[styles.sdItemText, isSelected && styles.sdItemTextSelected]}>
+                          {item.label}
+                        </Text>
+                        {isSelected && (
+                          <Icon name="check-circle" size={16} color={COLORS.accent} />
+                        )}
+                      </TouchableOpacity>
+                    );
+                  }}
+                  ListEmptyComponent={
+                    <View style={styles.sdEmpty}>
+                      <Icon name="search-off" size={28} color={COLORS.mutedText} />
+                      <Text style={styles.sdEmptyText}>No results found</Text>
+                    </View>
+                  }
+                />
+              </View>
+            </TouchableOpacity>
+          </KeyboardAvoidingView>
+        </TouchableOpacity>
+      </Modal>
+    </View>
+  );
+};
+
+// ─── DROPDOWN FIELD (upload modal এ ব্যবহার হচ্ছে — রাখা হয়েছে) ─────────────
 
 const DropdownField = ({ label, data, placeholder, value, onChange }) => {
   const [isFocus, setIsFocus] = React.useState(false);
@@ -134,7 +278,7 @@ const makeCall = phoneNumber => {
 
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
 
-const AssignRM = ({setHideBottomNav}) => {
+const AssignRM = ({ setHideBottomNav }) => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const [selected, setSelected] = useState([]);
@@ -166,48 +310,37 @@ const AssignRM = ({setHideBottomNav}) => {
 
   const filterAnim = useRef(new Animated.Value(screenHeight)).current;
 
-  // ✅ Role check — adjust based on your Redux state shape
   const userRole = useSelector(state => state.userRole);
   const isAdmin = userRole?.includes('ADMIN');
-  // ✅ Business role = NOT admin
   const isBusiness = !isAdmin;
 
   useEffect(() => { fetchRMList(); }, []);
 
   // ── Bottom Sheet ──
-  // const openFilterModal = () => {
-  //   setShowFilterModal(true);
-  //   Animated.spring(filterAnim, { toValue: 0, useNativeDriver: true, damping: 15 }).start();
-  // };
+  const openFilterModal = () => {
+    setHideBottomNav(true);
+    setShowFilterModal(true);
+    filterAnim.setValue(screenHeight);
+    requestAnimationFrame(() => {
+      Animated.spring(filterAnim, {
+        toValue: 0,
+        useNativeDriver: true,
+        damping: 18,
+      }).start();
+    });
+  };
 
-  // const closeFilterModal = () => {
-  //   Animated.timing(filterAnim, { toValue: screenHeight, duration: 280, useNativeDriver: true })
-  //     .start(() => setShowFilterModal(false));
-  // };
-const openFilterModal = () => {
-  setHideBottomNav(true);   // 👈 instant hide
-  setShowFilterModal(true);
-
-  filterAnim.setValue(screenHeight);
-
-  requestAnimationFrame(() => {
-    Animated.spring(filterAnim, {
-      toValue: 0,
+  const closeFilterModal = () => {
+    Animated.timing(filterAnim, {
+      toValue: screenHeight,
+      duration: 250,
       useNativeDriver: true,
-      damping: 18,
-    }).start();
-  });
-};
- const closeFilterModal = () => {
-  Animated.timing(filterAnim, {
-    toValue: screenHeight,
-    duration: 250,
-    useNativeDriver: true,
-  }).start(() => {
-    setShowFilterModal(false);
-    setHideBottomNav(false);   // 🔥 IMPORTANT
-  });
-};
+    }).start(() => {
+      setShowFilterModal(false);
+      setHideBottomNav(false);
+    });
+  };
+
   // ── Date ──
   const formatDate = date => {
     if (!date) return '';
@@ -299,20 +432,11 @@ const openFilterModal = () => {
   // ── Assign RM ──
   const handleAssignRM = async () => {
     if (!selectedRM) {
-      Alert.alert(
-        '⚠️ No RM Selected',
-        'Please select a Relationship Manager before assigning.',
-        [{ text: 'OK', style: 'default' }]
-      );
+      Alert.alert('⚠️ No RM Selected', 'Please select a Relationship Manager before assigning.', [{ text: 'OK', style: 'default' }]);
       return;
     }
-
     if (selectedLeadIds.length === 0) {
-      Alert.alert(
-        '⚠️ No Leads Selected',
-        'Please select at least one lead to assign.',
-        [{ text: 'OK', style: 'default' }]
-      );
+      Alert.alert('⚠️ No Leads Selected', 'Please select at least one lead to assign.', [{ text: 'OK', style: 'default' }]);
       return;
     }
     setAssigning(true);
@@ -321,38 +445,15 @@ const openFilterModal = () => {
         rm_id: selectedRM,
         property_lead_id: selectedLeadIds,
       });
-
       if (res?.data?.status) {
-        Alert.alert(
-          '✅ Assigned Successfully',
-          res?.data?.message || 'RM has been assigned to the selected leads.',
-          [
-            {
-              text: 'OK',
-              style: 'default',
-              onPress: () => {
-                setShowModal(false);
-                setSelected([]);
-                setSelectedRM(null);
-                rmrefetch();
-              },
-            },
-          ],
-          { cancelable: false }
-        );
+        Alert.alert('✅ Assigned Successfully', res?.data?.message || 'RM has been assigned to the selected leads.', [
+          { text: 'OK', style: 'default', onPress: () => { setShowModal(false); setSelected([]); setSelectedRM(null); rmrefetch(); } },
+        ], { cancelable: false });
       } else {
-        Alert.alert(
-          '❌ Assignment Failed',
-          res?.data?.message || 'Failed to assign RM. Please try again.',
-          [{ text: 'OK', style: 'cancel' }]
-        );
+        Alert.alert('❌ Assignment Failed', res?.data?.message || 'Failed to assign RM. Please try again.', [{ text: 'OK', style: 'cancel' }]);
       }
     } catch (error) {
-      Alert.alert(
-        '❌ Error',
-        'Something went wrong. Please try again.',
-        [{ text: 'OK', style: 'cancel' }]
-      );
+      Alert.alert('❌ Error', 'Something went wrong. Please try again.', [{ text: 'OK', style: 'cancel' }]);
     } finally {
       setAssigning(false);
     }
@@ -387,61 +488,31 @@ const openFilterModal = () => {
   // ── Download Format ──
   const handleDownloadFormat = async () => {
     const fileName = 'mulyam_new.xlsx';
-
     try {
       if (Platform.OS === 'android') {
-        // Android 9 (API 28) এর নিচে permission দরকার
         if (Platform.Version < 29) {
-          const granted = await PermissionsAndroid.request(
-            PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE
-          );
+          const granted = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE);
           if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
             Alert.alert('Permission Denied', 'Storage permission is required.');
             return;
           }
         }
-
-        // Assets থেকে read করো
         const assetContent = await RNFS.readFileAssets(fileName, 'base64');
-
-        // Downloads folder এ save করো (সবাই দেখতে পাবে)
         const destPath = `${RNFS.DownloadDirectoryPath}/${fileName}`;
-
         await RNFS.writeFile(destPath, assetContent, 'base64');
-
-        // Notification
-        await notifee.createChannel({
-          id: 'download',
-          name: 'Downloads',
-          importance: AndroidImportance.HIGH,
-        });
-
-        await notifee.displayNotification({
-          title: 'Download Complete ✅',
-          body: `File saved: ${destPath}`,
-          android: { channelId: 'download' },
-        });
-
+        await notifee.createChannel({ id: 'download', name: 'Downloads', importance: AndroidImportance.HIGH });
+        await notifee.displayNotification({ title: 'Download Complete ✅', body: `File saved: ${destPath}`, android: { channelId: 'download' } });
         Alert.alert('Success', 'File saved to Downloads folder!');
-
       } else {
-        // iOS — আগের মতোই
         const destPath = `${RNFS.DocumentDirectoryPath}/${fileName}`;
         const sourcePath = `${RNFS.MainBundlePath}/${fileName}`;
-
         const sourceExists = await RNFS.exists(sourcePath);
-        if (!sourceExists) {
-          Alert.alert('Error', 'Template file not found in bundle.');
-          return;
-        }
-
+        if (!sourceExists) { Alert.alert('Error', 'Template file not found in bundle.'); return; }
         const destExists = await RNFS.exists(destPath);
         if (destExists) await RNFS.unlink(destPath);
-
         await RNFS.copyFile(sourcePath, destPath);
         await Share.share({ url: `file://${destPath}` });
       }
-
     } catch (err) {
       console.log('❌ Download Error:', err);
       Alert.alert('Error', err.message || 'Could not download the file.');
@@ -458,169 +529,69 @@ const openFilterModal = () => {
     }
   };
 
-
   const handleUpload = async () => {
-    // ── Validation ──
     if (isAdmin) {
       if (!uploadProspect.reference || !uploadProspect.com_id || !selectedFile) {
-        Alert.alert(
-          '⚠️ Missing Fields',
-          'Please select Reference, Company and File',
-          [{ text: 'OK', style: 'default' }]
-        );
+        Alert.alert('⚠️ Missing Fields', 'Please select Reference, Company and File', [{ text: 'OK', style: 'default' }]);
         return;
       }
     } else {
       if (!uploadProspect.reference || !uploadProspect.location || !selectedFile) {
-        Alert.alert(
-          '⚠️ Missing Fields',
-          'Please select Location, Reference and File',
-          [{ text: 'OK', style: 'default' }]
-        );
+        Alert.alert('⚠️ Missing Fields', 'Please select Location, Reference and File', [{ text: 'OK', style: 'default' }]);
         return;
       }
     }
-
     setUploading(true);
     try {
       const formData = new FormData();
-      formData.append('excelUpload', {
-        uri: selectedFile.uri,
-        type: selectedFile.type,
-        name: selectedFile.name,
-      });
+      formData.append('excelUpload', { uri: selectedFile.uri, type: selectedFile.type, name: selectedFile.name });
       formData.append('reference', String(uploadProspect.reference));
       formData.append('location', String(uploadProspect.location || ''));
-
-      if (isAdmin && uploadProspect.com_id) {
-        formData.append('com_id', String(uploadProspect.com_id));
-      }
-
-      const res = await api.post('/api/pm/uploadPropertyLeadFromExcel', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-
-      console.log('UPLOAD RES:', JSON.stringify(res?.data));
-
+      if (isAdmin && uploadProspect.com_id) formData.append('com_id', String(uploadProspect.com_id));
+      const res = await api.post('/api/pm/uploadPropertyLeadFromExcel', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
       const resData = res?.data;
       const insertedCount = resData?.insertedCount ?? 0;
       const skippedCount = resData?.skippedCount ?? 0;
       const errorRows = resData?.errorRows ?? [];
-
-      // ── সব duplicate, কিছুই insert হয়নি ──
       if (resData?.status === true && insertedCount === 0 && errorRows.length > 0) {
-        const duplicateDetails = errorRows
-          .map((e, i) => `${i + 1}. ${e.row?.name} (${e.row?.phone})\n    ↳ ${e.reason}`)
-          .join('\n');
-
-        Alert.alert(
-          '⚠️ Duplicate Entries Found',
-          `All ${skippedCount} entries already exist in the system.\n\n${duplicateDetails}\n\nPlease remove duplicates and try again.`,
-          [{ text: 'OK', style: 'default' }]
-        );
+        const duplicateDetails = errorRows.map((e, i) => `${i + 1}. ${e.row?.name} (${e.row?.phone})\n    ↳ ${e.reason}`).join('\n');
+        Alert.alert('⚠️ Duplicate Entries Found', `All ${skippedCount} entries already exist.\n\n${duplicateDetails}`, [{ text: 'OK', style: 'default' }]);
         setSelectedFile(null);
-
-        // ── কিছু insert হয়েছে, কিছু duplicate ──
       } else if (resData?.status === true && insertedCount > 0 && errorRows.length > 0) {
-        const duplicateDetails = errorRows
-          .map((e, i) => `${i + 1}. ${e.row?.name} (${e.row?.phone})\n    ↳ ${e.reason}`)
-          .join('\n');
-
-        Alert.alert(
-          '⚠️ Partial Upload',
-          `✅ ${insertedCount} leads uploaded successfully.\n⚠️ ${skippedCount} entries skipped:\n\n${duplicateDetails}`,
-          [
-            {
-              text: 'OK',
-              style: 'default',
-              onPress: () => {
-                setUploadProspect({ reference: null, com_id: null, location: null });
-                setSelectedFile(null);
-                setShowUploadModal(false);
-                rmrefetch();
-              },
-            },
-          ]
-        );
-
-        // ── সব successfully insert হয়েছে ──
+        const duplicateDetails = errorRows.map((e, i) => `${i + 1}. ${e.row?.name} (${e.row?.phone})\n    ↳ ${e.reason}`).join('\n');
+        Alert.alert('⚠️ Partial Upload', `✅ ${insertedCount} leads uploaded.\n⚠️ ${skippedCount} skipped:\n\n${duplicateDetails}`, [
+          { text: 'OK', style: 'default', onPress: () => { setUploadProspect({ reference: null, com_id: null, location: null }); setSelectedFile(null); setShowUploadModal(false); rmrefetch(); } },
+        ]);
       } else if (resData?.status === true && insertedCount > 0 && errorRows.length === 0) {
-        Alert.alert(
-          '✅ Upload Successful',
-          `${insertedCount} leads uploaded successfully!`,
-          [
-            {
-              text: 'OK',
-              style: 'default',
-              onPress: () => {
-                setUploadProspect({ reference: null, com_id: null, location: null });
-                setSelectedFile(null);
-                setShowUploadModal(false);
-                rmrefetch();
-              },
-            },
-          ]
-        );
-
-        // ── status false ──
+        Alert.alert('✅ Upload Successful', `${insertedCount} leads uploaded successfully!`, [
+          { text: 'OK', style: 'default', onPress: () => { setUploadProspect({ reference: null, com_id: null, location: null }); setSelectedFile(null); setShowUploadModal(false); rmrefetch(); } },
+        ]);
       } else {
-        Alert.alert(
-          '❌ Upload Failed',
-          resData?.message || 'Upload failed. Please try again.',
-          [{ text: 'OK', style: 'cancel' }]
-        );
+        Alert.alert('❌ Upload Failed', resData?.message || 'Upload failed.', [{ text: 'OK', style: 'cancel' }]);
       }
-
     } catch (err) {
-      console.log('UPLOAD ERROR:', err?.response?.data || err);
-
       const errMsg = err?.response?.data?.message || '';
       const errStatus = err?.response?.status;
-
-      if (
-        errStatus === 409 ||
-        errMsg.toLowerCase().includes('duplicate') ||
-        errMsg.toLowerCase().includes('already exists') ||
-        errMsg.toLowerCase().includes('already exist') ||
-        errMsg.toLowerCase().includes('phone') ||
-        errMsg.toLowerCase().includes('exist')
-      ) {
-        Alert.alert(
-          '⚠️ Duplicate Entries Found',
-          `${errMsg || 'Some entries already exist in the system.'}\n\nPlease remove duplicate phone numbers or names and try again.`,
-          [{ text: 'OK', style: 'default' }]
-        );
+      if (errStatus === 409 || errMsg.toLowerCase().includes('duplicate') || errMsg.toLowerCase().includes('already exist') || errMsg.toLowerCase().includes('phone') || errMsg.toLowerCase().includes('exist')) {
+        Alert.alert('⚠️ Duplicate Entries Found', `${errMsg || 'Some entries already exist.'}\n\nPlease remove duplicate entries and try again.`, [{ text: 'OK', style: 'default' }]);
         setSelectedFile(null);
       } else {
-        Alert.alert(
-          '❌ Something Went Wrong',
-          errMsg || 'An unexpected error occurred. Please try again.',
-          [{ text: 'OK', style: 'cancel' }]
-        );
+        Alert.alert('❌ Something Went Wrong', errMsg || 'An unexpected error occurred.', [{ text: 'OK', style: 'cancel' }]);
       }
-
     } finally {
       setUploading(false);
     }
   };
 
-  // ── Reset upload modal ──
   const closeUploadModal = () => {
     setUploadProspect({ reference: null, com_id: null, location: null });
     setSelectedFile(null);
     setShowUploadModal(false);
   };
 
-  const onChange = (key, value) => {
-    setUploadProspect(prev => ({ ...prev, [key]: value }));
-  };
-
-  const onFilterChange = (key, value) => {
-    setFilters(prev => ({ ...prev, [key]: value }));
-  };
-
+  const onChange = (key, value) => setUploadProspect(prev => ({ ...prev, [key]: value }));
+  const onFilterChange = (key, value) => setFilters(prev => ({ ...prev, [key]: value }));
   const applyFilter = () => { setAppliedFilters(filters); closeFilterModal(); };
-
   const resetFilters = () => {
     const cleared = { fromDate: null, toDate: null, project: null, location: null };
     setFilters(cleared);
@@ -628,19 +599,19 @@ const openFilterModal = () => {
     closeFilterModal();
   };
 
+  useEffect(() => {
+    navigation.setParams({ hideBottomNav: showFilterModal });
+  }, [showFilterModal]);
+
   // ─── RENDER ───────────────────────────────────────────────────────────────
-useEffect(() => {
-  navigation.setParams({ hideBottomNav: showFilterModal });
-}, [showFilterModal]);
+
   return (
     <View style={styles.container}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
-
-        {/* <Header /> */}
+        <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
         {/* ── Section Header ── */}
         <View style={styles.sectionHeader}>
@@ -653,16 +624,9 @@ useEffect(() => {
               </View>
             ) : null}
           </View>
-          <TouchableOpacity
-            style={styles.closeBtn}
-            onPress={() => navigation.goBack()}
-            activeOpacity={0.75}
-          >
+          <TouchableOpacity style={styles.closeBtn} onPress={() => navigation.goBack()} activeOpacity={0.75}>
             <View style={styles.backButton}>
-              <Image
-                source={require('../asset/image/icon/Arrow.png')}
-                style={{ width: 11, height: 11, marginRight: 4 }}
-              />
+              <Image source={require('../asset/image/icon/Arrow.png')} style={{ width: 11, height: 11, marginRight: 4 }} />
               <Text style={styles.closeBtnText}>Back</Text>
             </View>
           </TouchableOpacity>
@@ -674,11 +638,7 @@ useEffect(() => {
             style={styles.actionBtn}
             onPress={() => {
               if (selected.length === 0) {
-                Alert.alert(
-                  '⚠️ No Leads Selected',
-                  'Please select at least one lead to assign an RM.',
-                  [{ text: 'OK', style: 'default' }]
-                );
+                Alert.alert('⚠️ No Leads Selected', 'Please select at least one lead to assign an RM.', [{ text: 'OK', style: 'default' }]);
                 return;
               }
               setShowModal(true);
@@ -689,26 +649,14 @@ useEffect(() => {
             <Text style={styles.actionBtnText}>Assign RM</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.actionBtn}
-            onPress={() => navigation.navigate('Rmform')}
-            activeOpacity={0.75}
-          >
+          <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('Rmform')} activeOpacity={0.75}>
             <Icon name="add" size={13} color="#fff" />
-            <Text style={styles.actionBtnText} numberOfLines={1} adjustsFontSizeToFit>
-              Add New Lead
-            </Text>
+            <Text style={styles.actionBtnText} numberOfLines={1} adjustsFontSizeToFit>Add New Lead</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.actionBtn}
-            onPress={() => setShowUploadModal(true)}
-            activeOpacity={0.75}
-          >
+          <TouchableOpacity style={styles.actionBtn} onPress={() => setShowUploadModal(true)} activeOpacity={0.75}>
             <Icon name="upload-file" size={13} color="#fff" />
-            <Text style={styles.actionBtnText} numberOfLines={1} adjustsFontSizeToFit>
-              Upload List
-            </Text>
+            <Text style={styles.actionBtnText} numberOfLines={1} adjustsFontSizeToFit>Upload List</Text>
           </TouchableOpacity>
         </View>
 
@@ -768,10 +716,7 @@ useEffect(() => {
             filteredrm?.map((item, index) => {
               const isChecked = selected.includes(index);
               return (
-                <View
-                  key={item.id}
-                  style={[styles.card, isChecked && styles.cardSelected]}
-                >
+                <View key={item.id} style={[styles.card, isChecked && styles.cardSelected]}>
                   <View style={styles.cardTop}>
                     <View style={styles.nameRow}>
                       <TouchableOpacity
@@ -782,27 +727,20 @@ useEffect(() => {
                       </TouchableOpacity>
                       <View style={styles.nameIndicator} />
                       <Text style={styles.cardName}>{item.name} |{' '}
-                        <Text style={styles.section}>
-                          {item?.propertyproject?.project_name}
-                        </Text>
+                        <Text style={styles.section}>{item?.propertyproject?.project_name}</Text>
                       </Text>
                     </View>
                     <View style={styles.iconRow}>
-                      <TouchableOpacity
-                        onPress={() => handleDeleteProspect(item?.id, item?.active == 1 ? 0 : 1)}
-                      >
+                      <TouchableOpacity onPress={() => handleDeleteProspect(item?.id, item?.active == 1 ? 0 : 1)}>
                         <Icon name="delete" size={16} color={COLORS.red} />
                       </TouchableOpacity>
-                      <TouchableOpacity
-                        onPress={() => navigation.navigate('MeetingsEdit', { id: item?.id })}
-                      >
+                      <TouchableOpacity onPress={() => navigation.navigate('MeetingsEdit', { id: item?.id })}>
                         <Icon name="edit" size={16} color={COLORS.accent} />
                       </TouchableOpacity>
                     </View>
                   </View>
 
                   <View style={styles.divider} />
-
                   <Text style={styles.sectionLabel}>Contact Details:</Text>
 
                   <View style={styles.contactRow}>
@@ -814,9 +752,7 @@ useEffect(() => {
                     </View>
                     <View style={styles.contactItem}>
                       <Icon name="email" size={12} color={COLORS.accent} />
-                      <Text style={styles.infoText} numberOfLines={1}>
-                        {item?.email || 'N/A'}
-                      </Text>
+                      <Text style={styles.infoText} numberOfLines={1}>{item?.email || 'N/A'}</Text>
                     </View>
                   </View>
 
@@ -858,11 +794,7 @@ useEffect(() => {
               {rmLoading ? (
                 <ActivityIndicator color={COLORS.accent} style={{ marginVertical: 20 }} />
               ) : (
-                <ScrollView
-                  style={styles.dropdownList}
-                  nestedScrollEnabled={true}
-                  showsVerticalScrollIndicator={true}
-                >
+                <ScrollView style={styles.dropdownList} nestedScrollEnabled showsVerticalScrollIndicator>
                   {rmList.length === 0 ? (
                     <Text style={styles.noRMText}>No RM found</Text>
                   ) : (
@@ -893,17 +825,12 @@ useEffect(() => {
               {selectedRM && (
                 <View style={styles.selectedRMBadge}>
                   <Icon name="person-pin" size={14} color={COLORS.accent} />
-                  <Text style={styles.selectedRMText}>
-                    {rmList.find(r => r.id === selectedRM)?.name}
-                  </Text>
+                  <Text style={styles.selectedRMText}>{rmList.find(r => r.id === selectedRM)?.name}</Text>
                 </View>
               )}
 
               <View style={styles.modalBtnRow}>
-                <TouchableOpacity
-                  style={styles.cancelBtn}
-                  onPress={() => { setShowModal(false); setSelectedRM(null); }}
-                >
+                <TouchableOpacity style={styles.cancelBtn} onPress={() => { setShowModal(false); setSelectedRM(null); }}>
                   <Text style={styles.cancelBtnText}>Cancel</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -921,7 +848,7 @@ useEffect(() => {
           </View>
         )}
 
-        {/* ✅ FIXED Upload Modal ── */}
+        {/* ── Upload Modal ── */}
         {showUploadModal && (
           <View style={styles.modalOverlay}>
             <View style={styles.uploadModalContainer}>
@@ -935,26 +862,15 @@ useEffect(() => {
                 </TouchableOpacity>
               </View>
 
-              {/* ✅ Role Badge */}
               <View style={styles.roleBadge}>
-                <Icon
-                  name={isAdmin ? 'admin-panel-settings' : 'business'}
-                  size={12}
-                  color={isAdmin ? COLORS.gold : COLORS.accent}
-                />
+                <Icon name={isAdmin ? 'admin-panel-settings' : 'business'} size={12} color={isAdmin ? COLORS.gold : COLORS.accent} />
                 <Text style={[styles.roleBadgeText, { color: isAdmin ? COLORS.gold : COLORS.accent }]}>
                   {isAdmin ? 'Admin Upload' : 'Business Upload'}
                 </Text>
               </View>
 
-              <ScrollView
-                style={{ width: '100%' }}
-                showsVerticalScrollIndicator={false}
-                keyboardShouldPersistTaps="handled"
-              >
+              <ScrollView style={{ width: '100%' }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                 <View style={styles.formBox}>
-
-                  {/* ✅ Location — সবার জন্য */}
                   <DropdownField
                     label="Location of Property *"
                     data={Property}
@@ -962,8 +878,6 @@ useEffect(() => {
                     value={uploadProspect.location}
                     onChange={value => onChange('location', value)}
                   />
-
-                  {/* ✅ Reference — সবার জন্য */}
                   <DropdownField
                     label="Reference *"
                     data={References}
@@ -971,8 +885,6 @@ useEffect(() => {
                     value={uploadProspect.reference}
                     onChange={value => onChange('reference', value)}
                   />
-
-                  {/* ✅ Company — শুধু Admin এর জন্য */}
                   {isAdmin && (
                     <DropdownField
                       label="Company *"
@@ -983,7 +895,6 @@ useEffect(() => {
                     />
                   )}
 
-                  {/* ✅ File Picker + Upload Button */}
                   <Text style={styles.dropLabel}>Excel / CSV File *</Text>
                   <View style={styles.uploadRow}>
                     <TouchableOpacity style={styles.browseBtn} onPress={pickExcelFile}>
@@ -1004,13 +915,10 @@ useEffect(() => {
                     </TouchableOpacity>
                   </View>
 
-                  {/* ✅ Selected file info */}
                   {selectedFile && (
                     <View style={styles.fileInfoRow}>
                       <Icon name="insert-drive-file" size={13} color={COLORS.green} />
-                      <Text style={styles.fileInfoText} numberOfLines={1}>
-                        {selectedFile.name}
-                      </Text>
+                      <Text style={styles.fileInfoText} numberOfLines={1}>{selectedFile.name}</Text>
                       <TouchableOpacity onPress={() => setSelectedFile(null)}>
                         <Icon name="close" size={13} color={COLORS.red} />
                       </TouchableOpacity>
@@ -1018,12 +926,9 @@ useEffect(() => {
                   )}
                 </View>
 
-                {/* ✅ Download Format Card */}
                 <View style={styles.downloadCard}>
                   <Text style={styles.downloadTitle}>📄 Download Format</Text>
-                  <Text style={styles.downloadDesc}>
-                    Download the template file to prepare your lead data for upload.
-                  </Text>
+                  <Text style={styles.downloadDesc}>Download the template file to prepare your lead data for upload.</Text>
                   <TouchableOpacity style={styles.downloadBtn} onPress={handleDownloadFormat}>
                     <Icon name="download" size={15} color="#000" />
                     <Text style={styles.downloadBtnText}>Download Template</Text>
@@ -1031,10 +936,7 @@ useEffect(() => {
                 </View>
               </ScrollView>
 
-              <TouchableOpacity
-                style={styles.cancelBtnBottom}
-                onPress={closeUploadModal}
-              >
+              <TouchableOpacity style={styles.cancelBtnBottom} onPress={closeUploadModal}>
                 <Text style={styles.cancelBtnBottomText}>Cancel</Text>
               </TouchableOpacity>
             </View>
@@ -1043,7 +945,10 @@ useEffect(() => {
 
         {/* ── Filter Bottom Sheet ── */}
         {showFilterModal && (
-          <View style={styles.bottomSheetOverlay}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={styles.bottomSheetOverlay}
+          >
             <TouchableOpacity
               style={StyleSheet.absoluteFill}
               activeOpacity={1}
@@ -1066,21 +971,27 @@ useEffect(() => {
 
               <View style={styles.filterDivider} />
 
-              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 8 }}>
-                <DropdownField
+              {/* ✅ SearchableDropdown — filter এর ভেতরে */}
+              <ScrollView
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ paddingBottom: 8 }}
+                keyboardShouldPersistTaps="handled"
+              >
+                <SearchableDropdown
                   label="Property Location"
                   data={Property}
                   placeholder="Select location"
                   value={filters.location}
                   onChange={value => onFilterChange('location', value)}
                 />
-                <DropdownField
+                <SearchableDropdown
                   label="Project"
                   data={projectOptions}
                   placeholder="Select project"
                   value={filters.project}
                   onChange={value => onFilterChange('project', value)}
                 />
+
                 <Text style={styles.filterLabel}>Date Range</Text>
                 <View style={styles.dateRow}>
                   <View style={styles.dateField}>
@@ -1142,10 +1053,9 @@ useEffect(() => {
                 </View>
               </View>
             </Animated.View>
-          </View>
+          </KeyboardAvoidingView>
         )}
 
-        {/* <BottomNav style={{ paddingBottom: insets.bottom }} /> */}
       </KeyboardAvoidingView>
     </View>
   );
@@ -1160,512 +1070,149 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.bg },
   scrollView: { flex: 1 },
   scrollContent: { paddingHorizontal: 12, paddingBottom: 100 },
-  centeredText: {
-    color: COLORS.white,
-    textAlign: 'center',
-    marginTop: 24,
-    fontSize: 14,
-    opacity: 0.7,
-  },
+  centeredText: { color: COLORS.white, textAlign: 'center', marginTop: 24, fontSize: 14, opacity: 0.7 },
 
   sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: COLORS.sectionBg,
-    borderRadius: 20,
-    marginHorizontal: 12,
-    marginTop: 10,
-    marginBottom: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: COLORS.sectionBg, borderRadius: 20, marginHorizontal: 12,
+    marginTop: 10, marginBottom: 10, paddingHorizontal: 14, paddingVertical: 8,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)',
   },
-  sectionTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 7,
-    flex: 1,
-  },
+  sectionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 7, flex: 1 },
   sectionTitle: { color: COLORS.white, fontSize: 14, fontWeight: '700' },
-  recordBadge: {
-    backgroundColor: COLORS.goldDim,
-    borderWidth: 1,
-    borderColor: COLORS.goldBorder,
-    borderRadius: 20,
-    paddingHorizontal: 9,
-    paddingVertical: 2,
-  },
+  recordBadge: { backgroundColor: COLORS.goldDim, borderWidth: 1, borderColor: COLORS.goldBorder, borderRadius: 20, paddingHorizontal: 9, paddingVertical: 2 },
   recordText: { color: COLORS.gold, fontSize: 10, fontWeight: '600' },
-  closeBtn: {
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.22)',
-  },
+  closeBtn: { backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 16, paddingHorizontal: 12, paddingVertical: 5, borderWidth: 1, borderColor: 'rgba(255,255,255,0.22)' },
   closeBtnText: { color: COLORS.white, fontSize: 11, fontWeight: '600' },
   backButton: { flexDirection: 'row', alignItems: 'center' },
 
-  buttonRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: 12,
-    marginBottom: 10,
-    gap: 6,
-  },
-  actionBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(58,63,122,0.85)',
-    paddingVertical: 8,
-    paddingHorizontal: 6,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: COLORS.borderColor,
-    minHeight: 36,
-  },
+  buttonRow: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 12, marginBottom: 10, gap: 6 },
+  actionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, backgroundColor: 'rgba(58,63,122,0.85)', paddingVertical: 8, paddingHorizontal: 6, borderRadius: 20, borderWidth: 1, borderColor: COLORS.borderColor, minHeight: 36 },
   actionBtnText: { color: COLORS.white, fontSize: 11, fontWeight: '600', textAlign: 'center' },
 
-  searchBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: COLORS.borderColor,
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    height: 40,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    marginBottom: 8,
-    marginTop: 2,
-  },
-  searchInput: {
-    color: COLORS.white,
-    marginLeft: 8,
-    fontSize: 13,
-    flex: 1,
-    paddingVertical: 0,
-  },
+  searchBox: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: COLORS.borderColor, borderRadius: 20, paddingHorizontal: 12, height: 40, backgroundColor: 'rgba(255,255,255,0.06)', marginBottom: 8, marginTop: 2 },
+  searchInput: { color: COLORS.white, marginLeft: 8, fontSize: 13, flex: 1, paddingVertical: 0 },
 
-  selectAllRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 10,
-    paddingHorizontal: 2,
-  },
-  selectAllLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    flexShrink: 1,
-    gap: 8,
-  },
+  selectAllRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, paddingHorizontal: 2 },
+  selectAllLeft: { flexDirection: 'row', alignItems: 'center', flex: 1, flexShrink: 1, gap: 8 },
   selectAllText: { color: COLORS.white, fontSize: 13, fontWeight: '500' },
-  selectedBadge: {
-    backgroundColor: COLORS.accentDim,
-    borderWidth: 1,
-    borderColor: COLORS.accentBorder,
-    borderRadius: 20,
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-  },
+  selectedBadge: { backgroundColor: COLORS.accentDim, borderWidth: 1, borderColor: COLORS.accentBorder, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 3 },
   selectedBadgeText: { color: COLORS.accent, fontSize: 11, fontWeight: '600' },
-  filterBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(58,63,122,0.8)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: COLORS.borderColor,
-    flexShrink: 0,
-  },
+  filterBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(58,63,122,0.8)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1, borderColor: COLORS.borderColor, flexShrink: 0 },
   filterBtnText: { color: COLORS.white, fontSize: 11, fontWeight: '500' },
 
-  checkbox: {
-    width: 17,
-    height: 17,
-    borderRadius: 4,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.4)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'transparent',
-  },
+  checkbox: { width: 17, height: 17, borderRadius: 4, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.4)', alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent' },
   checkboxChecked: { backgroundColor: COLORS.accent, borderColor: COLORS.accent },
 
-  card: {
-    backgroundColor: COLORS.cardBg,
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 10,
-    borderWidth: 0.5,
-    borderColor: 'rgba(255,255,255,0.2)',
-  },
-  cardSelected: {
-    borderColor: 'rgba(0,207,255,0.45)',
-    backgroundColor: COLORS.cardSelected,
-  },
-  cardTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
+  card: { backgroundColor: COLORS.cardBg, borderRadius: 12, padding: 12, marginBottom: 10, borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.2)' },
+  cardSelected: { borderColor: 'rgba(0,207,255,0.45)', backgroundColor: COLORS.cardSelected },
+  cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 },
   nameIndicator: { width: 3, height: 15, backgroundColor: COLORS.accent, borderRadius: 3 },
   cardName: { color: COLORS.white, fontWeight: '800', fontSize: 13, flex: 1 },
   iconRow: { flexDirection: 'row', gap: 12 },
   divider: { height: 0.5, backgroundColor: 'rgba(255,255,255,0.12)', marginBottom: 8 },
-  sectionLabel: {
-    color: COLORS.gold,
-    fontSize: 11,
-    fontWeight: '700',
-    marginBottom: 6,
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
-  },
-  contactRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 5,
-    gap: 8,
-  },
+  sectionLabel: { color: COLORS.gold, fontSize: 11, fontWeight: '700', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.4 },
+  contactRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5, gap: 8 },
   contactItem: { flexDirection: 'row', alignItems: 'center', gap: 5, flex: 1 },
   infoRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 4 },
   infoText: { color: COLORS.mutedText, fontSize: 11, flexShrink: 1 },
   refRow: { flexDirection: 'row', alignItems: 'center', marginTop: 2 },
   refLabel: { color: COLORS.labelText, fontSize: 11, fontWeight: '600' },
   refValue: { color: COLORS.white, fontSize: 11 },
+  section: { color: 'rgba(0, 208, 255, 0.84)' },
 
-  modalOverlay: {
-    position: 'absolute',
-    top: 0, left: 0, right: 0, bottom: 100,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 1000,
-  },
-  modalContainer: {
-    width: '90%',
-    backgroundColor: COLORS.modalBg,
-    borderRadius: 16,
-    padding: 18,
-    maxHeight: '75%',
-    borderWidth: 1,
-    borderColor: COLORS.borderColor,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
+  modalOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 100, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center', zIndex: 1000 },
+  modalContainer: { width: '90%', backgroundColor: COLORS.modalBg, borderRadius: 16, padding: 18, maxHeight: '75%', borderWidth: 1, borderColor: COLORS.borderColor },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   modalTitle: { color: COLORS.accent, fontSize: 15, fontWeight: '700' },
-  infoBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: COLORS.goldDim,
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: COLORS.goldBorder,
-  },
+  infoBox: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: COLORS.goldDim, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7, marginBottom: 12, borderWidth: 1, borderColor: COLORS.goldBorder },
   infoBoxText: { color: COLORS.gold, fontSize: 12, fontWeight: '500' },
   rmLabel: { color: COLORS.white, marginBottom: 6, fontSize: 13, fontWeight: '500' },
-  dropdownList: {
-    maxHeight: 200,
-    borderWidth: 1,
-    borderColor: COLORS.borderColor,
-    borderRadius: 10,
-    marginBottom: 12,
-    marginTop: 4,
-  },
-  dropdownItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 12,
-    paddingVertical: 11,
-    borderBottomWidth: 0.5,
-    borderBottomColor: 'rgba(255,255,255,0.08)',
-  },
+  dropdownList: { maxHeight: 200, borderWidth: 1, borderColor: COLORS.borderColor, borderRadius: 10, marginBottom: 12, marginTop: 4 },
+  dropdownItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingVertical: 11, borderBottomWidth: 0.5, borderBottomColor: 'rgba(255,255,255,0.08)' },
   dropdownItemSelected: { backgroundColor: COLORS.accentDim },
   rmItemLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  rmRadio: {
-    width: 16, height: 16, borderRadius: 8,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.3)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  rmRadio: { width: 16, height: 16, borderRadius: 8, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.3)', alignItems: 'center', justifyContent: 'center' },
   rmRadioSelected: { borderColor: COLORS.accent },
   rmRadioInner: { width: 8, height: 8, borderRadius: 4, backgroundColor: COLORS.accent },
   dropdownItemText: { color: COLORS.mutedText, fontSize: 13 },
   dropdownItemTextSelected: { color: COLORS.accent, fontWeight: '600' },
   noRMText: { color: COLORS.mutedText, textAlign: 'center', padding: 20, fontSize: 13 },
-  selectedRMBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: COLORS.accentDim,
-    borderWidth: 1,
-    borderColor: COLORS.accentBorder,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    marginBottom: 14,
-  },
+  selectedRMBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: COLORS.accentDim, borderWidth: 1, borderColor: COLORS.accentBorder, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 7, marginBottom: 14 },
   selectedRMText: { color: COLORS.accent, fontSize: 12, fontWeight: '600' },
   modalBtnRow: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10 },
-  cancelBtn: {
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    paddingHorizontal: 18,
-    paddingVertical: 9,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: COLORS.borderColor,
-  },
+  cancelBtn: { backgroundColor: 'rgba(255,255,255,0.08)', paddingHorizontal: 18, paddingVertical: 9, borderRadius: 20, borderWidth: 1, borderColor: COLORS.borderColor },
   cancelBtnText: { color: COLORS.white, fontWeight: '500', fontSize: 13 },
-  assignBtn: {
-    backgroundColor: COLORS.accent,
-    paddingHorizontal: 18,
-    paddingVertical: 9,
-    borderRadius: 20,
-    minWidth: 80,
-    alignItems: 'center',
-  },
+  assignBtn: { backgroundColor: COLORS.accent, paddingHorizontal: 18, paddingVertical: 9, borderRadius: 20, minWidth: 80, alignItems: 'center' },
   assignBtnDisabled: { backgroundColor: 'rgba(0,207,255,0.3)' },
   assignBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
 
-  // ✅ Upload Modal
-  uploadModalContainer: {
-    width: '92%',
-    backgroundColor: COLORS.modalBg,
-    borderRadius: 16,
-    padding: 18,
-    borderWidth: 1,
-    borderColor: COLORS.borderColor,
-    maxHeight: '88%',
-  },
-
-  // ✅ Role Badge
-  roleBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    alignSelf: 'flex-start',
-    backgroundColor: 'rgba(255,255,255,0.07)',
-    borderRadius: 20,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: COLORS.borderColor,
-  },
+  uploadModalContainer: { width: '92%', backgroundColor: COLORS.modalBg, borderRadius: 16, padding: 18, borderWidth: 1, borderColor: COLORS.borderColor, maxHeight: '88%' },
+  roleBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4, marginBottom: 12, borderWidth: 1, borderColor: COLORS.borderColor },
   roleBadgeText: { fontSize: 11, fontWeight: '600' },
-
-  formBox: {
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 12,
-    borderWidth: 0.5,
-    borderColor: COLORS.borderColor,
-  },
-  uploadRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 10,
-    gap: 10,
-  },
-  browseBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#0284c7',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    flex: 1,
-  },
+  formBox: { backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: 12, padding: 12, marginBottom: 12, borderWidth: 0.5, borderColor: COLORS.borderColor },
+  uploadRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10, gap: 10 },
+  browseBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#0284c7', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, flex: 1 },
   browseText: { color: '#fff', fontSize: 11, flex: 1 },
-  uploadBtn: {
-    backgroundColor: '#22c55e',
-    paddingHorizontal: 18,
-    paddingVertical: 8,
-    borderRadius: 20,
-    minWidth: 75,
-    alignItems: 'center',
-  },
+  uploadBtn: { backgroundColor: '#22c55e', paddingHorizontal: 18, paddingVertical: 8, borderRadius: 20, minWidth: 75, alignItems: 'center' },
   uploadBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
-
-  // ✅ File info row
-  fileInfoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginTop: 8,
-    backgroundColor: 'rgba(0,196,140,0.1)',
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderWidth: 0.5,
-    borderColor: 'rgba(0,196,140,0.3)',
-  },
+  fileInfoRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8, backgroundColor: 'rgba(0,196,140,0.1)', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, borderWidth: 0.5, borderColor: 'rgba(0,196,140,0.3)' },
   fileInfoText: { color: COLORS.green, fontSize: 11, flex: 1 },
-
-  downloadCard: {
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 12,
-    borderWidth: 0.5,
-    borderColor: COLORS.borderColor,
-  },
+  downloadCard: { backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: 12, padding: 12, marginBottom: 12, borderWidth: 0.5, borderColor: COLORS.borderColor },
   downloadTitle: { color: COLORS.gold, fontSize: 13, fontWeight: '700', marginBottom: 4 },
   downloadDesc: { color: COLORS.mutedText, fontSize: 11, marginBottom: 10, lineHeight: 16 },
-  downloadBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#fff',
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 20,
-    alignSelf: 'flex-start',
-  },
+  downloadBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#fff', paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, alignSelf: 'flex-start' },
   downloadBtnText: { color: '#000', fontWeight: '600', fontSize: 12 },
-  cancelBtnBottom: {
-    alignSelf: 'flex-end',
-    backgroundColor: 'rgba(239,68,68,0.2)',
-    borderWidth: 1,
-    borderColor: 'rgba(239,68,68,0.4)',
-    paddingHorizontal: 18,
-    paddingVertical: 7,
-    borderRadius: 20,
-    marginTop: 4,
-  },
+  cancelBtnBottom: { alignSelf: 'flex-end', backgroundColor: 'rgba(239,68,68,0.2)', borderWidth: 1, borderColor: 'rgba(239,68,68,0.4)', paddingHorizontal: 18, paddingVertical: 7, borderRadius: 20, marginTop: 4 },
   cancelBtnBottomText: { color: COLORS.red, fontWeight: '600', fontSize: 13 },
 
-  bottomSheetOverlay: {
-    position: 'absolute',
-    top: 0, left: 0, right: 0, bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    justifyContent: 'flex-end',
-    zIndex: 1000,
-  },
-  bottomSheet: {
-    backgroundColor: COLORS.modalBg,
-    borderTopLeftRadius: 22,
-    borderTopRightRadius: 22,
-    padding: 18,
-    paddingBottom: 30,
-    maxHeight: '85%',
-    borderWidth: 1,
-    borderColor: COLORS.borderColor,
-    borderBottomWidth: 0,
-  },
-  handleBar: {
-    width: 40,
-    height: 4,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: 4,
-    alignSelf: 'center',
-    marginBottom: 14,
-  },
+  bottomSheetOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end', zIndex: 1000 },
+  bottomSheet: { backgroundColor: COLORS.modalBg, borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 18, paddingBottom: 30, maxHeight: '85%', borderWidth: 1, borderColor: COLORS.borderColor, borderBottomWidth: 0 },
+  handleBar: { width: 40, height: 4, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 4, alignSelf: 'center', marginBottom: 14 },
   filterModalTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   filterDivider: { height: 0.5, backgroundColor: 'rgba(255,255,255,0.12)', marginVertical: 12 },
-  filterLabel: {
-    color: COLORS.accent,
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-    textTransform: 'uppercase',
-    marginBottom: 6,
-    marginTop: 4,
-  },
+  filterLabel: { color: COLORS.accent, fontSize: 11, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 6, marginTop: 4 },
   dateRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
   dateField: { flex: 1 },
   dateSubLabel: { color: COLORS.mutedText, fontSize: 11, marginBottom: 4 },
   dateSeparator: { paddingTop: 18 },
-  filterBtnRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 4,
-  },
-  resetBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(255,82,82,0.35)',
-    backgroundColor: 'rgba(255,82,82,0.1)',
-  },
+  filterBtnRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 },
+  resetBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255,82,82,0.35)', backgroundColor: 'rgba(255,82,82,0.1)' },
   resetBtnText: { color: COLORS.red, fontSize: 13, fontWeight: '500' },
   filterActionBtns: { flexDirection: 'row', gap: 10 },
-  applyBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: COLORS.accent,
-    paddingHorizontal: 18,
-    paddingVertical: 8,
-    borderRadius: 20,
-    minWidth: 80,
-    justifyContent: 'center',
-  },
+  applyBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: COLORS.accent, paddingHorizontal: 18, paddingVertical: 8, borderRadius: 20, minWidth: 80, justifyContent: 'center' },
   applyBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
 
+  // ── Dropdown Field (upload modal) ──
   inputWrapper: { marginBottom: 10, width: '100%' },
-  dropLabel: {
-    color: COLORS.accent,
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 0.4,
-    textTransform: 'uppercase',
-    marginBottom: 5,
-  },
-  dropdown: {
-    height: 42,
-    backgroundColor: 'rgba(255,255,255,0.07)',
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    borderWidth: 1,
-    borderColor: COLORS.borderColor,
-  },
+  dropLabel: { color: COLORS.accent, fontSize: 10, fontWeight: '700', letterSpacing: 0.4, textTransform: 'uppercase', marginBottom: 5 },
+  dropdown: { height: 42, backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: 10, paddingHorizontal: 10, borderWidth: 1, borderColor: COLORS.borderColor },
   dropdownContainer: { backgroundColor: '#fff', borderRadius: 10 },
   placeholderStyle: { color: COLORS.mutedText, fontSize: 13 },
   selectedTextStyle: { color: COLORS.white, fontSize: 13 },
   itemContainer: { paddingVertical: 0 },
-
   field: { marginBottom: 10 },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.07)',
-    borderWidth: 1,
-    borderColor: COLORS.borderColor,
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    height: 42,
-  },
+  inputContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.07)', borderWidth: 1, borderColor: COLORS.borderColor, borderRadius: 10, paddingHorizontal: 10, height: 42 },
   input: { color: COLORS.white, flex: 1, fontSize: 13 },
-  section: { color: 'rgba(0, 208, 255, 0.84)' },
+
+  // ── Searchable Dropdown ──
+  sdTrigger: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', height: 42, backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: 10, paddingHorizontal: 12, borderWidth: 1, borderColor: COLORS.borderColor },
+  sdTriggerText: { color: COLORS.white, fontSize: 13, flex: 1 },
+  sdTriggerIcons: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  sdOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
+  sdKAV: { justifyContent: 'flex-end' },
+  sdContainer: { backgroundColor: COLORS.modalBg, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 16, paddingBottom: Platform.OS === 'ios' ? 34 : 20, maxHeight: screenHeight * 0.65, borderWidth: 1, borderColor: COLORS.borderColor, borderBottomWidth: 0 },
+  sdHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  sdTitle: { color: COLORS.accent, fontSize: 14, fontWeight: '700' },
+  sdSearchBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 10, paddingHorizontal: 12, height: 42, gap: 8, borderWidth: 1, borderColor: COLORS.accentBorder, marginBottom: 8 },
+  sdSearchInput: { flex: 1, color: COLORS.white, fontSize: 13 },
+  sdCount: { color: COLORS.mutedText, fontSize: 11, marginBottom: 6, paddingLeft: 2 },
+  sdList: { maxHeight: screenHeight * 0.38 },
+  sdItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingVertical: 13, borderBottomWidth: 0.5, borderBottomColor: 'rgba(255,255,255,0.08)' },
+  sdItemSelected: { backgroundColor: COLORS.accentDim },
+  sdItemText: { color: COLORS.mutedText, fontSize: 13, flex: 1 },
+  sdItemTextSelected: { color: COLORS.accent, fontWeight: '600' },
+  sdEmpty: { alignItems: 'center', paddingVertical: 32, gap: 8 },
+  sdEmptyText: { color: COLORS.mutedText, fontSize: 13 },
 });

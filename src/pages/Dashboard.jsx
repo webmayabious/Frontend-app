@@ -31,14 +31,7 @@ const CARDS = (d, nav) => [
   value: ` ${d?.today_remaining_callbacks ?? 0}  / ${d?.todays_callbacks ?? 0} `,
   route: 'FollowUpsScreen',
 },
-{
-  icon: 'place',
-  label: 'Site Visits / Bookings',
-  period: 'Month / Till Date',
-  accent: '#4ade80',
-  value: `${d?.monthly_site_visits ?? 0}  /  ${d?.site_visits_till_date ?? 0} `,
-  route: 'SiteVisitsScreen',
-},
+
   {
     icon: 'upload',
     label: 'Uploaded Leads',
@@ -55,6 +48,14 @@ const CARDS = (d, nav) => [
     value: `${d?.total_assigned_lead ?? 0}`,
     route: 'LeadsassignedScreen',
   },
+  {
+  icon: 'place',
+  label: 'Site Visit',
+  period: 'Month / Till Date',
+  accent: '#f472b6',
+  value: `${d?.monthly_site_visits ?? 0}  /  ${d?.site_visits_till_date ?? 0} `,
+  route: 'SiteVisitsScreen',
+},
   {
     icon: 'people',
     label: 'Active Leads / Total Leads',

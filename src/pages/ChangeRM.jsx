@@ -15,6 +15,8 @@ import {
   Platform,
   Image,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Modal,
 } from 'react-native';
 import { ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -25,7 +27,6 @@ import Header from '../Layout/Header';
 import { useNavigation } from '@react-navigation/native';
 import api from '../api/AxiosInstance';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { Dropdown } from 'react-native-element-dropdown';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
 const screenHeight = Dimensions.get('window').height;
@@ -54,42 +55,160 @@ const COLORS = {
   sectionBg: 'rgba(255,255,255,0.13)',
 };
 
-// ─── DROPDOWN FIELD ───────────────────────────────────────────────────────────
+// ─── SEARCHABLE DROPDOWN ──────────────────────────────────────────────────────
 
-const DropdownField = ({ label, data, placeholder, value, onChange }) => {
-  const [isFocus, setIsFocus] = useState(false);
+const SearchableDropdown = ({ label, data = [], placeholder, value, onChange }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const searchRef = useRef(null);
+
+  const selectedItem = data.find(item => item.value === value);
+
+  const filtered = data.filter(item =>
+    item.label.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const handleOpen = () => {
+    setIsOpen(true);
+    setSearch('');
+    // auto-focus search box after modal opens
+    setTimeout(() => searchRef.current?.focus(), 150);
+  };
+
+  const handleSelect = (item) => {
+    onChange && onChange(item.value);
+    setIsOpen(false);
+    setSearch('');
+  };
+
+  const handleClear = () => {
+    onChange && onChange(null);
+    setIsOpen(false);
+    setSearch('');
+  };
+
   return (
     <View style={styles.inputWrapper}>
       {label ? <Text style={styles.filterLabel}>{label}</Text> : null}
-      <Dropdown
-        style={[
-          styles.dropdown,
-          isFocus && { borderColor: COLORS.accent, borderWidth: 1.5 },
-        ]}
-        containerStyle={styles.dropdownContainer}
-        placeholderStyle={styles.placeholderStyle}
-        selectedTextStyle={styles.selectedTextStyle}
-        itemTextStyle={{ color: '#0b0b0b', fontWeight: '500' }}
-        activeColor="#e6f7ff"
-        data={data || []}
-        labelField="label"
-        valueField="value"
-        placeholder={placeholder}
-        value={value}
-        onFocus={() => setIsFocus(true)}
-        onBlur={() => setIsFocus(false)}
-        onChange={item => {
-          setIsFocus(false);
-          onChange && onChange(item.value);
-        }}
-        renderRightIcon={() => (
-          <Icon
-            name={isFocus ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
-            size={20}
-            color={COLORS.accent}
-          />
-        )}
-      />
+
+      {/* Trigger Button */}
+      <TouchableOpacity
+        activeOpacity={0.8}
+        onPress={handleOpen}
+        style={styles.dropdownTrigger}
+      >
+        <Text
+          style={[
+            styles.dropdownTriggerText,
+            !selectedItem && { color: COLORS.mutedText },
+          ]}
+          numberOfLines={1}
+        >
+          {selectedItem ? selectedItem.label : placeholder}
+        </Text>
+        <View style={styles.dropdownTriggerIcons}>
+          {selectedItem ? (
+            <TouchableOpacity
+              onPress={handleClear}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Icon name="close" size={15} color={COLORS.mutedText} />
+            </TouchableOpacity>
+          ) : null}
+          <Icon name="keyboard-arrow-down" size={20} color={COLORS.accent} />
+        </View>
+      </TouchableOpacity>
+
+      {/* Dropdown Modal */}
+      <Modal
+        visible={isOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsOpen(false)}
+      >
+        <TouchableOpacity
+          style={styles.sdModalOverlay}
+          activeOpacity={1}
+          onPress={() => { setIsOpen(false); setSearch(''); }}
+        >
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={styles.sdKAV}
+          >
+            <TouchableOpacity activeOpacity={1}>
+              <View style={styles.sdContainer}>
+                {/* Header */}
+                <View style={styles.sdHeader}>
+                  <Text style={styles.sdTitle}>{label || placeholder}</Text>
+                  <TouchableOpacity onPress={() => { setIsOpen(false); setSearch(''); }}>
+                    <Icon name="close" size={20} color={COLORS.mutedText} />
+                  </TouchableOpacity>
+                </View>
+
+                {/* Search Box */}
+                <View style={styles.sdSearchBox}>
+                  <Icon name="search" size={16} color={COLORS.accent} />
+                  <TextInput
+                    ref={searchRef}
+                    style={styles.sdSearchInput}
+                    placeholder="Search..."
+                    placeholderTextColor={COLORS.mutedText}
+                    value={search}
+                    onChangeText={setSearch}
+                    autoCorrect={false}
+                  />
+                  {search ? (
+                    <TouchableOpacity onPress={() => setSearch('')}>
+                      <Icon name="close" size={14} color={COLORS.mutedText} />
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
+
+                {/* Count */}
+                <Text style={styles.sdCount}>
+                  {filtered.length} result{filtered.length !== 1 ? 's' : ''}
+                </Text>
+
+                {/* List */}
+                <FlatList
+                  data={filtered}
+                  keyExtractor={item => String(item.value)}
+                  style={styles.sdList}
+                  keyboardShouldPersistTaps="handled"
+                  renderItem={({ item }) => {
+                    const isSelected = item.value === value;
+                    return (
+                      <TouchableOpacity
+                        style={[styles.sdItem, isSelected && styles.sdItemSelected]}
+                        onPress={() => handleSelect(item)}
+                        activeOpacity={0.7}
+                      >
+                        <Text
+                          style={[
+                            styles.sdItemText,
+                            isSelected && styles.sdItemTextSelected,
+                          ]}
+                        >
+                          {item.label}
+                        </Text>
+                        {isSelected && (
+                          <Icon name="check-circle" size={16} color={COLORS.accent} />
+                        )}
+                      </TouchableOpacity>
+                    );
+                  }}
+                  ListEmptyComponent={
+                    <View style={styles.sdEmpty}>
+                      <Icon name="search-off" size={28} color={COLORS.mutedText} />
+                      <Text style={styles.sdEmptyText}>No results found</Text>
+                    </View>
+                  }
+                />
+              </View>
+            </TouchableOpacity>
+          </KeyboardAvoidingView>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 };
@@ -127,7 +246,7 @@ const makeCall = phoneNumber => {
 
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
 
-const ChangeRM = ({setHideBottomNav}) => {
+const ChangeRM = ({ setHideBottomNav }) => {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const [showrmModal, setShowrmModal] = useState(false);
@@ -139,7 +258,6 @@ const ChangeRM = ({setHideBottomNav}) => {
   const [showToPicker, setShowToPicker] = useState(false);
   const [appliedFilters, setAppliedFilters] = useState();
 
-  // ── Infinite Scroll State ──
   const [leads, setLeads] = useState([]);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
@@ -156,50 +274,32 @@ const ChangeRM = ({setHideBottomNav}) => {
     active: null,
   });
 
-  // ── Bottom Sheet Animation ──
   const filterAnim = useRef(new Animated.Value(screenHeight)).current;
 
-  // const openFilterModal = () => {
-  //   setShowFilterModal(true);
-  //   Animated.spring(filterAnim, {
-  //     toValue: 0,
-  //     useNativeDriver: true,
-  //     bounciness: 4,
-  //   }).start();
-  // };
-const openFilterModal = () => {
-  setHideBottomNav(true);   // 👈 instant hide
-  setShowFilterModal(true);
+  const openFilterModal = () => {
+    setHideBottomNav(true);
+    setShowFilterModal(true);
+    filterAnim.setValue(screenHeight);
+    requestAnimationFrame(() => {
+      Animated.spring(filterAnim, {
+        toValue: 0,
+        useNativeDriver: true,
+        damping: 18,
+      }).start();
+    });
+  };
 
-  filterAnim.setValue(screenHeight);
-
-  requestAnimationFrame(() => {
-    Animated.spring(filterAnim, {
-      toValue: 0,
+  const closeFilterModal = () => {
+    Animated.timing(filterAnim, {
+      toValue: screenHeight,
+      duration: 250,
       useNativeDriver: true,
-      damping: 18,
-    }).start();
-  });
-};
-  // const closeFilterModal = () => {
-  //   Animated.timing(filterAnim, {
-  //     toValue: screenHeight,
-  //     duration: 280,
-  //     useNativeDriver: true,
-  //   }).start(() => setShowFilterModal(false));
-  // };
+    }).start(() => {
+      setShowFilterModal(false);
+      setHideBottomNav(false);
+    });
+  };
 
-  // ── Date ──
- const closeFilterModal = () => {
-  Animated.timing(filterAnim, {
-    toValue: screenHeight,
-    duration: 250,
-    useNativeDriver: true,
-  }).start(() => {
-    setShowFilterModal(false);
-    setHideBottomNav(false);   // 🔥 IMPORTANT
-  });
-};
   const formatDate = date => {
     if (!date) return '';
     const d = new Date(date);
@@ -214,7 +314,6 @@ const openFilterModal = () => {
     if (selectedDate) onChange(key, formatDate(selectedDate));
   };
 
-  // ── RM List ──
   const { data: allRmList = [] } = useQuery({
     queryKey: ['allRMList'],
     queryFn: async () => {
@@ -229,7 +328,6 @@ const openFilterModal = () => {
 
   const Rm = allRmList?.map(item => ({ label: item.name, value: item.id }));
 
-  // ── Fetch Leads (with pagination) ──
   const fetchLeads = useCallback(
     async (pageNum = 1, isReset = false) => {
       if (pageNum === 1) {
@@ -261,13 +359,10 @@ const openFilterModal = () => {
         } else {
           setLeads(prev => {
             const combined = [...prev, ...newData];
-
-            // 🔥 duplicate remove
             const unique = combined.filter(
               (item, index, self) =>
                 index === self.findIndex(i => i.id === item.id)
             );
-
             return unique;
           });
         }
@@ -275,7 +370,7 @@ const openFilterModal = () => {
         setHasMore(newData.length === PAGE_SIZE);
         setPage(pageNum);
       } catch {
-        // error 
+        // error
       } finally {
         setIsInitialLoading(false);
         setIsFetchingMore(false);
@@ -284,20 +379,17 @@ const openFilterModal = () => {
     [searchText, filters],
   );
 
-  // ── Reset & reload
   useEffect(() => {
     setPage(1);
     setHasMore(true);
     fetchLeads(1, true);
   }, [searchText, appliedFilters]);
 
-  // ── Load more (next page) ──
   const loadMore = () => {
     if (!hasMore || isFetchingMore || isInitialLoading) return;
     fetchLeads(page + 1);
   };
 
-  // ── Locations ──
   const { data: AllProperty } = useQuery({
     queryKey: ['AllProperty'],
     queryFn: async () => {
@@ -306,7 +398,6 @@ const openFilterModal = () => {
     },
   });
 
-  // ── Projects ──
   const { data: projectList = [] } = useQuery({
     queryKey: ['project'],
     queryFn: async () => {
@@ -321,15 +412,6 @@ const openFilterModal = () => {
     value: item.id,
   }));
 
-  const LeadStatus = [
-    { label: 'Active', value: '1' },
-    { label: 'Inactive', value: '2' },
-    { label: 'Site Visit', value: '3' },
-    { label: 'Meeting Done', value: '4' },
-    { label: 'Booking Done', value: '5' },
-  ];
-
-  // ── Select ──
   const toggleSelect = id => {
     setSelected(prev =>
       prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id],
@@ -346,7 +428,6 @@ const openFilterModal = () => {
 
   const isAllSelected = selected.length === leads.length && leads.length > 0;
 
-  // ── Assign RM ──
   const { mutate: handleAssignRm } = useMutation({
     mutationFn: async () => {
       if (!selected.length) throw new Error('Please select prospects');
@@ -357,20 +438,12 @@ const openFilterModal = () => {
       });
     },
     onSuccess: () => {
-      Alert.alert(
-        '🎉 Success',
-        'RM has been changed successfully.',
-        [
-          {
-            text: 'OK',
-            onPress: () => console.log('Done'),
-          },
-        ]
-      );
+      Alert.alert('🎉 Success', 'RM has been changed successfully.', [
+        { text: 'OK', onPress: () => console.log('Done') },
+      ]);
       setSelected([]);
       setrms(null);
       setShowrmModal(false);
-      // Reset করে আবার load করো
       fetchLeads(1, true);
     },
     onError: error => {
@@ -378,7 +451,6 @@ const openFilterModal = () => {
     },
   });
 
-  // ── Filter Handlers ──
   const onChange = (key, value) => {
     setFilters(prev => ({ ...prev, [key]: value }));
   };
@@ -403,14 +475,11 @@ const openFilterModal = () => {
     closeFilterModal();
   };
 
-  // ─── LEAD CARD (FlatList renderItem) ───────────────────────────────────────
-
   const renderLeadCard = useCallback(
     ({ item }) => {
       const isChecked = selected.includes(item.id);
       return (
         <View style={[styles.card, isChecked && styles.cardSelected]}>
-          {/* Card Top */}
           <View style={styles.cardTop}>
             <View style={styles.nameRow}>
               <TouchableOpacity
@@ -429,10 +498,8 @@ const openFilterModal = () => {
                 style={[
                   styles.statusBadge,
                   {
-                    backgroundColor:
-                      item?.active === '1' ? '#00C48C22' : '#FF6B6B22',
-                    borderColor:
-                      item?.active === '1' ? '#00C48C60' : '#FF6B6B60',
+                    backgroundColor: item?.active === '1' ? '#00C48C22' : '#FF6B6B22',
+                    borderColor: item?.active === '1' ? '#00C48C60' : '#FF6B6B60',
                   },
                 ]}
               >
@@ -450,7 +517,6 @@ const openFilterModal = () => {
 
           <View style={styles.divider} />
 
-          {/* Card Body */}
           <View style={styles.cardBody}>
             <View style={styles.leftCol}>
               <View style={styles.infoRow}>
@@ -468,9 +534,7 @@ const openFilterModal = () => {
                   size={12}
                   color={COLORS.accent}
                 />
-                <Text style={styles.infoText}>
-                  {item?.company?.com_name || 'N/A'}
-                </Text>
+                <Text style={styles.infoText}>{item?.company?.com_name || 'N/A'}</Text>
               </View>
               <View style={styles.infoRow}>
                 <Icon name="email" size={12} color={COLORS.accent} />
@@ -489,15 +553,11 @@ const openFilterModal = () => {
               </View>
               <View style={styles.infoRow}>
                 <Icon name="location-on" size={12} color={COLORS.gold} />
-                <Text style={styles.infoText}>
-                  {item?.propertylocation?.name || 'N/A'}
-                </Text>
+                <Text style={styles.infoText}>{item?.propertylocation?.name || 'N/A'}</Text>
               </View>
               <View style={styles.infoRow}>
                 <Text style={styles.refLabel}>Reference: </Text>
-                <Text style={styles.refValue}>
-                  {item?.mrreference?.mrf_name || 'N/A'}
-                </Text>
+                <Text style={styles.refValue}>{item?.mrreference?.mrf_name || 'N/A'}</Text>
               </View>
             </View>
           </View>
@@ -506,8 +566,6 @@ const openFilterModal = () => {
     },
     [selected],
   );
-
-  // ─── Footer: loading spinner বা "no more data" ─────────────────────────────
 
   const renderFooter = () => {
     if (isFetchingMore) {
@@ -528,16 +586,10 @@ const openFilterModal = () => {
     return null;
   };
 
-  // ─── RENDER ───────────────────────────────────────────────────────────────
-
   return (
     <View style={styles.container}>
-   <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
+      <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
-      {/* ── Header pinned to top ── */}
-      {/* <Header /> */}
-
-      {/* ── Top Bar (title + actions) ── */}
       <View style={styles.sectionHeader}>
         <View style={styles.sectionTitleRow}>
           <MaterialCommunityIcons name="account-switch" size={16} color={COLORS.accent} />
@@ -552,18 +604,10 @@ const openFilterModal = () => {
                   '⚠️ Warning',
                   'Please select at least one lead',
                   [
-                    {
-                      text: 'Cancel',
-                      style: 'cancel',
-                    },
-                    {
-                      text: 'OK',
-                      onPress: () => console.log('OK pressed'),
-                    },
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'OK', onPress: () => console.log('OK pressed') },
                   ],
-                  {
-                    cancelable: true,
-                  }
+                  { cancelable: true }
                 );
                 return;
               }
@@ -589,7 +633,6 @@ const openFilterModal = () => {
         </View>
       </View>
 
-      {/* ── FlatList with Infinite Scroll ── */}
       <FlatList
         data={leads}
         keyExtractor={item => String(item.id)}
@@ -597,11 +640,10 @@ const openFilterModal = () => {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         onEndReached={loadMore}
-        onEndReachedThreshold={0.4}      // ৪০% বাকি থাকলেই পরের page fetch শুরু
+        onEndReachedThreshold={0.4}
         ListFooterComponent={renderFooter}
         ListHeaderComponent={
           <>
-            {/* Search Bar */}
             <View style={styles.searchRow}>
               <View style={styles.searchBox}>
                 <Icon name="search" size={16} color={COLORS.mutedText} />
@@ -620,7 +662,6 @@ const openFilterModal = () => {
               </View>
             </View>
 
-            {/* Select All + Filter Row */}
             <View style={styles.selectAllRow}>
               <TouchableOpacity style={styles.selectAllLeft} onPress={toggleSelectAll}>
                 <View style={[styles.checkbox, isAllSelected && styles.checkboxChecked]}>
@@ -642,14 +683,12 @@ const openFilterModal = () => {
               </TouchableOpacity>
             </View>
 
-            {/* Initial Loading */}
             {isInitialLoading && (
               <View style={styles.initialLoader}>
                 <ActivityIndicator size="large" color={COLORS.accent} />
               </View>
             )}
 
-            {/* Empty State */}
             {!isInitialLoading && leads.length === 0 && (
               <Text style={styles.centeredText}>No leads found</Text>
             )}
@@ -657,21 +696,17 @@ const openFilterModal = () => {
         }
       />
 
-      {/* ── Change RM Modal (center) ── */}
+      {/* ── Change RM Modal ── */}
       {showrmModal && (
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
-            {/* Modal Header */}
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Change RM</Text>
-              <TouchableOpacity
-                onPress={() => { setShowrmModal(false); setrms(null); }}
-              >
+              <TouchableOpacity onPress={() => { setShowrmModal(false); setrms(null); }}>
                 <Icon name="close" size={20} color={COLORS.mutedText} />
               </TouchableOpacity>
             </View>
 
-            {/* Selected leads info */}
             <View style={styles.infoBox}>
               <Icon name="people" size={14} color={COLORS.gold} />
               <Text style={styles.infoBoxText}>
@@ -681,7 +716,6 @@ const openFilterModal = () => {
 
             <Text style={styles.rmLabel}>Select RM</Text>
 
-            {/* RM List */}
             <ScrollView
               style={styles.dropdownList}
               nestedScrollEnabled={true}
@@ -695,40 +729,24 @@ const openFilterModal = () => {
                   return (
                     <TouchableOpacity
                       key={rm.value}
-                      style={[
-                        styles.dropdownItem,
-                        isSelected && styles.dropdownItemSelected,
-                      ]}
+                      style={[styles.dropdownItem, isSelected && styles.dropdownItemSelected]}
                       onPress={() => setrms(rm.value)}
                     >
                       <View style={styles.rmItemLeft}>
-                        <View
-                          style={[
-                            styles.rmRadio,
-                            isSelected && styles.rmRadioSelected,
-                          ]}
-                        >
+                        <View style={[styles.rmRadio, isSelected && styles.rmRadioSelected]}>
                           {isSelected && <View style={styles.rmRadioInner} />}
                         </View>
-                        <Text
-                          style={[
-                            styles.dropdownItemText,
-                            isSelected && styles.dropdownItemTextSelected,
-                          ]}
-                        >
+                        <Text style={[styles.dropdownItemText, isSelected && styles.dropdownItemTextSelected]}>
                           {rm.label}
                         </Text>
                       </View>
-                      {isSelected && (
-                        <Icon name="check-circle" size={16} color={COLORS.accent} />
-                      )}
+                      {isSelected && <Icon name="check-circle" size={16} color={COLORS.accent} />}
                     </TouchableOpacity>
                   );
                 })
               )}
             </ScrollView>
 
-            {/* Selected RM badge */}
             {rms && (
               <View style={styles.selectedRMBadge}>
                 <Icon name="person-pin" size={14} color={COLORS.accent} />
@@ -738,7 +756,6 @@ const openFilterModal = () => {
               </View>
             )}
 
-            {/* Buttons */}
             <View style={styles.modalBtnRow}>
               <TouchableOpacity
                 style={styles.cancelBtn}
@@ -760,7 +777,11 @@ const openFilterModal = () => {
 
       {/* ── Filter Bottom Sheet ── */}
       {showFilterModal && (
-        <View style={styles.bottomSheetOverlay}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.bottomSheetOverlay}
+          keyboardVerticalOffset={0}
+        >
           <TouchableOpacity
             style={StyleSheet.absoluteFill}
             activeOpacity={1}
@@ -786,11 +807,14 @@ const openFilterModal = () => {
 
             <View style={styles.filterDivider} />
 
+            {/* ✅ keyboardShouldPersistTaps="handled" — keyboard-এর উপরে scroll থাকবে */}
             <ScrollView
               showsVerticalScrollIndicator={false}
               contentContainerStyle={{ paddingBottom: 8 }}
+              keyboardShouldPersistTaps="handled"
             >
-              <DropdownField
+              {/* ✅ SearchableDropdown replace করা হয়েছে */}
+              <SearchableDropdown
                 label="Property Location"
                 data={Property}
                 placeholder="Select location"
@@ -798,7 +822,7 @@ const openFilterModal = () => {
                 onChange={value => onChange('location', value)}
               />
 
-              <DropdownField
+              <SearchableDropdown
                 label="Relationship Manager"
                 data={Rm}
                 placeholder="Select RM"
@@ -867,11 +891,8 @@ const openFilterModal = () => {
               </View>
             </View>
           </Animated.View>
-        </View>
+        </KeyboardAvoidingView>
       )}
-
-      {/* ── Bottom Nav pinned to bottom ── */}
-      {/* <BottomNav /> */}
     </View>
   );
 };
@@ -883,614 +904,250 @@ export default ChangeRM;
 const styles = StyleSheet.create({
 
   // ── Layout ──
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.bg,
-  },
-  scrollContent: {
-    paddingHorizontal: 12,
-    paddingBottom: 100,
-  },
-  centeredText: {
-    color: COLORS.white,
-    textAlign: 'center',
-    marginTop: 24,
-    fontSize: 14,
-    opacity: 0.7,
-  },
-  initialLoader: {
-    paddingVertical: 32,
-    alignItems: 'center',
-  },
-  footerLoader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 16,
-  },
-  footerText: {
-    color: COLORS.accent,
-    fontSize: 12,
-  },
-  footerEndText: {
-    color: COLORS.mutedText,
-    fontSize: 12,
-  },
+  container: { flex: 1, backgroundColor: COLORS.bg },
+  scrollContent: { paddingHorizontal: 12, paddingBottom: 100 },
+  centeredText: { color: COLORS.white, textAlign: 'center', marginTop: 24, fontSize: 14, opacity: 0.7 },
+  initialLoader: { paddingVertical: 32, alignItems: 'center' },
+  footerLoader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 16 },
+  footerText: { color: COLORS.accent, fontSize: 12 },
+  footerEndText: { color: COLORS.mutedText, fontSize: 12 },
 
   // ── Section Header ──
   sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: COLORS.sectionBg,
-    borderRadius: 20,
-    marginHorizontal: 12,
-    marginTop: 10,
-    marginBottom: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: COLORS.sectionBg, borderRadius: 20, marginHorizontal: 12,
+    marginTop: 10, marginBottom: 10, paddingHorizontal: 14, paddingVertical: 8,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)',
   },
-  sectionTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 7,
-  },
-  sectionTitle: {
-    color: COLORS.white,
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  sectionActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
+  sectionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  sectionTitle: { color: COLORS.white, fontSize: 14, fontWeight: '700' },
+  sectionActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   changeBtn: {
-    backgroundColor: 'rgba(0,207,255,0.12)',
-    borderRadius: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 5,
-    borderWidth: 1.5,
-    borderColor: COLORS.accent,
+    backgroundColor: 'rgba(0,207,255,0.12)', borderRadius: 16, paddingHorizontal: 14,
+    paddingVertical: 5, borderWidth: 1.5, borderColor: COLORS.accent,
   },
-  changeBtnText: {
-    color: COLORS.white,
-    fontSize: 11,
-    fontWeight: '600',
-  },
+  changeBtnText: { color: COLORS.white, fontSize: 11, fontWeight: '600' },
   closeBtn: {
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.25)',
+    backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 16, paddingHorizontal: 12,
+    paddingVertical: 5, borderWidth: 1, borderColor: 'rgba(255,255,255,0.25)',
   },
-  closeBtnText: {
-    color: COLORS.white,
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  backButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
+  closeBtnText: { color: COLORS.white, fontSize: 11, fontWeight: '600' },
+  backButton: { flexDirection: 'row', alignItems: 'center' },
 
   // ── Search ──
-  searchRow: {
-    marginBottom: 8,
-    marginTop: 2,
-  },
+  searchRow: { marginBottom: 8, marginTop: 2 },
   searchBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: COLORS.borderColor,
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    height: 40,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    flexDirection: 'row', alignItems: 'center', borderWidth: 1,
+    borderColor: COLORS.borderColor, borderRadius: 20, paddingHorizontal: 12,
+    height: 40, backgroundColor: 'rgba(255,255,255,0.06)',
   },
-  searchInput: {
-    color: COLORS.white,
-    marginLeft: 8,
-    fontSize: 13,
-    flex: 1,
-    paddingVertical: Platform.OS === 'ios' ? 0 : 0,
-  },
+  searchInput: { color: COLORS.white, marginLeft: 8, fontSize: 13, flex: 1 },
 
   // ── Select All Row ──
   selectAllRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 10,
-    paddingHorizontal: 2,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    marginBottom: 10, paddingHorizontal: 2,
   },
-  selectAllLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  selectAllText: {
-    color: COLORS.white,
-    fontSize: 13,
-    fontWeight: '500',
-  },
+  selectAllLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  selectAllText: { color: COLORS.white, fontSize: 13, fontWeight: '500' },
   selectedBadge: {
-    backgroundColor: COLORS.accentDim,
-    borderWidth: 1,
-    borderColor: COLORS.accentBorder,
-    borderRadius: 20,
-    paddingHorizontal: 10,
-    paddingVertical: 3,
+    backgroundColor: COLORS.accentDim, borderWidth: 1, borderColor: COLORS.accentBorder,
+    borderRadius: 20, paddingHorizontal: 10, paddingVertical: 3,
   },
-  selectedBadgeText: {
-    color: COLORS.accent,
-    fontSize: 11,
-    fontWeight: '600',
-  },
+  selectedBadgeText: { color: COLORS.accent, fontSize: 11, fontWeight: '600' },
   filterBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(58,63,122,0.8)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: COLORS.borderColor,
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: 'rgba(58,63,122,0.8)', paddingHorizontal: 12, paddingVertical: 6,
+    borderRadius: 20, borderWidth: 1, borderColor: COLORS.borderColor,
   },
-  filterBtnText: {
-    color: COLORS.white,
-    fontSize: 11,
-    fontWeight: '500',
-  },
+  filterBtnText: { color: COLORS.white, fontSize: 11, fontWeight: '500' },
 
   // ── Checkbox ──
   checkbox: {
-    width: 17,
-    height: 17,
-    borderRadius: 4,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.4)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'transparent',
+    width: 17, height: 17, borderRadius: 4, borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.4)', alignItems: 'center',
+    justifyContent: 'center', backgroundColor: 'transparent',
   },
-  checkboxChecked: {
-    backgroundColor: COLORS.accent,
-    borderColor: COLORS.accent,
-  },
+  checkboxChecked: { backgroundColor: COLORS.accent, borderColor: COLORS.accent },
 
   // ── Lead Card ──
   card: {
-    backgroundColor: COLORS.cardBg,
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 10,
-    borderWidth: 0.5,
-    borderColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: COLORS.cardBg, borderRadius: 12, padding: 12, marginBottom: 10,
+    borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.2)',
   },
-  cardSelected: {
-    borderColor: 'rgba(0,207,255,0.45)',
-    backgroundColor: COLORS.cardSelected,
-  },
-  cardTop: {
-    marginBottom: 8,
-  },
-  nameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  cardName: {
-    color: COLORS.white,
-    fontWeight: '800',
-    fontSize: 13,
-    flex: 1,
-  },
-  statusBadge: {
-    borderRadius: 20,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderWidth: 0.8,
-  },
-  statusText: {
-    fontSize: 10,
-    fontWeight: '700',
-  },
-  divider: {
-    height: 0.5,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    marginBottom: 8,
-  },
-  cardBody: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  leftCol: {
-    flex: 1,
-    gap: 5,
-  },
-  rightCol: {
-    flex: 1,
-    gap: 5,
-  },
-  infoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-  },
-  infoText: {
-    color: COLORS.mutedText,
-    fontSize: 11,
-    flexShrink: 1,
-  },
-  rmLabelCard: {
-    color: COLORS.gold,
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  rmValue: {
-    color: COLORS.gold,
-    fontSize: 11,
-    fontWeight: '600',
-    flexShrink: 1,
-  },
-  refLabel: {
-    color: COLORS.labelText,
-    fontSize: 10,
-    fontWeight: '600',
-  },
-  refValue: {
-    color: COLORS.labelText,
-    fontSize: 10,
-    flexShrink: 1,
-  },
+  cardSelected: { borderColor: 'rgba(0,207,255,0.45)', backgroundColor: COLORS.cardSelected },
+  cardTop: { marginBottom: 8 },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  cardName: { color: COLORS.white, fontWeight: '800', fontSize: 13, flex: 1 },
+  statusBadge: { borderRadius: 20, paddingHorizontal: 8, paddingVertical: 2, borderWidth: 0.8 },
+  statusText: { fontSize: 10, fontWeight: '700' },
+  divider: { height: 0.5, backgroundColor: 'rgba(255,255,255,0.12)', marginBottom: 8 },
+  cardBody: { flexDirection: 'row', gap: 8 },
+  leftCol: { flex: 1, gap: 5 },
+  rightCol: { flex: 1, gap: 5 },
+  infoRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  infoText: { color: COLORS.mutedText, fontSize: 11, flexShrink: 1 },
+  rmLabelCard: { color: COLORS.gold, fontSize: 11, fontWeight: '600' },
+  rmValue: { color: COLORS.gold, fontSize: 11, fontWeight: '600', flexShrink: 1 },
+  refLabel: { color: COLORS.labelText, fontSize: 10, fontWeight: '600' },
+  refValue: { color: COLORS.labelText, fontSize: 10, flexShrink: 1 },
+  section: { color: 'rgba(0, 208, 255, 0.84)' },
 
   // ── Change RM Modal ──
   modalOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.65)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 1000,
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'center',
+    alignItems: 'center', zIndex: 1000,
   },
   modalContainer: {
-    width: '90%',
-    backgroundColor: COLORS.modalBg,
-    borderRadius: 16,
-    padding: 18,
-    maxHeight: '75%',
-    borderWidth: 1,
-    borderColor: COLORS.borderColor,
+    width: '90%', backgroundColor: COLORS.modalBg, borderRadius: 16, padding: 18,
+    maxHeight: '75%', borderWidth: 1, borderColor: COLORS.borderColor,
   },
   modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12,
   },
-  modalTitle: {
-    color: COLORS.accent,
-    fontSize: 15,
-    fontWeight: '700',
-  },
+  modalTitle: { color: COLORS.accent, fontSize: 15, fontWeight: '700' },
   infoBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: COLORS.goldDim,
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: COLORS.goldBorder,
+    flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: COLORS.goldDim,
+    borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7, marginBottom: 12,
+    borderWidth: 1, borderColor: COLORS.goldBorder,
   },
-  infoBoxText: {
-    color: COLORS.gold,
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  rmLabel: {
-    color: COLORS.white,
-    marginBottom: 6,
-    fontSize: 13,
-    fontWeight: '500',
-  },
+  infoBoxText: { color: COLORS.gold, fontSize: 12, fontWeight: '500' },
+  rmLabel: { color: COLORS.white, marginBottom: 6, fontSize: 13, fontWeight: '500' },
   dropdownList: {
-    maxHeight: 200,
-    borderWidth: 1,
-    borderColor: COLORS.borderColor,
-    borderRadius: 10,
-    marginBottom: 12,
-    marginTop: 4,
+    maxHeight: 200, borderWidth: 1, borderColor: COLORS.borderColor,
+    borderRadius: 10, marginBottom: 12, marginTop: 4,
   },
   dropdownItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 12,
-    paddingVertical: 11,
-    borderBottomWidth: 0.5,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 12, paddingVertical: 11, borderBottomWidth: 0.5,
     borderBottomColor: 'rgba(255,255,255,0.08)',
   },
-  dropdownItemSelected: {
-    backgroundColor: COLORS.accentDim,
-  },
-  rmItemLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
+  dropdownItemSelected: { backgroundColor: COLORS.accentDim },
+  rmItemLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   rmRadio: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.3)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    width: 16, height: 16, borderRadius: 8, borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.3)', alignItems: 'center', justifyContent: 'center',
   },
-  rmRadioSelected: {
-    borderColor: COLORS.accent,
-  },
-  rmRadioInner: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: COLORS.accent,
-  },
-  dropdownItemText: {
-    color: COLORS.mutedText,
-    fontSize: 13,
-  },
-  dropdownItemTextSelected: {
-    color: COLORS.accent,
-    fontWeight: '600',
-  },
-  noRMText: {
-    color: COLORS.mutedText,
-    textAlign: 'center',
-    padding: 20,
-    fontSize: 13,
-  },
+  rmRadioSelected: { borderColor: COLORS.accent },
+  rmRadioInner: { width: 8, height: 8, borderRadius: 4, backgroundColor: COLORS.accent },
+  dropdownItemText: { color: COLORS.mutedText, fontSize: 13 },
+  dropdownItemTextSelected: { color: COLORS.accent, fontWeight: '600' },
+  noRMText: { color: COLORS.mutedText, textAlign: 'center', padding: 20, fontSize: 13 },
   selectedRMBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: COLORS.accentDim,
-    borderWidth: 1,
-    borderColor: COLORS.accentBorder,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    marginBottom: 14,
+    flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: COLORS.accentDim,
+    borderWidth: 1, borderColor: COLORS.accentBorder, borderRadius: 8,
+    paddingHorizontal: 12, paddingVertical: 7, marginBottom: 14,
   },
-  selectedRMText: {
-    color: COLORS.accent,
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  modalBtnRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 10,
-  },
+  selectedRMText: { color: COLORS.accent, fontSize: 12, fontWeight: '600' },
+  modalBtnRow: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10 },
   cancelBtn: {
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    paddingHorizontal: 18,
-    paddingVertical: 9,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: COLORS.borderColor,
+    backgroundColor: 'rgba(255,255,255,0.08)', paddingHorizontal: 18, paddingVertical: 9,
+    borderRadius: 20, borderWidth: 1, borderColor: COLORS.borderColor,
   },
-  cancelBtnText: {
-    color: COLORS.white,
-    fontWeight: '500',
-    fontSize: 13,
-  },
+  cancelBtnText: { color: COLORS.white, fontWeight: '500', fontSize: 13 },
   assignBtn: {
-    backgroundColor: COLORS.accent,
-    paddingHorizontal: 18,
-    paddingVertical: 9,
-    borderRadius: 20,
-    minWidth: 80,
-    alignItems: 'center',
+    backgroundColor: COLORS.accent, paddingHorizontal: 18, paddingVertical: 9,
+    borderRadius: 20, minWidth: 80, alignItems: 'center',
   },
-  assignBtnDisabled: {
-    backgroundColor: 'rgba(0,207,255,0.3)',
-  },
-  assignBtnText: {
-    color: '#fff',
-    fontWeight: '700',
-    fontSize: 13,
-  },
+  assignBtnDisabled: { backgroundColor: 'rgba(0,207,255,0.3)' },
+  assignBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
 
   // ── Filter Bottom Sheet ──
-bottomSheetOverlay: {
-  ...StyleSheet.absoluteFillObject,
-  backgroundColor: 'rgba(0,0,0,0.6)',
-  justifyContent: 'flex-end',
-  zIndex: 99999,
-  elevation: 99999,
-},
+  bottomSheetOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'flex-end',
+    zIndex: 99999,
+    elevation: 99999,
+  },
   bottomSheet: {
-    backgroundColor: COLORS.modalBg,
-    borderTopLeftRadius: 22,
-    borderTopRightRadius: 22,
-    padding: 18,
-    paddingBottom: 30,
-    maxHeight: '85%',
-    borderWidth: 1,
-    borderColor: COLORS.borderColor,
-    borderBottomWidth: 0,
+    backgroundColor: COLORS.modalBg, borderTopLeftRadius: 22, borderTopRightRadius: 22,
+    padding: 18, paddingBottom: 30, maxHeight: '85%',
+    borderWidth: 1, borderColor: COLORS.borderColor, borderBottomWidth: 0,
   },
   handleBar: {
-    width: 40,
-    height: 4,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: 4,
-    alignSelf: 'center',
-    marginBottom: 14,
+    width: 40, height: 4, backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 4, alignSelf: 'center', marginBottom: 14,
   },
-  filterModalTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  filterDivider: {
-    height: 0.5,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    marginVertical: 12,
-  },
+  filterModalTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  filterDivider: { height: 0.5, backgroundColor: 'rgba(255,255,255,0.12)', marginVertical: 12 },
   filterLabel: {
-    color: COLORS.accent,
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-    textTransform: 'uppercase',
-    marginBottom: 6,
-    marginTop: 4,
+    color: COLORS.accent, fontSize: 11, fontWeight: '700', letterSpacing: 0.5,
+    textTransform: 'uppercase', marginBottom: 6, marginTop: 4,
   },
-  dateRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 4,
-  },
+  dateRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
   dateField: { flex: 1 },
-  dateSubLabel: {
-    color: COLORS.mutedText,
-    fontSize: 11,
-    marginBottom: 4,
-  },
+  dateSubLabel: { color: COLORS.mutedText, fontSize: 11, marginBottom: 4 },
   dateSeparator: { paddingTop: 18 },
-  statusChipRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 8,
-  },
-  statusChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.07)',
-    borderWidth: 1,
-    borderColor: COLORS.borderColor,
-  },
-  statusChipActive: {
-    backgroundColor: COLORS.accentDim,
-    borderColor: COLORS.accentBorder,
-  },
-  statusChipText: {
-    color: COLORS.mutedText,
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  statusChipTextActive: {
-    color: COLORS.accent,
-    fontWeight: '700',
-  },
   filterBtnRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 4,
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4,
   },
   resetBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(255,82,82,0.35)',
+    flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 14, paddingVertical: 8,
+    borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255,82,82,0.35)',
     backgroundColor: 'rgba(255,82,82,0.1)',
   },
-  resetBtnText: {
-    color: COLORS.red,
-    fontSize: 13,
-    fontWeight: '500',
-  },
-  filterActionBtns: {
-    flexDirection: 'row',
-    gap: 10,
-  },
+  resetBtnText: { color: COLORS.red, fontSize: 13, fontWeight: '500' },
+  filterActionBtns: { flexDirection: 'row', gap: 10 },
   applyBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: COLORS.accent,
-    paddingHorizontal: 18,
-    paddingVertical: 8,
-    borderRadius: 20,
-    minWidth: 80,
-    justifyContent: 'center',
+    flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: COLORS.accent,
+    paddingHorizontal: 18, paddingVertical: 8, borderRadius: 20, minWidth: 80, justifyContent: 'center',
   },
-  applyBtnText: {
-    color: '#fff',
-    fontWeight: '700',
-    fontSize: 13,
-  },
-
-  // ── Dropdown Field ──
-  inputWrapper: {
-    marginBottom: 10,
-    width: '100%',
-  },
-  dropdown: {
-    height: 42,
-    backgroundColor: 'rgba(255,255,255,0.07)',
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    borderWidth: 1,
-    borderColor: COLORS.borderColor,
-  },
-  dropdownContainer: {
-    backgroundColor: '#fff',
-    borderRadius: 10,
-  },
-  placeholderStyle: {
-    color: COLORS.mutedText,
-    fontSize: 13,
-  },
-  selectedTextStyle: {
-    color: COLORS.white,
-    fontSize: 13,
-  },
+  applyBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
 
   // ── Input Field ──
-  field: {
-    marginBottom: 10,
-  },
+  inputWrapper: { marginBottom: 10, width: '100%' },
+  field: { marginBottom: 10 },
   inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.07)',
-    borderWidth: 1,
-    borderColor: COLORS.borderColor,
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    height: 42,
+    flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.07)',
+    borderWidth: 1, borderColor: COLORS.borderColor, borderRadius: 10, paddingHorizontal: 10, height: 42,
   },
-  input: {
-    color: COLORS.white,
-    flex: 1,
-    fontSize: 13,
+  input: { color: COLORS.white, flex: 1, fontSize: 13 },
+
+  // ── Searchable Dropdown ──
+  dropdownTrigger: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    height: 42, backgroundColor: 'rgba(255,255,255,0.07)',
+    borderRadius: 10, paddingHorizontal: 12,
+    borderWidth: 1, borderColor: COLORS.borderColor,
   },
-  section: {
-    color: 'rgba(0, 208, 255, 0.84)',
+  dropdownTriggerText: { color: COLORS.white, fontSize: 13, flex: 1 },
+  dropdownTriggerIcons: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+
+  // ── Searchable Dropdown Modal ──
+  sdModalOverlay: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'flex-end',
   },
+  sdKAV: { justifyContent: 'flex-end' },
+  sdContainer: {
+    backgroundColor: COLORS.modalBg, borderTopLeftRadius: 20, borderTopRightRadius: 20,
+    padding: 16, paddingBottom: Platform.OS === 'ios' ? 34 : 20,
+    maxHeight: screenHeight * 0.65,
+    borderWidth: 1, borderColor: COLORS.borderColor, borderBottomWidth: 0,
+  },
+  sdHeader: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12,
+  },
+  sdTitle: { color: COLORS.accent, fontSize: 14, fontWeight: '700' },
+  sdSearchBox: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 10,
+    paddingHorizontal: 12, height: 42, gap: 8,
+    borderWidth: 1, borderColor: COLORS.accentBorder, marginBottom: 8,
+  },
+  sdSearchInput: { flex: 1, color: COLORS.white, fontSize: 13 },
+  sdCount: { color: COLORS.mutedText, fontSize: 11, marginBottom: 6, paddingLeft: 2 },
+  sdList: { maxHeight: screenHeight * 0.38 },
+  sdItem: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 12, paddingVertical: 13,
+    borderBottomWidth: 0.5, borderBottomColor: 'rgba(255,255,255,0.08)',
+  },
+  sdItemSelected: { backgroundColor: COLORS.accentDim },
+  sdItemText: { color: COLORS.mutedText, fontSize: 13, flex: 1 },
+  sdItemTextSelected: { color: COLORS.accent, fontWeight: '600' },
+  sdEmpty: { alignItems: 'center', paddingVertical: 32, gap: 8 },
+  sdEmptyText: { color: COLORS.mutedText, fontSize: 13 },
 });

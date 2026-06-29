@@ -30,6 +30,19 @@ const makeCall = phoneNumber => {
     { text: 'Call', onPress: () => Linking.openURL(`tel:${phoneNumber}`) },
   ]);
 };
+const sendMail = async email => {
+  if (!email) return;
+
+  const url = `mailto:${email}`;
+
+  const supported = await Linking.canOpenURL(url);
+
+  if (supported) {
+    Linking.openURL(url);
+  } else {
+    Alert.alert('Error', 'No email app is installed.');
+  }
+};
 const FollowCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
   <View style={styles.card}>
     {/* Header */}
@@ -97,7 +110,7 @@ const FollowCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
       </TouchableOpacity>
       <Text style={styles.label}>
         Email:{' '}
-        <Text style={styles.value}>{data?.propertylead?.email || 'N/A'}</Text>
+        <Text style={styles.value}>onPress={()=>sendMail(data?.propertylead?.email || 'N/A')}</Text>
       </Text>
     </View>
     <View style={styles.rowBetween}>

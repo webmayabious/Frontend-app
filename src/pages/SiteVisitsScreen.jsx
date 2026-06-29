@@ -30,6 +30,19 @@ const makeCall = phoneNumber => {
     { text: 'Call', onPress: () => Linking.openURL(`tel:${phoneNumber}`) },
   ]);
 };
+const sendMail = async email => {
+  if (!email) return;
+
+  const url = `mailto:${email}`;
+
+  const supported = await Linking.canOpenURL(url);
+
+  if (supported) {
+    Linking.openURL(url);
+  } else {
+    Alert.alert('Error', 'No email app is installed.');
+  }
+};
 const DropdownField = ({ label, data, placeholder, value, onChange }) => {
   const [isFocus, setIsFocus] = useState(false);
   return (
@@ -140,12 +153,15 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
       </Text>
     </View>
     <View style={styles.rowBetween}>
+       <TouchableOpacity onPress={()=>sendMail(data?.propertylead?.email || 'N/A')}>
       <Text style={styles.label}>
         <Text style={styles.label}>
           Email:{' '}
           <Text style={styles.value}>{data?.propertylead?.email || 'N/A'}</Text>
         </Text>
+        
       </Text>
+      </TouchableOpacity>
     </View>
     <Text style={styles.label}>
       RM:{' '}
