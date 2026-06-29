@@ -301,7 +301,7 @@ const isScrollingToTop = useRef(false);
       <View style={styles.topBarContainer}>
         <View style={styles.topBar}>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Icon name="event-note" size={18} color="#cfd8dc" />
+            <Icon name="assignment-ind" size={18} color="#cfd8dc" />
             <Text style={styles.screenTitle}>Today's All Assigned Leads</Text>
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>

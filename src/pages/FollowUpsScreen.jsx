@@ -377,8 +377,8 @@ const FollowUpsScreen = () => {
         <View style={styles.topBar}>
           {/* Left */}
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Icon name="event-note" size={18} color="#cfd8dc" />
-            <Text style={styles.screenTitle}>Follow-ups / Meetings</Text>
+            <Icon name="phone-callback" size={18} color="#cfd8dc" />
+            <Text style={styles.screenTitle}>Remaining  / Total Followups</Text>
           </View>
 
           {/* Right */}

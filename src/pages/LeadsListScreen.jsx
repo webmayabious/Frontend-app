@@ -489,7 +489,7 @@ const LeadsListScreen = () => {
       <View style={styles.topBarContainer}>
         <View style={styles.topBar}>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Icon name="event-note" size={18} color="#cfd8dc" />
+            <Icon name="list-alt" size={18} color="#cfd8dc" />
             <Text style={styles.screenTitle}>Leads List</Text>
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
