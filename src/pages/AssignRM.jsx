@@ -610,6 +610,7 @@ const AssignRM = ({ setHideBottomNav }) => {
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 120 : 0}
       >
         <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
@@ -948,6 +949,7 @@ const AssignRM = ({ setHideBottomNav }) => {
           <KeyboardAvoidingView
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             style={styles.bottomSheetOverlay}
+
           >
             <TouchableOpacity
               style={StyleSheet.absoluteFill}
