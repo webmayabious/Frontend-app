@@ -229,7 +229,7 @@ const BookingDetailScreen = ({ navigation, route }) => {
         >
           <Text style={styles.cancelText}>Cancel</Text>
         </TouchableOpacity>
-
+         <View style={{ height: 100 }} />
       </ScrollView>
     </View>
   );

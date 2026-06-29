@@ -19,7 +19,7 @@ import messaging from '@react-native-firebase/messaging';
 import socket from '../socket';                            
 import api from '../api/AxiosInstance';             
 
-const STATUSBAR_HEIGHT = Platform.OS === "android" ? StatusBar.currentHeight : 44;
+const STATUSBAR_HEIGHT = Platform.OS === "android" ? StatusBar.currentHeight : 60;
 
 const Header = ({ routeName }) => {
 

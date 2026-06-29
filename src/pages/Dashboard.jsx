@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
+  RefreshControl,
   TouchableOpacity,
   StatusBar,
   Platform,
@@ -134,8 +135,9 @@ const Card = ({ icon, label, period, accent, value, onPress }) => (
 const Dashboard = () => {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
+  const [refreshing, setRefreshing] = useState(false);
 
-  const { data: dashboardCards } = useQuery({
+  const { data: dashboardCards, refetch } = useQuery({
     queryKey: ['dashboardCards'],
     queryFn: async () => {
       const res = await api.get('/api/pm/PropertyCrmDashboardData');
@@ -143,8 +145,13 @@ const Dashboard = () => {
     },
   });
 
-const paddingTop = Platform.OS === 'ios' ? insets.top + 14 : 14;
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await refetch();
+    setRefreshing(false);
+  };
 
+  const paddingTop = Platform.OS === 'ios' ? insets.top + 14 : 14;
   const bottomNavHeight = 60 + insets.bottom;
 
   return (
@@ -160,6 +167,15 @@ const paddingTop = Platform.OS === 'ios' ? insets.top + 14 : 14;
             paddingBottom: bottomNavHeight + 10,
           },
         ]}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor="#4ade80"
+            colors={['#e3e5e4', '#f472b6', '#a78bfa']}
+            progressBackgroundColor="#1a2080"
+          />
+        }
       >
         {/* Section heading */}
         <View style={styles.sectionHeader}>
