@@ -32,22 +32,54 @@ const makeCall = phoneNumber => {
     { text: 'Call', onPress: () => Linking.openURL(`tel:${phoneNumber}`) },
   ]);
 };
+const sendMail = async (email) => {
+  if (!email) return;
 
+  try {
+    if (Platform.OS === 'android') {
+      const gmailUrl = `googlegmail://co?to=${email}`;
+      const supported = await Linking.canOpenURL(gmailUrl);
+
+      if (supported) {
+        await Linking.openURL(gmailUrl);
+      } else {
+        // Fallback to mailto
+        await Linking.openURL(`mailto:${email}`);
+      }
+    } else {
+      // iOS
+      await Linking.openURL(`mailto:${email}`);
+    }
+  } catch (error) {
+    Alert.alert('Error', 'Unable to open email app.');
+  }
+};
 const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
   <View style={styles.card}>
     <View style={styles.cardHeader}>
       <View style={styles.nameRow}>
         <Text style={styles.name}>{data?.name || []}</Text>
-        <View
-          style={[
-            styles.activeBadge,
-            { backgroundColor: data?.active === '1' ? '#4caf50' : '#f44336' },
-          ]}
-        >
-          <Text style={styles.activeText}>
-            {data?.active === '1' ? 'Active' : 'Inactive'}
-          </Text>
-        </View>
+            <View
+        style={[
+          styles.activeBadge,
+          {
+            backgroundColor:
+              data?.active === '1'
+                ? '#4caf50'
+                : data?.active === '5'
+                ? '#6b7785'
+                : '#f44336',
+          },
+        ]}
+      >
+        <Text style={styles.activeText}>
+          {data?.active === '1'
+            ? 'Active'
+            : data?.active === '5'
+            ? 'Booking Done'
+            : 'Inactive'}
+        </Text>
+      </View>
       </View>
 
       <View style={{ flexDirection: 'row', alignItems: 'center', flexShrink: 0 }}>
@@ -56,7 +88,7 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
           onPress={() => {
             setRemarksText(
               data?.propertyfeedbacks?.map(x => x?.remarks || []).join(', ') ||
-                'No remarks available',
+              'No remarks available',
             );
             setShowRemarks(true);
           }}
@@ -78,7 +110,7 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
       {data?.propertyproject?.project_name || []} | {data?.propertylocation?.name || []}
     </Text>
 
-    <View style={styles.rowBetween}>
+    {/* <View style={styles.rowBetween}>
       <TouchableOpacity onPress={() => makeCall(data?.phone)}>
         <Text style={styles.label}>
           Phone: <Text style={styles.value}>{data?.phone || 'N/A'}</Text>
@@ -87,8 +119,44 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
       <Text style={styles.label}>
         Email: <Text style={styles.value}>{data?.email || 'N/A'}</Text>
       </Text>
-    </View>
+    </View> */}
+    <View style={styles.rowBetween}>
+      {/* <TouchableOpacity onPress={() => makeCall(data?.propertylead?.phone)}>
+        <Text style={styles.label}>
+          Phone:{' '}
+          <Text style={styles.remarksBtn}>{data?.propertylead?.phone || 'N/A'}</Text>
+        </Text>
+      </TouchableOpacity> */}
+      <TouchableOpacity onPress={() => makeCall(data?.phone)}>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <Text style={styles.label1}>Phone:{' '}</Text>
 
+          {/* <View style={styles.remarksBtn}> */}
+            <Text style={styles.phoneText}>
+              {data?.phone || 'N/A'}
+            </Text>
+          {/* </View> */}
+        </View>
+      </TouchableOpacity>
+
+    </View>
+    <View style={styles.rowBetween}>
+      <TouchableOpacity
+
+        onPress={() => sendMail(data?.email)}
+
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <Text style={styles.label1}>Email:{' '}</Text>
+
+
+          <Text style={styles.emailText}>
+            {data?.email || 'N/A'}
+          </Text>
+
+        </View>
+      </TouchableOpacity>
+    </View>
     <View style={styles.rowBetween}>
       <Text style={styles.label}>
         Site Visit Date:
@@ -267,7 +335,7 @@ const FilterModal = ({
           <DropdownField
             label="Property Location"
             data={Property}
-            placeholder="Select location"
+            placeholder="Select Location"
             value={filters.location}
             onChange={value => onChange('location', value)}
           />
@@ -303,14 +371,14 @@ const FilterModal = ({
           <DropdownField
             label="Project"
             data={projectOptions}
-            placeholder="Select project"
+            placeholder="Select Project"
             value={filters.project}
             onChange={value => onChange('project', value)}
           />
           <DropdownField
             label="Lead Status"
             data={LeadStatus}
-            placeholder="Select status"
+            placeholder="Select Status"
             value={filters.active}
             onChange={value => onChange('active', value)}
           />
@@ -457,6 +525,7 @@ const LeadsListScreen = () => {
   const LeadStatus = [
     { label: 'Active', value: '1' },
     { label: 'Inactive', value: '2' },
+     { label: 'Booking Done', value: '5' },
   ];
 
   const onChange = (key, value) => setFilters(prev => ({ ...prev, [key]: value }));
@@ -675,10 +744,35 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     maxWidth: 80,
   },
+    phoneText: {
+  color: '#00acc1',
+  backgroundColor: 'rgba(0, 172, 193, 0.15)',
+  paddingHorizontal: 4,
+  paddingVertical: 2,
+  borderRadius: 4,
+  fontWeight: '600',
+},
   remarksText: { color: '#fff', fontSize: 10 },
   location: { color: '#00e5ff', marginTop: 5, flexWrap: 'wrap', lineHeight: 16 },
   rowBetween: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 5, gap: 6 },
-  label: { color: '#FFB85D', fontSize: 12, flex: 1, flexWrap: 'wrap', paddingTop: 2 },
+  label: {
+    color: '#FFB85D', fontSize: 12,
+    flex: 1, flexWrap: 'wrap',
+    paddingTop: 2
+  },
+    label1: {
+    color: '#FFB85D', fontSize: 12,
+    // flex: 1, flexWrap: 'wrap',
+    paddingTop: 2
+  },
+    emailText: {
+    color: '#00acc1',
+    textDecorationLine: 'underline',
+    fontWeight: '500',
+    fontSize: 12,
+
+
+  },
   value: { color: '#fff', flexShrink: 1 },
   cardFooter: {
     flexDirection: 'row',
@@ -716,7 +810,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 1000,
-    bottom:85
+    bottom: 85
   },
 
   /* Remarks modal */

@@ -18,7 +18,11 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '../api/AxiosInstance';
 import { useNavigation } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
-
+const LeadStatus = [
+  { label: 'Active', value: '1' },
+  { label: 'Inactive', value: '2' },
+  { label: 'Booking Done', value: '5' },
+];
 const DropdownField = ({ label, data, placeholder, value, onChange }) => {
   const [isFocus, setIsFocus] = React.useState(false);
   return (
@@ -143,8 +147,9 @@ const Section = ({ title, children }) => (
 );
 
 const maritalData = [
-  { label: 'Single', value: 'single' },
-  { label: 'Married', value: 'married' },
+  { label: 'SINGLE', value: 'single' },
+  { label: 'MARRIED', value: 'married' },
+  { label: 'UNMARRIED', value: 'unmarried' },
 ];
 
 export default function MeetingsEdit({ route }) {
@@ -178,6 +183,7 @@ export default function MeetingsEdit({ route }) {
     purpose_of_purchase: '',
     planning_to_buy_date: '',
     interested_in_site_visit: '',
+    active:''
   });
 
   const navigation = useNavigation();
@@ -422,6 +428,13 @@ export default function MeetingsEdit({ route }) {
 
           {/* Lead Profile */}
           <Section title="Lead Profile">
+           <DropdownField
+  label="Lead Status"
+  data={LeadStatus}
+  placeholder="Select"
+  value={form.active}
+  onChange={value => onChange('active', value)}
+/>
             <DropdownField
               label="Location of Property *"
               data={Property || []}

@@ -243,7 +243,7 @@ const COLORS = {
   green: '#00C48C',
   red: '#FF6B6B',
   remarksBg: '#2488B5',
-  addNewBg: 'rgba(30,42,110,0.28)',
+  addNewBg: '#2488B5',
   borderColor: '#1E2550',
 };
 

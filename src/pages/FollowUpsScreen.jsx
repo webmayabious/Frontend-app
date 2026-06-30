@@ -30,17 +30,26 @@ const makeCall = phoneNumber => {
     { text: 'Call', onPress: () => Linking.openURL(`tel:${phoneNumber}`) },
   ]);
 };
-const sendMail = async email => {
+const sendMail = async (email) => {
   if (!email) return;
 
-  const url = `mailto:${email}`;
+  try {
+    if (Platform.OS === 'android') {
+      const gmailUrl = `googlegmail://co?to=${email}`;
+      const supported = await Linking.canOpenURL(gmailUrl);
 
-  const supported = await Linking.canOpenURL(url);
-
-  if (supported) {
-    Linking.openURL(url);
-  } else {
-    Alert.alert('Error', 'No email app is installed.');
+      if (supported) {
+        await Linking.openURL(gmailUrl);
+      } else {
+        // Fallback to mailto
+        await Linking.openURL(`mailto:${email}`);
+      }
+    } else {
+      // iOS
+      await Linking.openURL(`mailto:${email}`);
+    }
+  } catch (error) {
+    Alert.alert('Error', 'Unable to open email app.');
   }
 };
 const FollowCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
@@ -51,17 +60,17 @@ const FollowCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
         <Text style={styles.name}>{data?.propertylead?.name}</Text>
 
         <View
-          style={[
-            styles.activeBadge,
-            {
-              backgroundColor: data?.active === '1' ? '#4caf50' : '#f44336',
-            },
-          ]}
-        >
-          <Text style={styles.activeText}>
-            {data?.active === '1' ? 'Active' : 'Inactive'}
-          </Text>
-        </View>
+                  style={[
+                    styles.activeBadge,
+                    {
+                      backgroundColor: data?.active === '1' ? '#4caf50' : '#f44336',
+                    },
+                  ]}
+                >
+                  <Text style={styles.activeText}>
+                    {data?.active === '1' ? 'Active' : 'Inactive'}
+                  </Text>
+                </View>
       </View>
 
       <View
@@ -101,18 +110,43 @@ const FollowCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
       {data?.propertylead?.propertyproject?.project_name} |{' '}
       {data?.propertylead?.propertylocation?.name}
     </Text>
-    <View style={styles.rowBetween}>
-      <TouchableOpacity onPress={() => makeCall(data?.propertylead?.phone)}>
-        <Text style={styles.label}>
-          Phone:{' '}
-          <Text style={styles.value}>{data?.propertylead?.phone || 'N/A'}</Text>
-        </Text>
-      </TouchableOpacity>
-      <Text style={styles.label}>
-        Email:{' '}
-        <Text style={styles.value}>onPress={()=>sendMail(data?.propertylead?.email || 'N/A')}</Text>
-      </Text>
-    </View>
+   <View style={styles.rowBetween}>
+        {/* <TouchableOpacity onPress={() => makeCall(data?.propertylead?.phone)}>
+          <Text style={styles.label}>
+            Phone:{' '}
+            <Text style={styles.remarksBtn}>{data?.propertylead?.phone || 'N/A'}</Text>
+          </Text>
+        </TouchableOpacity> */}
+        <TouchableOpacity onPress={() => makeCall(data?.propertylead?.phone)}>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Text style={styles.label1}>Phone:{' '}</Text>
+  
+            {/* <View style={styles.remarksBtn}> */}
+              <Text style={styles.phoneText}>
+                {data?.propertylead?.phone || 'N/A'}
+              </Text>
+            {/* </View> */}
+          </View>
+        </TouchableOpacity>
+       
+      </View>
+        <View style={styles.rowBetween}> 
+            <TouchableOpacity
+      
+              onPress={() => sendMail(data?.propertylead?.email)}
+      
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Text style={styles.label1}>Email:{' '}</Text>
+      
+      
+                <Text style={styles.emailText}>
+                  {data?.propertylead?.email || 'N/A'}
+                </Text>
+      
+              </View>
+            </TouchableOpacity>
+          </View>
     <View style={styles.rowBetween}>
       <Text style={styles.label}>
         <Text style={styles.label}>
@@ -324,6 +358,7 @@ const FollowUpsScreen = () => {
   const LeadStatus = [
     { label: 'Active', value: '1' },
     { label: 'Inactive', value: '2' },
+     { label: 'Booking Done', value: '5' },
     // { label: 'Site Visit', value: '3' },
     // { label: 'Meeting Done', value: '4' },
     // { label: 'Booking Done', value: '5' },
@@ -489,7 +524,7 @@ const FollowUpsScreen = () => {
         <DropdownField
           label="Property Location"
           data={Property}
-          placeholder="Select location"
+          placeholder="Select Location"
           value={filters.location}
           onChange={value => onChange('location', value)}
         />
@@ -505,7 +540,7 @@ const FollowUpsScreen = () => {
         <DropdownField
           label="Project"
           data={projectOptions}
-          placeholder="Select project"
+          placeholder="Select Project"
           value={filters.project}
           onChange={value => onChange('project', value)}
         />
@@ -513,7 +548,7 @@ const FollowUpsScreen = () => {
         <DropdownField
           label="Lead Status"
           data={LeadStatus}
-          placeholder="Select status"
+          placeholder="Select Status"
           value={filters.status}
           onChange={value => onChange('status', value)}
         />
@@ -634,7 +669,14 @@ const styles = StyleSheet.create({
   },
 
   remarksText: { color: '#fff', fontSize: 10 },
-
+phoneText: {
+  color: '#00acc1',
+  backgroundColor: 'rgba(0, 172, 193, 0.15)',
+  paddingHorizontal: 4,
+  paddingVertical: 2,
+  borderRadius: 4,
+  fontWeight: '600',
+},
   location: {
     color: '#00e5ff',
     marginTop: 5,
@@ -656,8 +698,26 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     paddingTop: 2,
     paddingBottom:5,
-    fontStyle: 'italic',
+    // fontStyle: 'italic',
     fontWeight: '500',
+  },
+    label1: {
+    color: '#eae8e5df',
+    fontSize: 12,
+    // flex: 1,
+    // flexWrap: 'wrap',
+    paddingTop: 2,
+    paddingBottom:5,
+    // fontStyle: 'italic',
+    fontWeight: '500',
+  },
+    emailText: {
+    color: '#00acc1',
+    textDecorationLine: 'underline',
+    fontWeight: '500',
+    fontSize: 12,
+
+
   },
   value: {
     color: '#fff',

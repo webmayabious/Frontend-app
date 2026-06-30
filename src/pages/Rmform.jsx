@@ -168,10 +168,15 @@ const Section = ({ title, icon, children }) => (
 // ─── STATIC DATA ──────────────────────────────────────────────────────────────
 
 const maritalData = [
-  { label: 'Single', value: 'single' },
-  { label: 'Married', value: 'married' },
+  { label: 'SINGLE', value: 'single' },
+  { label: 'MARRIED', value: 'married' },
+  { label: 'UNMARRIED', value: 'unmarried' },
 ];
-
+const LeadStatus = [
+  { label: 'Active', value: '1' },
+  { label: 'Inactive', value: '2' },
+  { label: 'Booking Done', value: '5' },
+];
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
 
 export default function Rmform() {
@@ -189,7 +194,7 @@ export default function Rmform() {
     date_of_birth: '',
     gender: '',
     marital_status: '',
-    active: '1',
+    active: '',
     office_location: '',
     industry: '',
     occupation: '',
@@ -359,7 +364,7 @@ export default function Rmform() {
             <DropdownField
               label="Reference *"
               data={References}
-              placeholder="Select reference"
+              placeholder="Select Reference"
               value={form.reference}
               onChange={value => onChange('reference', value)}
             />
@@ -367,7 +372,7 @@ export default function Rmform() {
 
             <InputField
               label="Name *"
-              placeholder="Enter full name"
+              placeholder="Enter Full Name"
               value={form.name}
               onChangeText={v => onChange('name', v)}
             />
@@ -391,7 +396,7 @@ export default function Rmform() {
 
             <InputField
               label="Email *"
-              placeholder="Enter email address"
+              placeholder="Enter Email Address"
               value={form.email}
               onChangeText={v => onChange('email', v)}
               keyboardType="email-address"
@@ -403,28 +408,28 @@ export default function Rmform() {
             <DropdownField
               label="Marital Status"
               data={maritalData}
-              placeholder="Select marital status"
+              placeholder="Select Marital Status"
               value={form.marital_status}
               onChange={value => onChange('marital_status', value)}
             />
 
             <InputField
               label="Office Location"
-              placeholder="Office city / area"
+              placeholder="Office City / Area"
               value={form.office_location}
               onChangeText={v => onChange('office_location', v)}
             />
 
             <InputField
               label="Industry"
-              placeholder="e.g. IT, Healthcare"
+              placeholder="Industry"
               value={form.industry}
               onChangeText={v => onChange('industry', v)}
             />
 
             <InputField
               label="Occupation"
-              placeholder="e.g. Engineer, Doctor"
+              placeholder="Occupation"
               value={form.occupation}
               onChangeText={v => onChange('occupation', v)}
             />
@@ -433,7 +438,7 @@ export default function Rmform() {
               <DropdownField
                 label="Company *"
                 data={Company}
-                placeholder="Select company"
+                placeholder="Select Company"
                 value={form.com_id}
                 onChange={value => onChange('com_id', value)}
               />
@@ -442,7 +447,7 @@ export default function Rmform() {
             <DropdownField
               label="Project *"
               data={projectOptions}
-              placeholder="Select project"
+              placeholder="Select Project"
               value={form.project_id}
               onChange={value => onChange('project_id', value)}
             />
@@ -451,10 +456,17 @@ export default function Rmform() {
 
           {/* Lead Profile */}
           <Section title="Lead Profile" icon="leaderboard">
+             <DropdownField
+  label="Lead Status"
+  data={LeadStatus}
+  placeholder="Select"
+  value={form.active}
+  onChange={value => onChange('active', value)}
+/>
             <DropdownField
               label="Location of Property *"
               data={Property}
-              placeholder="Select location"
+              placeholder="Select Location"
               value={form.location_of_property}
               onChange={value => onChange('location_of_property', value)}
             />
@@ -462,14 +474,14 @@ export default function Rmform() {
 
             <InputField
               label="Budget"
-              placeholder="e.g. 50 Lakhs"
+              placeholder="Budget"
               value={form.budget}
               onChangeText={v => onChange('budget', v)}
             />
 
             <InputField
               label="BHK"
-              placeholder="e.g. 2BHK / 3BHK"
+              placeholder="BHK"
               value={form.flat_type}
               onChangeText={v => onChange('flat_type', v)}
             />
@@ -483,21 +495,21 @@ export default function Rmform() {
 
             <InputField
               label="Preferred Bank"
-              placeholder="Bank name"
+              placeholder="Bank Name"
               value={form.preferred_bank}
               onChangeText={v => onChange('preferred_bank', v)}
             />
 
             <InputField
               label="Purpose of Purchase"
-              placeholder="e.g. Investment / Self Use"
+              // placeholder="e.g. Investment / Self Use"
               value={form.purpose_type}
               onChangeText={v => onChange('purpose_type', v)}
             />
 
             <InputField
               label="Planning to Buy"
-              placeholder="e.g. Within 3 months"
+              // placeholder="e.g. Within 3 months"
               value={form.planning_to_buy_date}
               onChangeText={v => onChange('planning_to_buy_date', v)}
             />

@@ -30,17 +30,26 @@ const makeCall = phoneNumber => {
     { text: 'Call', onPress: () => Linking.openURL(`tel:${phoneNumber}`) },
   ]);
 };
-const sendMail = async email => {
+const sendMail = async (email) => {
   if (!email) return;
 
-  const url = `mailto:${email}`;
+  try {
+    if (Platform.OS === 'android') {
+      const gmailUrl = `googlegmail://co?to=${email}`;
+      const supported = await Linking.canOpenURL(gmailUrl);
 
-  const supported = await Linking.canOpenURL(url);
-
-  if (supported) {
-    Linking.openURL(url);
-  } else {
-    Alert.alert('Error', 'No email app is installed.');
+      if (supported) {
+        await Linking.openURL(gmailUrl);
+      } else {
+        // Fallback to mailto
+        await Linking.openURL(`mailto:${email}`);
+      }
+    } else {
+      // iOS
+      await Linking.openURL(`mailto:${email}`);
+    }
+  } catch (error) {
+    Alert.alert('Error', 'Unable to open email app.');
   }
 };
 const DropdownField = ({ label, data, placeholder, value, onChange }) => {
@@ -89,16 +98,25 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
       <View style={styles.nameRow}>
         <Text style={styles.name}>{data?.propertylead?.name}</Text>
 
-        <View
+                <View
           style={[
             styles.activeBadge,
             {
-              backgroundColor: data?.active === '1' ? '#4caf50' : '#f44336',
+              backgroundColor:
+                data?.propertylead?.active === '1'
+                  ? '#4caf50'
+                  : data?.propertylead?.active === '5'
+                  ? '#6b7785'
+                  : '#f44336',
             },
           ]}
         >
           <Text style={styles.activeText}>
-            {data?.active === '1' ? 'Active' : 'Inactive'}
+            {data?.propertylead?.active === '1'
+              ? 'Active'
+              : data?.propertylead?.active === '5'
+              ? 'Booking Done'
+              : 'Inactive'}
           </Text>
         </View>
       </View>
@@ -141,26 +159,43 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
       {data?.propertylead?.propertylocation?.name}
     </Text>
     <View style={styles.rowBetween}>
-      <TouchableOpacity onPress={() => makeCall(data?.propertylead?.phone)}>
+      {/* <TouchableOpacity onPress={() => makeCall(data?.propertylead?.phone)}>
         <Text style={styles.label}>
           Phone:{' '}
-          <Text style={styles.value}>{data?.propertylead?.phone || 'N/A'}</Text>
+          <Text style={styles.remarksBtn}>{data?.propertylead?.phone || 'N/A'}</Text>
         </Text>
+      </TouchableOpacity> */}
+      <TouchableOpacity onPress={() => makeCall(data?.propertylead?.phone)}>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <Text style={styles.label}>Phone:{' '}</Text>
+
+          {/* <View style={styles.remarksBtn}> */}
+            <Text style={styles.phoneText}>
+              {data?.propertylead?.phone || 'N/A'}
+            </Text>
+          {/* </View> */}
+        </View>
       </TouchableOpacity>
       <Text style={styles.label}>
         Site Visit Date:
         <Text style={styles.value}> {data?.site_visit_date}</Text>
       </Text>
     </View>
-    <View style={styles.rowBetween}>
-       <TouchableOpacity onPress={()=>sendMail(data?.propertylead?.email || 'N/A')}>
-      <Text style={styles.label}>
-        <Text style={styles.label}>
-          Email:{' '}
-          <Text style={styles.value}>{data?.propertylead?.email || 'N/A'}</Text>
-        </Text>
-        
-      </Text>
+    <View style={styles.rowBetween}> 
+      <TouchableOpacity
+
+        onPress={() => sendMail(data?.propertylead?.email)}
+
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <Text style={styles.label}>Email:{' '}</Text>
+
+
+          <Text style={styles.emailText}>
+            {data?.propertylead?.email || 'N/A'}
+          </Text>
+
+        </View>
       </TouchableOpacity>
     </View>
     <Text style={styles.label}>
@@ -287,7 +322,7 @@ const SiteVisitsScreen = () => {
     const name = item?.propertylead?.name?.toLowerCase() || '';
     const phone = item?.propertylead?.phone || '';
     const email = item?.propertylead?.email?.toLowerCase() || '';
-    const project =item?.propertylead?.propertyproject?.project_name?.toLowerCase() || '';
+    const project = item?.propertylead?.propertyproject?.project_name?.toLowerCase() || '';
     const search = searchText.toLowerCase();
 
     return (
@@ -341,6 +376,7 @@ const SiteVisitsScreen = () => {
     // { label: 'Site Visit', value: '3' },
     // { label: 'Meeting Done', value: '4' },
     // { label: 'Booking Done', value: '5' },
+     { label: 'Booking Done', value: '5' },
   ];
 
   /* ================= HANDLERS ================= */
@@ -691,6 +727,23 @@ const styles = StyleSheet.create({
 
   activeText: { color: '#fff', fontSize: 10 },
 
+
+  emailText: {
+    color: '#00acc1',
+    textDecorationLine: 'underline',
+    fontWeight: '500',
+    fontSize: 12,
+
+
+  },
+  phoneText: {
+  color: '#00acc1',
+  backgroundColor: 'rgba(0, 172, 193, 0.15)',
+  paddingHorizontal: 4,
+  paddingVertical: 2,
+  borderRadius: 4,
+  fontWeight: '600',
+},
   remarksBtn: {
     backgroundColor: '#00acc1',
     borderRadius: 10,
@@ -718,7 +771,7 @@ const styles = StyleSheet.create({
   label: {
     color: '#a0b4e8', // muted blue-white — better contrast on dark bg
     fontSize: 12,
-    marginBottom: 5,
+    // marginBottom: 5,
     fontWeight: '500',
   },
   value: {
@@ -769,7 +822,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.6)',
     justifyContent: 'center',
     alignItems: 'center',
-    bottom:45
+    bottom: 45
   },
 
   modalCard: {

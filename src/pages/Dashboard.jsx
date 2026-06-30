@@ -88,14 +88,14 @@ const CARDS = (d, nav) => [
     value: `${d?.total_missed_callback ?? 0}`,
     route: 'MissedFollowup',
   },
-  {
-    icon: 'list-alt',
-    label: 'Leads List',
-    period: 'Till Date',
-    accent: '#a78bfa',
-    value: '—',
-    route: 'LeadsListScreen',
-  },
+  // {
+  //   icon: 'list-alt',
+  //   label: 'Leads List',
+  //   period: 'Till Date',
+  //   accent: '#a78bfa',
+  //   value: '—',
+  //   route: 'LeadsListScreen',
+  // },
 ];
 
 /* ─────────────────────────────────────────
@@ -172,7 +172,7 @@ const Dashboard = () => {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor="#4ade80"
+            tintColor="#e3e5e4"
             colors={['#e3e5e4', '#f472b6', '#a78bfa']}
             progressBackgroundColor="#1a2080"
           />

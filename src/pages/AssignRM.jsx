@@ -823,12 +823,12 @@ const AssignRM = ({ setHideBottomNav }) => {
                 </ScrollView>
               )}
 
-              {selectedRM && (
+              {/* {selectedRM && (
                 <View style={styles.selectedRMBadge}>
                   <Icon name="person-pin" size={14} color={COLORS.accent} />
                   <Text style={styles.selectedRMText}>{rmList.find(r => r.id === selectedRM)?.name}</Text>
                 </View>
-              )}
+              )} */}
 
               <View style={styles.modalBtnRow}>
                 <TouchableOpacity style={styles.cancelBtn} onPress={() => { setShowModal(false); setSelectedRM(null); }}>
@@ -875,14 +875,14 @@ const AssignRM = ({ setHideBottomNav }) => {
                   <DropdownField
                     label="Location of Property *"
                     data={Property}
-                    placeholder="Select location"
+                    placeholder="Select Location"
                     value={uploadProspect.location}
                     onChange={value => onChange('location', value)}
                   />
                   <DropdownField
                     label="Reference *"
                     data={References}
-                    placeholder="Select reference"
+                    placeholder="Select Reference"
                     value={uploadProspect.reference}
                     onChange={value => onChange('reference', value)}
                   />
@@ -890,7 +890,7 @@ const AssignRM = ({ setHideBottomNav }) => {
                     <DropdownField
                       label="Company *"
                       data={Company}
-                      placeholder="Select company"
+                      placeholder="Select Company"
                       value={uploadProspect.com_id}
                       onChange={value => onChange('com_id', value)}
                     />
@@ -901,7 +901,7 @@ const AssignRM = ({ setHideBottomNav }) => {
                     <TouchableOpacity style={styles.browseBtn} onPress={pickExcelFile}>
                       <Icon name="folder-open" size={15} color="#fff" />
                       <Text style={styles.browseText} numberOfLines={1}>
-                        {selectedFile ? selectedFile.name : 'Browse file...'}
+                        {selectedFile ? selectedFile.name : 'Browse File...'}
                       </Text>
                     </TouchableOpacity>
                     <TouchableOpacity
@@ -982,14 +982,14 @@ const AssignRM = ({ setHideBottomNav }) => {
                 <SearchableDropdown
                   label="Property Location"
                   data={Property}
-                  placeholder="Select location"
+                  placeholder="Select Location"
                   value={filters.location}
                   onChange={value => onFilterChange('location', value)}
                 />
                 <SearchableDropdown
                   label="Project"
                   data={projectOptions}
-                  placeholder="Select project"
+                  placeholder="Select Project"
                   value={filters.project}
                   onChange={value => onFilterChange('project', value)}
                 />

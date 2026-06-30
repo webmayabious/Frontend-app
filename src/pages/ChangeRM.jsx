@@ -747,14 +747,14 @@ const ChangeRM = ({ setHideBottomNav }) => {
               )}
             </ScrollView>
 
-            {rms && (
+            {/* {rms && (
               <View style={styles.selectedRMBadge}>
                 <Icon name="person-pin" size={14} color={COLORS.accent} />
                 <Text style={styles.selectedRMText}>
                   {Rm.find(r => r.value === rms)?.label}
                 </Text>
               </View>
-            )}
+            )} */}
 
             <View style={styles.modalBtnRow}>
               <TouchableOpacity
@@ -817,7 +817,7 @@ const ChangeRM = ({ setHideBottomNav }) => {
               <SearchableDropdown
                 label="Property Location"
                 data={Property}
-                placeholder="Select location"
+                placeholder="Select Location"
                 value={filters.location}
                 onChange={value => onChange('location', value)}
               />

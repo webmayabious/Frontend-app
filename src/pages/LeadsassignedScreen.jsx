@@ -31,7 +31,28 @@ const makeCall = phoneNumber => {
     { text: 'Call', onPress: () => Linking.openURL(`tel:${phoneNumber}`) },
   ]);
 };
+const sendMail = async (email) => {
+  if (!email) return;
 
+  try {
+    if (Platform.OS === 'android') {
+      const gmailUrl = `googlegmail://co?to=${email}`;
+      const supported = await Linking.canOpenURL(gmailUrl);
+
+      if (supported) {
+        await Linking.openURL(gmailUrl);
+      } else {
+        // Fallback to mailto
+        await Linking.openURL(`mailto:${email}`);
+      }
+    } else {
+      // iOS
+      await Linking.openURL(`mailto:${email}`);
+    }
+  } catch (error) {
+    Alert.alert('Error', 'Unable to open email app.');
+  }
+};
 const DropdownField = ({ label, data, placeholder, value, onChange }) => {
   const [isFocus, setIsFocus] = useState(false);
   return (
@@ -76,7 +97,7 @@ const FollowCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
     <View style={styles.cardHeader}>
       <View style={styles.nameRow}>
         <Text style={styles.name}>{data?.name}</Text>
-        <View
+        {/* <View
           style={[
             styles.activeBadge,
             {
@@ -87,15 +108,44 @@ const FollowCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
           <Text style={styles.activeText}>
             {data?.active === '1' ? 'Active' : 'Inactive'}
           </Text>
-        </View>
+        </View> */}
+        <View
+  style={[
+    styles.activeBadge,
+    {
+      backgroundColor:
+        data?.active === '1'
+          ? '#4caf50'
+          : data?.active === '5'
+          ? '#6b7785'
+          : '#f44336',
+    },
+  ]}
+>
+  <Text style={styles.activeText}>
+    {data?.active === '1'
+      ? 'Active'
+      : data?.active === '5'
+      ? 'Booking Done'
+      : 'Inactive'}
+  </Text>
+</View>
       </View>
 
       <View style={{ flexDirection: 'row', alignItems: 'center', flexShrink: 0 }}>
         <TouchableOpacity
           style={styles.remarksBtn}
-          onPress={() => {
-            setRemarksText(data?.remarks || 'No remarks available');
-            setShowRemarks(true);
+           onPress={() => {
+            // setRemarksText(data?.propertyfeedbacks?.map(x=>x.remarks)|| 'No remarks available');
+            // setShowRemarks(true);
+            const remarks =
+      data?.propertyfeedbacks?.length > 0
+        ? data.propertyfeedbacks.map(x => x.remarks).join('\n')
+        : 'No remarks available';
+
+    setRemarksText(remarks);
+    setShowRemarks(true);
+          
           }}
         >
           <Text style={styles.remarksText}>Remarks</Text>
@@ -118,7 +168,7 @@ const FollowCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
       {data?.propertylocation?.name || 'N/A'}
     </Text>
 
-    <View style={styles.rowBetween}>
+    {/* <View style={styles.rowBetween}>
       <TouchableOpacity onPress={() => makeCall(data?.phone)}>
         <Text style={styles.label}>
           Phone: <Text style={styles.value}>{data?.phone || 'N/A'}</Text>
@@ -127,8 +177,44 @@ const FollowCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
       <Text style={styles.label}>
         Email: <Text style={styles.value}>{data?.email || 'N/A'}</Text>
       </Text>
-    </View>
+    </View> */}
+  <View style={styles.rowBetween}>
+      {/* <TouchableOpacity onPress={() => makeCall(data?.propertylead?.phone)}>
+        <Text style={styles.label}>
+          Phone:{' '}
+          <Text style={styles.remarksBtn}>{data?.propertylead?.phone || 'N/A'}</Text>
+        </Text>
+      </TouchableOpacity> */}
+      <TouchableOpacity onPress={() => makeCall(data?.phone)}>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <Text style={styles.label1}>Phone:{' '}</Text>
 
+          {/* <View style={styles.remarksBtn}> */}
+            <Text style={styles.phoneText}>
+              {data?.phone || 'N/A'}
+            </Text>
+          {/* </View> */}
+        </View>
+      </TouchableOpacity>
+     
+    </View>
+    <View style={styles.rowBetween}> 
+      <TouchableOpacity
+
+        onPress={() => sendMail(data?.email)}
+
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <Text style={styles.label1}>Email:{' '}</Text>
+
+
+          <Text style={styles.emailText}>
+            {data?.email || 'N/A'}
+          </Text>
+
+        </View>
+      </TouchableOpacity>
+    </View>
     <View style={styles.rowBetween}>
       <Text style={styles.label}>
         RM:{' '}
@@ -155,7 +241,11 @@ const FollowCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
         <Text style={styles.buttonText}>View Interaction</Text>
       </TouchableOpacity>
       <Text style={styles.completed}>
-        {data?.propertycallstatus?.name || 'N/A'}
+        {data?.propertyfeedbacks?.length
+    ? data.propertyfeedbacks
+        .map(item => item.propertycallstatus?.name)
+        .join(', ')
+    : 'N/A'}
       </Text>
     </View>
   </View>
@@ -259,6 +349,7 @@ const isScrollingToTop = useRef(false);
   const LeadStatus = [
     { label: 'Active', value: '1' },
     { label: 'Inactive', value: '2' },
+    { label: 'Booking Done', value: '5' },
   ];
 
   const onChange = (key, value) => {
@@ -391,6 +482,7 @@ const isScrollingToTop = useRef(false);
                     }}
                   />
                 )}
+                <View style={{paddingBottom:100}}/>
       </ScrollView>
 
       {/* ✅ REMARKS MODAL */}
@@ -581,7 +673,14 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     maxWidth: 80,
   },
-
+  phoneText: {
+  color: '#00acc1',
+  backgroundColor: 'rgba(0, 172, 193, 0.15)',
+  paddingHorizontal: 4,
+  paddingVertical: 2,
+  borderRadius: 4,
+  fontWeight: '600',
+},
   remarksText: { color: '#fff', fontSize: 10 },
 
   location: { color: '#00e5ff', marginTop: 5, flexWrap: 'wrap', lineHeight: 16 },
@@ -600,7 +699,21 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     paddingTop: 2,
   },
+label1: {
+    color: '#FFB85D',
+    fontSize: 12,
+    // flex: 1,
+    // flexWrap: 'wrap',
+    paddingTop: 2,
+  },
+   emailText: {
+    color: '#00acc1',
+    textDecorationLine: 'underline',
+    fontWeight: '500',
+    fontSize: 12,
 
+
+  }, 
   value: { color: '#fff', flexShrink: 1 },
 
   cardFooter: {

@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import Icon1 from 'react-native-vector-icons/MaterialIcons';
 import { useNavigation } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 
@@ -20,12 +21,13 @@ const BottomNav = ({ routeName }) => {
           <NavItem icon="account-details" label="Assign RM" screen="AssignRM" routeName={routeName} />
         </>
       )}
-      <NavItem icon="bell" label="Notifications" screen="Notifications" routeName={routeName} />
+      {/* <NavItem icon="bell" label="Notifications" screen="Notifications" routeName={routeName} /> */}
+         <NavItem icon1="list-alt" label="Leads List" screen="LeadsListScreen" routeName={routeName} />
     </View>
   );
 };
 
-const NavItem = ({ icon, label, screen, routeName }) => {
+const NavItem = ({ icon, icon1,label, screen, routeName }) => {
   const navigation = useNavigation();
   const isActive = routeName === screen;
 
@@ -34,9 +36,21 @@ const NavItem = ({ icon, label, screen, routeName }) => {
       style={styles.navItem}
       onPress={() => navigation.navigate(screen)}
     >
-      <View style={[styles.iconWrapper, isActive && styles.iconWrapperActive]}>
-        <Icon name={icon} size={20} color={isActive ? '#00cfff' : '#cfd8dc'} />
-      </View>
+     <View style={[styles.iconWrapper, isActive && styles.iconWrapperActive]}>
+  {icon ? (
+    <Icon
+      name={icon}
+      size={20}
+      color={isActive ? '#00cfff' : '#cfd8dc'}
+    />
+  ) : (
+    <Icon1
+      name={icon1}
+      size={20}
+      color={isActive ? '#00cfff' : '#cfd8dc'}
+    />
+  )}
+</View>
       <Text style={[styles.navText, isActive && styles.navTextActive]}>
         {label}
       </Text>

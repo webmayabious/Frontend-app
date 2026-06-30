@@ -30,6 +30,28 @@ const makeCall = phoneNumber => {
     { text: 'Call', onPress: () => Linking.openURL(`tel:${phoneNumber}`) },
   ]);
 };
+const sendMail = async (email) => {
+  if (!email) return;
+
+  try {
+    if (Platform.OS === 'android') {
+      const gmailUrl = `googlegmail://co?to=${email}`;
+      const supported = await Linking.canOpenURL(gmailUrl);
+
+      if (supported) {
+        await Linking.openURL(gmailUrl);
+      } else {
+        // Fallback to mailto
+        await Linking.openURL(`mailto:${email}`);
+      }
+    } else {
+      // iOS
+      await Linking.openURL(`mailto:${email}`);
+    }
+  } catch (error) {
+    Alert.alert('Error', 'Unable to open email app.');
+  }
+};
 //  navigation prop টা বাইরে থেকে pass করা হচ্ছে
 const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
   <View style={styles.card}>
@@ -38,7 +60,7 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
       <View style={styles.nameRow}>
         <Text style={styles.name}>{data?.name}</Text>
 
-        <View
+        {/* <View
           style={[
             styles.activeBadge,
             {
@@ -65,6 +87,27 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
               : data?.active === '4'
               ? 'Meeting Done'
               : 'Booking Done'}
+          </Text>
+        </View> */}
+              <View
+          style={[
+            styles.activeBadge,
+            {
+              backgroundColor:
+                data?.active === '1'
+                  ? '#4caf50'
+                  : data?.active === '5'
+                  ? '#6b7785'
+                  : '#f44336',
+            },
+          ]}
+        >
+          <Text style={styles.activeText}>
+            {data?.active === '1'
+              ? 'Active'
+              : data?.active === '5'
+              ? 'Booking Done'
+              : 'Inactive'}
           </Text>
         </View>
       </View>
@@ -120,15 +163,37 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
       {data?.propertyproject?.project_name} | {data?.propertylocation?.name}
     </Text>
     <View style={styles.rowBetween}>
-      <TouchableOpacity onPress={() => makeCall(data?.mobile)}>
-        <Text style={styles.label}>
-          Phone: <Text style={styles.value}>{data?.mobile || 'N/A'}</Text>
-        </Text>
-      </TouchableOpacity>
-      <Text style={styles.label}>
-        Email: <Text style={styles.value}>{data?.email || 'N/A'}</Text>
-      </Text>
-    </View>
+        <TouchableOpacity onPress={() => makeCall(data?.mobile)}>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Text style={styles.label}>Phone:{' '}</Text>
+  
+            {/* <View style={styles.remarksBtn}> */}
+              <Text style={styles.phoneText}>
+                {data?.mobile || 'N/A'}
+              </Text>
+            {/* </View> */}
+          </View>
+        </TouchableOpacity>
+  
+      </View>
+      <View style={styles.rowBetween}>
+  
+        <TouchableOpacity
+  
+          onPress={() => sendMail(data?.email)}
+  
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Text style={styles.label}>Email:{' '}</Text>
+  
+  
+            <Text style={styles.emailText}>
+              {data?.email || 'N/A'}
+            </Text>
+  
+          </View>
+        </TouchableOpacity>
+      </View>
     <View style={styles.rowBetween}>
       <Text style={styles.label}>
         <Text style={styles.label}>
@@ -378,7 +443,14 @@ const styles = StyleSheet.create({
     padding: 12,
     backgroundColor: '#ffffff20',
   },
+ emailText: {
+    color: '#00acc1',
+    textDecorationLine: 'underline',
+    fontWeight: '500',
+    fontSize: 12,
 
+
+  },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -403,7 +475,14 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     maxWidth: 80,
   },
-
+  phoneText: {
+  color: '#00acc1',
+  backgroundColor: 'rgba(0, 172, 193, 0.15)',
+  paddingHorizontal: 4,
+  paddingVertical: 2,
+  borderRadius: 4,
+  fontWeight: '600',
+},
   remarksText: { color: '#fff', fontSize: 10 },
 
   location: {
@@ -423,8 +502,8 @@ const styles = StyleSheet.create({
   label: {
     color: '#FFB85D',
     fontSize: 12,
-    flex: 1,
-    flexWrap: 'wrap',
+    // flex: 1,
+    // flexWrap: 'wrap',
     paddingTop: 2,
   },
   value: {

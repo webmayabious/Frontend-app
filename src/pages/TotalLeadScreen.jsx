@@ -33,7 +33,28 @@ const makeCall = phoneNumber => {
     { text: 'Call', onPress: () => Linking.openURL(`tel:${phoneNumber}`) },
   ]);
 };
+const sendMail = async (email) => {
+  if (!email) return;
 
+  try {
+    if (Platform.OS === 'android') {
+      const gmailUrl = `googlegmail://co?to=${email}`;
+      const supported = await Linking.canOpenURL(gmailUrl);
+
+      if (supported) {
+        await Linking.openURL(gmailUrl);
+      } else {
+        // Fallback to mailto
+        await Linking.openURL(`mailto:${email}`);
+      }
+    } else {
+      // iOS
+      await Linking.openURL(`mailto:${email}`);
+    }
+  } catch (error) {
+    Alert.alert('Error', 'Unable to open email app.');
+  }
+};
 /* ================= DROPDOWN FIELD ================= */
 const DropdownField = ({ label, data, placeholder, value, onChange }) => {
   const [isFocus, setIsFocus] = useState(false);
@@ -81,18 +102,27 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
     <View style={styles.cardHeader}>
       <View style={styles.nameRow}>
         <Text style={styles.name}>{data?.name}</Text>
-        <View
-          style={[
-            styles.activeBadge,
-            {
-              backgroundColor: data?.active === '1' ? '#4caf50' : '#f44336',
-            },
-          ]}
-        >
-          <Text style={styles.activeText}>
-            {data?.active === '1' ? 'Active' : 'Inactive'}
-          </Text>
-        </View>
+             <View
+         style={[
+           styles.activeBadge,
+           {
+             backgroundColor:
+               data?.active === '1'
+                 ? '#4caf50'
+                 : data?.active === '5'
+                 ? '#6b7785'
+                 : '#f44336',
+           },
+         ]}
+       >
+         <Text style={styles.activeText}>
+           {data?.active === '1'
+             ? 'Active'
+             : data?.active === '5'
+             ? 'Booking Done'
+             : 'Inactive'}
+         </Text>
+       </View>
       </View>
 
       <View
@@ -108,7 +138,7 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
           onPress={() => {
             setRemarksText(
               data?.propertyfeedbacks?.map(x => x?.remarks).join(', ') ||
-                'No remarks available',
+              'No remarks available',
             );
             setShowRemarks(true);
           }}
@@ -136,13 +166,35 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
     </Text>
     <View style={styles.rowBetween}>
       <TouchableOpacity onPress={() => makeCall(data?.phone)}>
-        <Text style={styles.label}>
-          Phone: <Text style={styles.value}>{data?.phone || 'N/A'}</Text>
-        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <Text style={styles.label}>Phone:{' '}</Text>
+
+          {/* <View style={styles.remarksBtn}> */}
+            <Text style={styles.phoneText}>
+              {data?.phone || 'N/A'}
+            </Text>
+          {/* </View> */}
+        </View>
       </TouchableOpacity>
-      <Text style={styles.label}>
-        Email: <Text style={styles.value}>{data?.email || 'N/A'}</Text>
-      </Text>
+
+    </View>
+    <View style={styles.rowBetween}>
+
+      <TouchableOpacity
+
+        onPress={() => sendMail(data?.email)}
+
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <Text style={styles.label}>Email:{' '}</Text>
+
+
+          <Text style={styles.emailText}>
+            {data?.email || 'N/A'}
+          </Text>
+
+        </View>
+      </TouchableOpacity>
     </View>
     <View style={styles.rowBetween}>
       <Text style={styles.label}>
@@ -250,18 +302,18 @@ const TotalLeadScreen = () => {
     const phone = item?.phone?.toString() || '';
     const email = item?.email?.toLowerCase() || '';
     const project = item?.propertyproject?.project_name?.toLowerCase() || '';
-    const address = item?.propertylocation?.name?.toLowerCase()||'';
+    const address = item?.propertylocation?.name?.toLowerCase() || '';
     const rm = `${item?.relationshipManager?.usr_fname || ''} ${item?.relationshipManager?.usr_lname || ''}`
-  .trim()
-  .toLowerCase();
+      .trim()
+      .toLowerCase();
     const search = searchText.toLowerCase().trim();
 
     return (
       name.includes(search) ||
       phone.includes(search) ||
       email.includes(search) ||
-      project.includes(search)||
-      address.includes(search)||
+      project.includes(search) ||
+      address.includes(search) ||
       rm.includes(search)
     );
   });
@@ -311,6 +363,7 @@ const TotalLeadScreen = () => {
   const LeadStatus = [
     { label: 'Active', value: '1' },
     { label: 'Inactive', value: '2' },
+    {label:'Booking Done',value:'5'}
   ];
 
   /* ================= HANDLERS ================= */
@@ -586,6 +639,14 @@ const styles = StyleSheet.create({
 
   topBarContainer: { paddingHorizontal: 15, marginTop: 10 },
 
+  emailText: {
+    color: '#00acc1',
+    textDecorationLine: 'underline',
+    fontWeight: '500',
+    fontSize: 12,
+
+
+  },
   topBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -669,7 +730,14 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     maxWidth: 80,
   },
-
+  phoneText: {
+  color: '#00acc1',
+  backgroundColor: 'rgba(0, 172, 193, 0.15)',
+  paddingHorizontal: 4,
+  paddingVertical: 2,
+  borderRadius: 4,
+  fontWeight: '600',
+},
   remarksText: { color: '#fff', fontSize: 10 },
 
   location: {
@@ -689,10 +757,10 @@ const styles = StyleSheet.create({
   label: {
     color: '#a0b4e8',
     fontSize: 12,
-    marginBottom: 5,
+    // marginBottom: 5,
     fontWeight: '500',
-    flex: 1,
-    flexShrink: 1,
+    // flex: 1,
+    // flexShrink: 1,
   },
 
   value: {
@@ -744,7 +812,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.6)',
     justifyContent: 'center',
     alignItems: 'center',
-    bottom:45
+    bottom: 45
   },
 
   modalCard: {

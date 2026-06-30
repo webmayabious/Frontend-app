@@ -32,6 +32,28 @@ const makeCall = phoneNumber => {
     { text: 'Call', onPress: () => Linking.openURL(`tel:${phoneNumber}`) },
   ]);
 };
+const sendMail = async (email) => {
+  if (!email) return;
+
+  try {
+    if (Platform.OS === 'android') {
+      const gmailUrl = `googlegmail://co?to=${email}`;
+      const supported = await Linking.canOpenURL(gmailUrl);
+
+      if (supported) {
+        await Linking.openURL(gmailUrl);
+      } else {
+        // Fallback to mailto
+        await Linking.openURL(`mailto:${email}`);
+      }
+    } else {
+      // iOS
+      await Linking.openURL(`mailto:${email}`);
+    }
+  } catch (error) {
+    Alert.alert('Error', 'Unable to open email app.');
+  }
+};
 const DropdownField = ({ label, data, placeholder, value, onChange }) => {
   const [isFocus, setIsFocus] = useState(false);
   return (
@@ -85,7 +107,7 @@ const LeadCard = ({ item, navigation, setShowRemarks, setRemarksText }) => {
             {feedback?.propertyrating?.name}
           </Text>
 
-          <View
+          {/* <View
             style={[
               styles.activeBadge,
               {
@@ -96,7 +118,28 @@ const LeadCard = ({ item, navigation, setShowRemarks, setRemarksText }) => {
             <Text style={styles.activeText}>
               {item?.active == 1 ? 'Active' : 'Inactive'}
             </Text>
-          </View>
+          </View> */}
+          <View
+  style={[
+    styles.activeBadge,
+    {
+      backgroundColor:
+        item?.active === '1'
+          ? '#4caf50'
+          : item?.active === '5'
+          ? '#6b7785'
+          : '#f44336',
+    },
+  ]}
+>
+  <Text style={styles.activeText}>
+    {item?.active === '1'
+      ? 'Active'
+      : item?.active === '5'
+      ? 'Booking Done'
+      : 'Inactive'}
+  </Text>
+</View>
         </View>
 
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -126,17 +169,43 @@ const LeadCard = ({ item, navigation, setShowRemarks, setRemarksText }) => {
       </Text>
 
       {/* PHONE + EMAIL */}
-      <View style={styles.rowBetween}>
-        <TouchableOpacity onPress={() => makeCall(item?.phone)}>
-          <Text style={styles.label} numberOfLines={1} ellipsizeMode="tail">
-            Phone: <Text style={styles.value}>{item?.phone || 'N/A'}</Text>
-          </Text>
-        </TouchableOpacity>
-
-        <Text style={styles.label} numberOfLines={1} ellipsizeMode="tail">
-          Email: <Text style={styles.value}>{item?.email || 'N/A'}</Text>
-        </Text>
-      </View>
+     <View style={styles.rowBetween}>
+         {/* <TouchableOpacity onPress={() => makeCall(data?.propertylead?.phone)}>
+           <Text style={styles.label}>
+             Phone:{' '}
+             <Text style={styles.remarksBtn}>{data?.propertylead?.phone || 'N/A'}</Text>
+           </Text>
+         </TouchableOpacity> */}
+         <TouchableOpacity onPress={() => makeCall(item?.phone)}>
+           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+             <Text style={styles.label}>Phone:{' '}</Text>
+   
+             {/* <View style={styles.remarksBtn}> */}
+               <Text style={styles.phoneText}>
+                 {item?.phone || 'N/A'}
+               </Text>
+             {/* </View> */}
+           </View>
+         </TouchableOpacity>
+         
+       </View>
+       <View style={styles.rowBetween}> 
+         <TouchableOpacity
+   
+           onPress={() => sendMail(item?.email)}
+   
+         >
+           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+             <Text style={styles.label}>Email:{' '}</Text>
+   
+   
+             <Text style={styles.emailText}>
+               {item?.email || 'N/A'}
+             </Text>
+   
+           </View>
+         </TouchableOpacity>
+       </View>
 
       {/* RM + CALLBACK */}
       <View style={styles.rowBetween}>
@@ -285,6 +354,7 @@ const MissedFollowup = () => {
   const LeadStatus = [
     { label: 'Active', value: '1' },
     { label: 'Inactive', value: '2' },
+     { label: 'Booking Done', value: '5' },
     // { label: 'Site Visit', value: '3' },
     // { label: 'Meeting Done', value: '4' },
     // { label: 'Booking Done', value: '5' },
@@ -624,7 +694,14 @@ nameRow: {
     paddingHorizontal: 8,
     paddingVertical: 3,
   },
-
+  phoneText: {
+  color: '#00acc1',
+  backgroundColor: 'rgba(0, 172, 193, 0.15)',
+  paddingHorizontal: 4,
+  paddingVertical: 2,
+  borderRadius: 4,
+  fontWeight: '600',
+},
   remarksText: { color: '#fff', fontSize: 10 },
 
   location: {
@@ -643,12 +720,19 @@ rowBetween: {
 label: {
   color: '#a0b4e8',
   fontSize: 12,
-  marginBottom: 5,
+  // marginBottom: 5,
   fontWeight: '500',
-  flex: 1,                 
-  flexShrink: 1,           
+  // flex: 1,                 
+  // flexShrink: 1,           
 },
+  emailText: {
+    color: '#00acc1',
+    textDecorationLine: 'underline',
+    fontWeight: '500',
+    fontSize: 12,
 
+
+  },
  value: { color: '#fff', flexShrink: 1 }, 
 
   cardFooter: {
