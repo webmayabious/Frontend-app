@@ -714,7 +714,7 @@ const AssignRM = ({ setHideBottomNav }) => {
             <Icon name="email" size={12} color={COLORS.accent} />
             {/* <Text style={styles.infoText} numberOfLines={1}>{item?.email || 'N/A'}</Text> */}
              <TouchableOpacity onPress={() => sendMail(item?.email)}>
-                        <Text style={styles.emailText} numberOfLines={1}>
+                        <Text style={styles.emailText} numberOfLines={2}>
                           {item?.email || 'N/A'}
                         </Text>
                       </TouchableOpacity>
@@ -1247,7 +1247,7 @@ phoneText: {
     color: '#00acc1',
     textDecorationLine: 'underline',
     fontWeight: '500',
-    fontSize: 12,
+    fontSize: 11,
 
 
   },
