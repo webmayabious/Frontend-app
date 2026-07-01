@@ -27,7 +27,7 @@ import TotalBookingsAgreementsPerMonth from '../pages/TotalBookingsAgreementsPer
 import BookingDetailScreen from '../pages/BookingDetailScreen';
 import LeadsassignedScreen from '../pages/LeadsassignedScreen';
 import Rmform from '../pages/Rmform';
-
+import NotificationScreen from '../pages/Notification/Notificationscreen'
 const Stack = createNativeStackNavigator();
 
 // Screens where BottomNav should NOT show
@@ -99,6 +99,7 @@ export default function StackNavigations() {
             <Stack.Screen name="BookingDetailScreen" component={BookingDetailScreen} />
             <Stack.Screen name="LeadsassignedScreen" component={LeadsassignedScreen} />
             <Stack.Screen name="Rmform" component={Rmform} />
+             <Stack.Screen name="NotificationScreen" component={NotificationScreen} />
           </Stack.Navigator>
         </View>
 
