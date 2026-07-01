@@ -275,7 +275,28 @@ const makeCall = phoneNumber => {
     { text: 'Call', onPress: () => Linking.openURL(`tel:${phoneNumber}`) },
   ]);
 };
+const sendMail = async (email) => {
+  if (!email) return;
 
+  try {
+    if (Platform.OS === 'android') {
+      const gmailUrl = `googlegmail://co?to=${email}`;
+      const supported = await Linking.canOpenURL(gmailUrl);
+
+      if (supported) {
+        await Linking.openURL(gmailUrl);
+      } else {
+        // Fallback to mailto
+        await Linking.openURL(`mailto:${email}`);
+      }
+    } else {
+      // iOS
+      await Linking.openURL(`mailto:${email}`);
+    }
+  } catch (error) {
+    Alert.alert('Error', 'Unable to open email app.');
+  }
+};
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
 
 const AssignRM = ({ setHideBottomNav }) => {
@@ -747,13 +768,29 @@ const AssignRM = ({ setHideBottomNav }) => {
                   <View style={styles.contactRow}>
                     <View style={styles.contactItem}>
                       <Icon name="call" size={12} color={COLORS.accent} />
-                      <Text style={styles.infoText} onPress={() => makeCall(item?.phone)}>
+                      {/* <Text style={styles.infoText} onPress={() => makeCall(item?.phone)}>
                         {item?.phone || 'N/A'}
-                      </Text>
+                      </Text> */}
+                        <TouchableOpacity onPress={() => makeCall(item?.phone)}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                               
+                        
+                                  {/* <View style={styles.remarksBtn}> */}
+                                    <Text style={styles.phoneText}>
+                                      {item?.phone || 'N/A'}
+                                    </Text>
+                                  {/* </View> */}
+                                </View>
+                              </TouchableOpacity>
                     </View>
                     <View style={styles.contactItem}>
                       <Icon name="email" size={12} color={COLORS.accent} />
-                      <Text style={styles.infoText} numberOfLines={1}>{item?.email || 'N/A'}</Text>
+                      {/* <Text style={styles.infoText} numberOfLines={1}>{item?.email || 'N/A'}</Text> */}
+                      <TouchableOpacity onPress={() => sendMail(item?.email)}>
+                        <Text style={styles.emailText} numberOfLines={1}>
+                          {item?.email || 'N/A'}
+                        </Text>
+                      </TouchableOpacity>
                     </View>
                   </View>
 
@@ -1094,7 +1131,14 @@ const styles = StyleSheet.create({
 
   searchBox: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: COLORS.borderColor, borderRadius: 20, paddingHorizontal: 12, height: 40, backgroundColor: 'rgba(255,255,255,0.06)', marginBottom: 8, marginTop: 2 },
   searchInput: { color: COLORS.white, marginLeft: 8, fontSize: 13, flex: 1, paddingVertical: 0 },
-
+phoneText: {
+  color: '#00acc1',
+  backgroundColor: 'rgba(0, 172, 193, 0.15)',
+  paddingHorizontal: 4,
+  paddingVertical: 2,
+  borderRadius: 4,
+  fontWeight: '600',
+},
   selectAllRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, paddingHorizontal: 2 },
   selectAllLeft: { flexDirection: 'row', alignItems: 'center', flex: 1, flexShrink: 1, gap: 8 },
   selectAllText: { color: COLORS.white, fontSize: 13, fontWeight: '500' },
@@ -1118,7 +1162,7 @@ const styles = StyleSheet.create({
   contactRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5, gap: 8 },
   contactItem: { flexDirection: 'row', alignItems: 'center', gap: 5, flex: 1 },
   infoRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 4 },
-  infoText: { color: COLORS.mutedText, fontSize: 11, flexShrink: 1 },
+  infoText: { color: COLORS.mutedText, fontSize: 12, flexShrink: 1 },
   refRow: { flexDirection: 'row', alignItems: 'center', marginTop: 2 },
   refLabel: { color: COLORS.labelText, fontSize: 11, fontWeight: '600' },
   refValue: { color: COLORS.white, fontSize: 11 },
@@ -1149,7 +1193,14 @@ const styles = StyleSheet.create({
   assignBtn: { backgroundColor: COLORS.accent, paddingHorizontal: 18, paddingVertical: 9, borderRadius: 20, minWidth: 80, alignItems: 'center' },
   assignBtnDisabled: { backgroundColor: 'rgba(0,207,255,0.3)' },
   assignBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
+   emailText: {
+    color: '#00acc1',
+    textDecorationLine: 'underline',
+    fontWeight: '500',
+    fontSize: 12,
 
+
+  },
   uploadModalContainer: { width: '92%', backgroundColor: COLORS.modalBg, borderRadius: 16, padding: 18, borderWidth: 1, borderColor: COLORS.borderColor, maxHeight: '88%' },
   roleBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4, marginBottom: 12, borderWidth: 1, borderColor: COLORS.borderColor },
   roleBadgeText: { fontSize: 11, fontWeight: '600' },

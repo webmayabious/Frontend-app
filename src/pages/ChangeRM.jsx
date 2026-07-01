@@ -243,7 +243,28 @@ const makeCall = phoneNumber => {
     { text: 'Call', onPress: () => Linking.openURL(`tel:${phoneNumber}`) },
   ]);
 };
+const sendMail = async (email) => {
+  if (!email) return;
 
+  try {
+    if (Platform.OS === 'android') {
+      const gmailUrl = `googlegmail://co?to=${email}`;
+      const supported = await Linking.canOpenURL(gmailUrl);
+
+      if (supported) {
+        await Linking.openURL(gmailUrl);
+      } else {
+        // Fallback to mailto
+        await Linking.openURL(`mailto:${email}`);
+      }
+    } else {
+      // iOS
+      await Linking.openURL(`mailto:${email}`);
+    }
+  } catch (error) {
+    Alert.alert('Error', 'Unable to open email app.');
+  }
+};
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
 
 const ChangeRM = ({ setHideBottomNav }) => {
@@ -521,12 +542,23 @@ const ChangeRM = ({ setHideBottomNav }) => {
             <View style={styles.leftCol}>
               <View style={styles.infoRow}>
                 <Icon name="call" size={12} color={COLORS.accent} />
-                <Text
+                {/* <Text
                   style={[styles.infoText, { color: COLORS.accent }]}
                   onPress={() => makeCall(item?.phone)}
                 >
                   {item?.phone || 'N/A'}
-                </Text>
+                </Text> */}
+                   <TouchableOpacity onPress={() => makeCall(item?.phone)}>
+                                                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                               
+                                        
+                                                  {/* <View style={styles.remarksBtn}> */}
+                                                    <Text style={styles.phoneText}>
+                                                      {item?.phone || 'N/A'}
+                                                    </Text>
+                                                  {/* </View> */}
+                                                </View>
+                                              </TouchableOpacity>
               </View>
               <View style={styles.infoRow}>
                 <MaterialCommunityIcons
@@ -538,7 +570,11 @@ const ChangeRM = ({ setHideBottomNav }) => {
               </View>
               <View style={styles.infoRow}>
                 <Icon name="email" size={12} color={COLORS.accent} />
-                <Text style={styles.infoText}>{item?.email || 'N/A'}</Text>
+                <TouchableOpacity onPress={() => sendMail(item?.email)}>
+                                       <Text style={styles.emailText} >
+                                         {item?.email || 'N/A'}
+                                       </Text>
+                                     </TouchableOpacity>
               </View>
             </View>
 
@@ -579,7 +615,7 @@ const ChangeRM = ({ setHideBottomNav }) => {
     if (!hasMore && leads.length > 0) {
       return (
         <View style={styles.footerLoader}>
-          <Text style={styles.footerEndText}>✓ All leads loaded</Text>
+          {/* <Text style={styles.footerEndText}>✓ All leads loaded</Text> */}
         </View>
       );
     }
@@ -1017,6 +1053,22 @@ const styles = StyleSheet.create({
   dropdownList: {
     maxHeight: 200, borderWidth: 1, borderColor: COLORS.borderColor,
     borderRadius: 10, marginBottom: 12, marginTop: 4,
+  },
+  phoneText: {
+  color: '#00acc1',
+  backgroundColor: 'rgba(0, 172, 193, 0.15)',
+  paddingHorizontal: 4,
+  paddingVertical: 2,
+  borderRadius: 4,
+  fontWeight: '600',
+},
+ emailText: {
+    color: '#00acc1',
+    textDecorationLine: 'underline',
+    fontWeight: '500',
+    fontSize: 12,
+
+
   },
   dropdownItem: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
