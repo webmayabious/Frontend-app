@@ -21,8 +21,9 @@ const BottomNav = ({ routeName }) => {
           <NavItem icon="account-details" label="Assign RM" screen="AssignRM" routeName={routeName} />
         </>
       )}
-      {/* <NavItem icon="bell" label="Notifications" screen="Notifications" routeName={routeName} /> */}
+     
          <NavItem icon1="list-alt" label="Leads List" screen="LeadsListScreen" routeName={routeName} />
+          <NavItem icon="bell" label="Notifications" screen="Notifications" routeName={routeName} />
     </View>
   );
 };

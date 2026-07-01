@@ -183,7 +183,7 @@ export default function MeetingsEdit({ route }) {
     purpose_of_purchase: '',
     planning_to_buy_date: '',
     interested_in_site_visit: '',
-    active:''
+    active: ''
   });
 
   const navigation = useNavigation();
@@ -428,13 +428,13 @@ export default function MeetingsEdit({ route }) {
 
           {/* Lead Profile */}
           <Section title="Lead Profile">
-           <DropdownField
-  label="Lead Status"
-  data={LeadStatus}
-  placeholder="Select"
-  value={form.active}
-  onChange={value => onChange('active', value)}
-/>
+            <DropdownField
+              label="Lead Status"
+              data={LeadStatus}
+              placeholder="Select"
+              value={form.active}
+              onChange={value => onChange('active', value)}
+            />
             <DropdownField
               label="Location of Property *"
               data={Property || []}
