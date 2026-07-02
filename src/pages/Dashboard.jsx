@@ -88,6 +88,14 @@ const CARDS = (d, nav) => [
     value: `${d?.total_missed_callback ?? 0}`,
     route: 'MissedFollowup',
   },
+    {
+    icon: 'notifications-off',
+    label: 'Totalleads',
+    period: 'Till Date',
+    accent: '#a78bfa',
+    value: `${d?.total_missed_callback ?? 0}`,
+    route: 'Totalleadscreen1',
+  },
   // {
   //   icon: 'list-alt',
   //   label: 'Leads List',
@@ -201,6 +209,12 @@ const Dashboard = () => {
             <Text style={styles.summaryVal}>{dashboardCards?.total_missed_callback ?? '—'}</Text>
             <Text style={styles.summaryLbl}>Missed</Text>
           </View>
+            <View style={styles.summaryDivider} />
+          <View style={styles.summaryItem}>
+            {/* <Text style={styles.summaryVal}>{dashboardCards?.total_missed_callback ?? '—'}</Text> */}
+            <Text style={styles.summaryLbl}>Totalleadscreen1</Text>
+          </View>
+         
         </View>
 
         {/* Cards */}
