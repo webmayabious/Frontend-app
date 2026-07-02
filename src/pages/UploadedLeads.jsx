@@ -641,7 +641,7 @@ const Uploadleads = uploadleads?.pages?.flatMap(page => page.data) || [];
           <Icon name="keyboard-arrow-up" size={26} color="#fff" />
         </TouchableOpacity>
       )}
-
+   <View style={{paddingBottom: 100}}/>
       {/* <BottomNav /> */}
     </View>
   );

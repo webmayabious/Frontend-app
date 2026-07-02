@@ -621,6 +621,7 @@ const FollowUpsScreen = () => {
 
       {/* Bottom Nav */}
       {/* <BottomNav /> */}
+      <View style={{paddingBottom: 100}}/>
     </View>
   );
 };

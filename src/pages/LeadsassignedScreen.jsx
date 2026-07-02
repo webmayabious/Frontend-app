@@ -613,7 +613,7 @@ const isScrollingToTop = useRef(false);
           <Icon name="keyboard-arrow-up" size={26} color="#fff" />
         </TouchableOpacity>
       )}
-
+   <View style={{paddingBottom: 100}}/>
       {/* <BottomNav /> */}
     </View>
   );
