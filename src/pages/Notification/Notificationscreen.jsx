@@ -21,7 +21,7 @@
  *   ...render <NotificationScreen /> inside your navigator or App.js
  */
 
-import React, {useEffect, useRef, useState, useCallback} from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -77,11 +77,11 @@ const USERLIST_API_PATH = '/api/pm/getUserListOnly';
 // label shown in dropdown -> query param value sent to the API
 // (value: null means "All" -> no `type` param, fetches everything)
 const FILTER_OPTIONS = [
-  {label: 'All', value: null},
-  {label: 'Assigned', value: 'ASG'},
-  {label: 'Follow Up Date', value: 'FLOWUPDT'},
-  {label: 'Site Visit Date', value: 'VISITDT'},
-  {label: 'Reminder', value: 'REMINDER'},
+  { label: 'All', value: null },
+  { label: 'Assigned', value: 'ASG' },
+  { label: 'Follow Up Date', value: 'FLOWUPDT' },
+  { label: 'Site Visit Date', value: 'VISITDT' },
+  { label: 'Reminder', value: 'REMINDER' },
 ];
 
 // Strip basic HTML tags/entities from the API's `body` field.
@@ -93,9 +93,9 @@ const stripHtml = html =>
     .trim();
 
 const STATUS_OPTIONS = [
-  {label: 'All', value: ''},
-  {label: 'Unread', value: '1'},
-  {label: 'Read', value: '2'},
+  { label: 'All', value: '' },
+  { label: 'Unread', value: '1' },
+  { label: 'Read', value: '2' },
 ];
 
 const formatDate = date => {
@@ -108,10 +108,11 @@ const formatDate = date => {
 };
 
 // ─── Searchable user picker (From/To date + user list w/ search) ──────────
-const UserPicker = ({users, loading, value, onSelect}) => {
+const UserPicker = ({ users, loading, value, onSelect }) => {
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
-
+console.log('users',users)
+console.log('value',value)
   const filtered = !query
     ? users
     : users.filter(
@@ -119,7 +120,8 @@ const UserPicker = ({users, loading, value, onSelect}) => {
           u.name?.toLowerCase().includes(query.toLowerCase()) ||
           u.username?.toLowerCase().includes(query.toLowerCase()),
       );
-
+  const selectedUser = users.find(u => u.id === value);
+  console.log('selectedUser', selectedUser);
   return (
     <View style={styles.field}>
       <Text style={styles.filterLabel}>User</Text>
@@ -127,11 +129,13 @@ const UserPicker = ({users, loading, value, onSelect}) => {
       <TouchableOpacity
         activeOpacity={0.8}
         style={styles.filterInputContainer}
-        onPress={() => setOpen(prev => !prev)}>
+        onPress={() => setOpen(prev => !prev)}
+      >
         <Text
           style={value ? styles.userValueText : styles.userPlaceholderText}
-          numberOfLines={1}>
-          {value ? value.name : 'Select user'}
+          numberOfLines={1}
+        >
+          {selectedUser ? selectedUser.name : 'Select user'}
         </Text>
         {value ? (
           <TouchableOpacity
@@ -139,7 +143,8 @@ const UserPicker = ({users, loading, value, onSelect}) => {
               onSelect(null);
               setQuery('');
             }}
-            hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
             <MaterialIcon name="close" size={16} color="#7a8fc4" />
           </TouchableOpacity>
         ) : (
@@ -170,14 +175,15 @@ const UserPicker = ({users, loading, value, onSelect}) => {
             <ActivityIndicator
               size="small"
               color="#00e5ff"
-              style={{marginVertical: 14}}
+              style={{ marginVertical: 14 }}
             />
           ) : (
             <ScrollView
               style={styles.userListScroll}
               nestedScrollEnabled
               keyboardShouldPersistTaps="handled"
-              showsVerticalScrollIndicator={false}>
+              showsVerticalScrollIndicator={false}
+            >
               {filtered.length === 0 ? (
                 <Text style={styles.userEmptyText}>No users found</Text>
               ) : (
@@ -186,10 +192,11 @@ const UserPicker = ({users, loading, value, onSelect}) => {
                     key={u.id}
                     style={styles.userListItem}
                     onPress={() => {
-                      onSelect(u);
+                      onSelect(u.id);
                       setOpen(false);
                       setQuery('');
-                    }}>
+                    }}
+                  >
                     <Text style={styles.userListItemName}>{u.name}</Text>
                     <Text style={styles.userListItemUsername}>
                       @{u.username}
@@ -205,7 +212,7 @@ const UserPicker = ({users, loading, value, onSelect}) => {
   );
 };
 
-const InputField = ({label, placeholder, icon, value, onPress}) => (
+const InputField = ({ label, placeholder, icon, value, onPress }) => (
   <View style={styles.field}>
     <Text style={styles.filterLabel}>{label}</Text>
     <TouchableOpacity activeOpacity={0.8} onPress={onPress}>
@@ -286,10 +293,12 @@ const AdvancedFilterModal = ({
       visible
       animationType="none"
       statusBarTranslucent
-      onRequestClose={handleClose}>
+      onRequestClose={handleClose}
+    >
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.bottomSheetOverlay}>
+        style={styles.bottomSheetOverlay}
+      >
         <TouchableOpacity
           style={StyleSheet.absoluteFill}
           activeOpacity={1}
@@ -299,12 +308,13 @@ const AdvancedFilterModal = ({
         <Animated.View
           style={[
             styles.bottomSheet,
-            {transform: [{translateY: slideAnim}]},
-          ]}>
+            { transform: [{ translateY: slideAnim }] },
+          ]}
+        >
           <View style={styles.dragHandle} />
 
           <View style={styles.sheetHeaderRow}>
-            <View style={{flexDirection: 'row', alignItems: 'center'}}>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               <MaterialIcon name="filter-alt" size={18} color="#00e5ff" />
               <Text style={styles.modalTitle}>Filter Notifications</Text>
             </View>
@@ -319,9 +329,16 @@ const AdvancedFilterModal = ({
             style={styles.filterScrollView}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
-            nestedScrollEnabled>
-            <View style={{flexDirection: 'row', justifyContent: 'space-between', width: '100%'}}>
-              <View style={{width: '48%'}}>
+            nestedScrollEnabled
+          >
+            <View
+              style={{
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                width: '100%',
+              }}
+            >
+              <View style={{ width: '48%' }}>
                 <InputField
                   label="From Date"
                   placeholder="YYYY-MM-DD"
@@ -330,7 +347,7 @@ const AdvancedFilterModal = ({
                   onPress={() => setShowFromPicker(true)}
                 />
               </View>
-              <View style={{width: '48%'}}>
+              <View style={{ width: '48%' }}>
                 <InputField
                   label="To Date"
                   placeholder="YYYY-MM-DD"
@@ -360,12 +377,14 @@ const AdvancedFilterModal = ({
                         styles.statusChip,
                         active && styles.statusChipActive,
                       ]}
-                      onPress={() => onStatusChange(opt.value)}>
+                      onPress={() => onStatusChange(opt.value)}
+                    >
                       <Text
                         style={[
                           styles.statusChipText,
                           active && styles.statusChipTextActive,
-                        ]}>
+                        ]}
+                      >
                         {opt.label}
                       </Text>
                     </TouchableOpacity>
@@ -396,7 +415,7 @@ const AdvancedFilterModal = ({
                 }}
               />
             )}
-            <View style={{height: 8}} />
+            <View style={{ height: 8 }} />
           </ScrollView>
 
           <View style={styles.modalDivider} />
@@ -407,7 +426,7 @@ const AdvancedFilterModal = ({
               <Text style={styles.resetBtnText}>Reset</Text>
             </TouchableOpacity>
 
-            <View style={{flexDirection: 'row', gap: 10}}>
+            <View style={{ flexDirection: 'row', gap: 10 }}>
               <TouchableOpacity style={styles.cancelBtn} onPress={handleClose}>
                 <Text style={styles.cancelBtnText}>Cancel</Text>
               </TouchableOpacity>
@@ -423,7 +442,7 @@ const AdvancedFilterModal = ({
   );
 };
 
-const NotificationScreen = ({setHideBottomNav}) => {
+const NotificationScreen = ({ setHideBottomNav }) => {
   const [selectAll, setSelectAll] = useState(false);
   const [checkedIds, setCheckedIds] = useState([]);
   const [filter, setFilter] = useState(FILTER_OPTIONS[0]); // {label, value}
@@ -464,28 +483,51 @@ const NotificationScreen = ({setHideBottomNav}) => {
     );
   };
 
-  const buildQueryParams = useCallback(() => {
-    if (isAdvancedFilterActive) {
-      const params = {type: 'FIL'};
-      if (advancedFilter.fromDate) params.fromDate = advancedFilter.fromDate;
-      if (advancedFilter.toDate) params.toDate = advancedFilter.toDate;
-      if (advancedFilter.user) params.user = advancedFilter.user.username;
-      if (advancedFilter.status) params.status = advancedFilter.status;
-      return params;
-    }
-    return filter.value ? {type: filter.value} : undefined;
-  }, [filter, advancedFilter, isAdvancedFilterActive]);
+  // const buildQueryParams = useCallback(() => {
+  //   if (isAdvancedFilterActive) {
+  //     const params = { type: 'FIL' };
+  //     if (advancedFilter.fromDate) params.fromDate = advancedFilter.fromDate;
+  //     if (advancedFilter.toDate) params.toDate = advancedFilter.toDate;
+  //     if (advancedFilter.user)   params.user = advancedFilter.user;
+  //     if (advancedFilter.status) params.status = advancedFilter.status;
+  //     return params;
+  //   }
+  //   return filter.value ? { type: filter.value } : undefined;
+  // }, [filter, advancedFilter, isAdvancedFilterActive]);
+const buildQueryParams = useCallback(() => {
+  const params = {
+    type: filter.value, // always include type
+  };
 
+  // advanced filters only when active
+  if (isAdvancedFilterActive) {
+    if (advancedFilter.fromDate) params.fromDate = advancedFilter.fromDate;
+    if (advancedFilter.toDate) params.toDate = advancedFilter.toDate;
+    if (advancedFilter.user) params.user = advancedFilter.user;
+  }
+
+  // ✅ ALWAYS include status if present
+  if (advancedFilter.status) {
+    params.status = advancedFilter.status;
+  }
+
+  return params;
+}, [filter, advancedFilter, isAdvancedFilterActive]);
   const fetchNotifications = useCallback(async params => {
     setLoading(true);
     setError(null);
     try {
       // eslint-disable-next-line no-console
       console.log('[Notifications] fetch params ->', params);
-      const res = await api.get(API_PATH, {params});
+      const res = await api.get(API_PATH, { params });
       const json = res.data;
       // eslint-disable-next-line no-console
-      console.log('[Notifications] response filters ->', json?.filters, 'count ->', json?.uarray?.length);
+      console.log(
+        '[Notifications] response filters ->',
+        json?.filters,
+        'count ->',
+        json?.uarray?.length,
+      );
 
       if (json?.status === false) {
         throw new Error(json?.error || 'Failed to load notifications');
@@ -494,7 +536,9 @@ const NotificationScreen = ({setHideBottomNav}) => {
       setNotifications(json?.uarray || []);
     } catch (e) {
       const message =
-        e?.response?.data?.error || e?.message || 'Failed to load notifications';
+        e?.response?.data?.error ||
+        e?.message ||
+        'Failed to load notifications';
       setError(message);
       setNotifications([]);
     } finally {
@@ -514,7 +558,7 @@ const NotificationScreen = ({setHideBottomNav}) => {
     setFilter(option);
     setDropdownOpen(false);
     // quick category filter overrides the advanced (date/user) filter
-    setAdvancedFilter({fromDate: null, toDate: null, user: null});
+    setAdvancedFilter({ fromDate: null, toDate: null, user: null });
   };
 
   const fetchUserList = useCallback(async () => {
@@ -561,26 +605,32 @@ const NotificationScreen = ({setHideBottomNav}) => {
     setModalToDate(null);
     setModalUser(null);
     setModalStatus('');
-    setAdvancedFilter({fromDate: null, toDate: null, user: null, status: ''});
+    setAdvancedFilter({ fromDate: null, toDate: null, user: null, status: '' });
     closeFilterModal();
   };
 
   // val: 2 = read, 1 = unread
   const changeStatus = async (ids, val) => {
     if (!ids.length) {
-      Alert.alert('Select notifications', 'Please select at least one notification first.');
+      Alert.alert(
+        'Select notifications',
+        'Please select at least one notification first.',
+      );
       return;
     }
     setActionLoading(true);
     try {
       await Promise.all(
-        ids.map(id => api.post(STATUS_API_PATH, {chanstat: String(id), val})),
+        ids.map(id => api.post(STATUS_API_PATH, { chanstat: String(id), val })),
       );
       setCheckedIds([]);
       setSelectAll(false);
       await fetchNotifications(buildQueryParams());
     } catch (e) {
-      Alert.alert('Error', e?.response?.data?.message || 'Failed to update status');
+      Alert.alert(
+        'Error',
+        e?.response?.data?.message || 'Failed to update status',
+      );
     } finally {
       setActionLoading(false);
     }
@@ -598,9 +648,9 @@ const NotificationScreen = ({setHideBottomNav}) => {
   // just update local state so the UI reflects it immediately).
   const markReadSilently = async id => {
     try {
-      await api.post(STATUS_API_PATH, {chanstat: String(id), val: 2});
+      await api.post(STATUS_API_PATH, { chanstat: String(id), val: 2 });
       setNotifications(prev =>
-        prev.map(n => (n.id === id ? {...n, stat: 2} : n)),
+        prev.map(n => (n.id === id ? { ...n, stat: 2 } : n)),
       );
     } catch (e) {
       // fail silently — the item just stays marked unread, user can retry
@@ -617,14 +667,17 @@ const NotificationScreen = ({setHideBottomNav}) => {
 
   const handleDeleteSelected = () => {
     if (!checkedIds.length) {
-      Alert.alert('Select notifications', 'Please select at least one notification first.');
+      Alert.alert(
+        'Select notifications',
+        'Please select at least one notification first.',
+      );
       return;
     }
     Alert.alert(
       'Delete notifications',
       `Delete ${checkedIds.length} selected notification(s)? They will be moved to trash.`,
       [
-        {text: 'Cancel', style: 'cancel'},
+        { text: 'Cancel', style: 'cancel' },
         {
           text: 'Delete',
           style: 'destructive',
@@ -633,14 +686,17 @@ const NotificationScreen = ({setHideBottomNav}) => {
             try {
               await Promise.all(
                 checkedIds.map(id =>
-                  api.post(DELETE_API_PATH, {chanstat: String(id), id: 0}),
+                  api.post(DELETE_API_PATH, { chanstat: String(id), id: 0 }),
                 ),
               );
               setCheckedIds([]);
               setSelectAll(false);
               await fetchNotifications(buildQueryParams());
             } catch (e) {
-              Alert.alert('Error', e?.response?.data?.message || 'Failed to delete');
+              Alert.alert(
+                'Error',
+                e?.response?.data?.message || 'Failed to delete',
+              );
             } finally {
               setActionLoading(false);
             }
@@ -668,7 +724,7 @@ const NotificationScreen = ({setHideBottomNav}) => {
     </View>
   );
 
-  const renderItem = ({item}) => {
+  const renderItem = ({ item }) => {
     const checked = checkedIds.includes(item.id);
     const unread = item.stat === 1;
     const expanded = expandedIds.includes(item.id);
@@ -676,11 +732,13 @@ const NotificationScreen = ({setHideBottomNav}) => {
       <TouchableOpacity
         activeOpacity={0.8}
         style={[styles.card, unread && styles.cardHighlight]}
-        onPress={() => handleCardPress(item)}>
+        onPress={() => handleCardPress(item)}
+      >
         <View style={styles.cardRow}>
           <TouchableOpacity
             onPress={() => toggleItem(item.id)}
-            hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
             {renderCheckbox(checked)}
           </TouchableOpacity>
 
@@ -691,7 +749,8 @@ const NotificationScreen = ({setHideBottomNav}) => {
           <View style={styles.cardTextWrap}>
             <Text
               style={[styles.cardTitle, unread && styles.cardTitleUnread]}
-              numberOfLines={expanded ? undefined : 2}>
+              numberOfLines={expanded ? undefined : 2}
+            >
               {item.subject}
             </Text>
             <Text style={styles.cardSubtitle}>{item.created_at}</Text>
@@ -720,53 +779,60 @@ const NotificationScreen = ({setHideBottomNav}) => {
       {/* Section Title Row — styled like LeadsListScreen topBar */}
       <View style={styles.topBarContainer}>
         <View style={styles.topBar}>
-          <View style={{flexDirection: 'row', alignItems: 'center'}}>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <Icon name="notifications" size={18} color="#cfd8dc" />
             <Text style={styles.sectionTitle}>Notification</Text>
           </View>
 
-          <View style={{flexDirection: 'row', alignItems: 'center'}}>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             {actionLoading && (
               <ActivityIndicator
                 size="small"
                 color="#00e5ff"
-                style={{marginRight: 10}}
+                style={{ marginRight: 10 }}
               />
             )}
 
             <TouchableOpacity
               style={styles.topBarIconBtn}
               disabled={actionLoading}
-              onPress={handleDeleteSelected}>
+              onPress={handleDeleteSelected}
+            >
               <Icon name="trash-outline" size={24} color="#cfd8dc" />
             </TouchableOpacity>
 
             <TouchableOpacity
               style={styles.topBarIconBtn}
               disabled={actionLoading}
-              onPress={handleMarkRead}>
+              onPress={handleMarkRead}
+            >
               <Icon name="mail-open" size={24} color="#cfd8dc" />
             </TouchableOpacity>
 
             <TouchableOpacity
               style={styles.topBarIconBtn}
               disabled={actionLoading}
-              onPress={handleMarkUnread}>
+              onPress={handleMarkUnread}
+            >
               <Icon name="mail-unread-outline" size={24} color="#cfd8dc" />
             </TouchableOpacity>
 
             <TouchableOpacity
               style={styles.topBarIconBtn}
               disabled={actionLoading}
-              onPress={handleMarkAllRead}>
+              onPress={handleMarkAllRead}
+            >
               <MaterialIcon name="mark-email-read" size={24} color="#cfd8dc" />
             </TouchableOpacity>
 
             <TouchableOpacity
               style={styles.filterIconBtn}
-              onPress={openFilterModal}>
+              onPress={openFilterModal}
+            >
               <MaterialIcon name="filter-alt" size={22} color="#00e5ff" />
-              {isAdvancedFilterActive && <View style={styles.filterActiveDot} />}
+              {isAdvancedFilterActive && (
+                <View style={styles.filterActiveDot} />
+              )}
             </TouchableOpacity>
           </View>
         </View>
@@ -774,7 +840,10 @@ const NotificationScreen = ({setHideBottomNav}) => {
 
       {/* Select All + Filter Dropdown */}
       <View style={styles.controlsRow}>
-        <TouchableOpacity style={styles.selectAllWrap} onPress={toggleSelectAll}>
+        <TouchableOpacity
+          style={styles.selectAllWrap}
+          onPress={toggleSelectAll}
+        >
           {renderCheckbox(selectAll)}
           <Text style={styles.selectAllText}>Select All</Text>
         </TouchableOpacity>
@@ -782,7 +851,8 @@ const NotificationScreen = ({setHideBottomNav}) => {
         <View>
           <TouchableOpacity
             style={styles.filterPill}
-            onPress={() => setDropdownOpen(prev => !prev)}>
+            onPress={() => setDropdownOpen(prev => !prev)}
+          >
             <Text style={styles.filterPillText}>
               {isAdvancedFilterActive ? 'Filtered' : filter.label}
             </Text>
@@ -805,12 +875,14 @@ const NotificationScreen = ({setHideBottomNav}) => {
                       styles.dropdownItem,
                       active && styles.dropdownItemActive,
                     ]}
-                    onPress={() => selectFilter(option)}>
+                    onPress={() => selectFilter(option)}
+                  >
                     <Text
                       style={[
                         styles.dropdownItemText,
                         active && styles.dropdownItemTextActive,
-                      ]}>
+                      ]}
+                    >
                       {option.label}
                     </Text>
                   </TouchableOpacity>
@@ -966,7 +1038,7 @@ const styles = StyleSheet.create({
     elevation: 8,
     shadowColor: '#000',
     shadowOpacity: 0.3,
-    shadowOffset: {width: 0, height: 4},
+    shadowOffset: { width: 0, height: 4 },
     shadowRadius: 6,
   },
   dropdownItem: {
@@ -1140,7 +1212,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,82,82,0.35)',
     backgroundColor: 'rgba(255,82,82,0.1)',
   },
-  resetBtnText: {color: '#ff6b6b', fontSize: 13, fontWeight: '500'},
+  resetBtnText: { color: '#ff6b6b', fontSize: 13, fontWeight: '500' },
   cancelBtn: {
     backgroundColor: 'rgba(255,255,255,0.08)',
     paddingHorizontal: 16,
@@ -1149,7 +1221,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#ffffff20',
   },
-  cancelBtnText: {color: '#fff', fontWeight: '500', fontSize: 13},
+  cancelBtnText: { color: '#fff', fontWeight: '500', fontSize: 13 },
   applyBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1161,9 +1233,9 @@ const styles = StyleSheet.create({
     minWidth: 80,
     justifyContent: 'center',
   },
-  applyBtnText: {color: '#fff', fontWeight: '700', fontSize: 13},
+  applyBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
 
-  field: {marginBottom: 12, width: '100%'},
+  field: { marginBottom: 12, width: '100%' },
   filterLabel: {
     color: '#a0b4e8',
     fontSize: 12,
@@ -1181,10 +1253,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     height: 40,
   },
-  filterInput: {flex: 1, color: '#fff', fontSize: 13, paddingVertical: 0},
+  filterInput: { flex: 1, color: '#fff', fontSize: 13, paddingVertical: 0 },
 
-  userPlaceholderText: {color: '#7a8fc4', fontSize: 13, flex: 1},
-  userValueText: {color: '#fff', fontSize: 13, flex: 1, marginRight: 8},
+  userPlaceholderText: { color: '#7a8fc4', fontSize: 13, flex: 1 },
+  userValueText: { color: '#fff', fontSize: 13, flex: 1, marginRight: 8 },
   userDropdownBox: {
     marginTop: 6,
     backgroundColor: '#151a54',
@@ -1218,8 +1290,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#ffffff10',
   },
-  userListItemName: {color: '#fff', fontSize: 13, fontWeight: '600'},
-  userListItemUsername: {color: '#7a8fc4', fontSize: 11, marginTop: 1},
+  userListItemName: { color: '#fff', fontSize: 13, fontWeight: '600' },
+  userListItemUsername: { color: '#7a8fc4', fontSize: 11, marginTop: 1 },
   userEmptyText: {
     color: '#7a8fc4',
     fontSize: 12,
