@@ -1,43 +1,53 @@
 /**
  * NotificationScreen.js
  *
- * React Native CLI screen — recreated from the "mokhsh" app notification design.
+ * React Native CLI screen — recreated from the "mokhsh" app notification design,
+ * now with a date-range + user "advanced filter" modal (opened via the filter icon).
  *
  * Dependencies to install:
- *   npm install react-native-vector-icons
+ *   npm install react-native-vector-icons @react-native-community/datetimepicker
  *   (iOS) cd ios && pod install
  *   For Android, make sure vector icons are linked in android/app/build.gradle:
  *     apply from: "../../node_modules/react-native-vector-icons/fonts.gradle"
  *
  * Auth:
- *   Requests go through the shared `api` instance (../api/AxiosInstance),
+ *   Requests go through the shared `api` instance (../../api/AxiosInstance),
  *   which attaches the `PM_TOKEN` bearer token from AsyncStorage on every
  *   request automatically — same as LeadsListScreen. Adjust the import path
- *   below (`../api/AxiosInstance`) if this file lives in a different folder.
+ *   below if this file lives in a different folder.
  *
  * Usage:
  *   import NotificationScreen from './NotificationScreen';
  *   ...render <NotificationScreen /> inside your navigator or App.js
  */
 
-import React, {useEffect, useState, useCallback} from 'react';
+import React, {useEffect, useRef, useState, useCallback} from 'react';
 import {
   View,
   Text,
   StyleSheet,
   StatusBar,
   TouchableOpacity,
+  TextInput,
   FlatList,
+  ScrollView,
   SafeAreaView,
   ActivityIndicator,
   LayoutAnimation,
   UIManager,
   Platform,
   Alert,
+  Animated,
+  Dimensions,
+  KeyboardAvoidingView,
+  Modal,
 } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import Icon from 'react-native-vector-icons/Ionicons';
 import MaterialIcon from 'react-native-vector-icons/MaterialIcons';
 import api from '../../api/AxiosInstance';
+
+const SCREEN_HEIGHT = Dimensions.get('window').height;
 
 const COLORS = {
   bg: '#070c4d',
@@ -62,6 +72,7 @@ if (
 const API_PATH = '/api/pm/fetchNotification';
 const STATUS_API_PATH = '/api/pm/changeStatusOfNotification';
 const DELETE_API_PATH = '/api/pm/deleteNotification';
+const USERLIST_API_PATH = '/api/pm/getUserListOnly';
 
 // label shown in dropdown -> query param value sent to the API
 // (value: null means "All" -> no `type` param, fetches everything)
@@ -73,8 +84,7 @@ const FILTER_OPTIONS = [
   {label: 'Reminder', value: 'REMINDER'},
 ];
 
-// Strip basic HTML tags/entities from the API's `body` field, if you ever
-// want to show it (currently only `subject` + `created_at` are shown).
+// Strip basic HTML tags/entities from the API's `body` field.
 const stripHtml = html =>
   (html || '')
     .replace(/<br\s*\/?>/gi, '\n')
@@ -82,7 +92,338 @@ const stripHtml = html =>
     .replace(/\s+\n/g, '\n')
     .trim();
 
-const NotificationScreen = () => {
+const STATUS_OPTIONS = [
+  {label: 'All', value: ''},
+  {label: 'Unread', value: '1'},
+  {label: 'Read', value: '2'},
+];
+
+const formatDate = date => {
+  if (!date) return '';
+  const d = new Date(date);
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const year = d.getFullYear();
+  return `${year}-${month}-${day}`;
+};
+
+// ─── Searchable user picker (From/To date + user list w/ search) ──────────
+const UserPicker = ({users, loading, value, onSelect}) => {
+  const [query, setQuery] = useState('');
+  const [open, setOpen] = useState(false);
+
+  const filtered = !query
+    ? users
+    : users.filter(
+        u =>
+          u.name?.toLowerCase().includes(query.toLowerCase()) ||
+          u.username?.toLowerCase().includes(query.toLowerCase()),
+      );
+
+  return (
+    <View style={styles.field}>
+      <Text style={styles.filterLabel}>User</Text>
+
+      <TouchableOpacity
+        activeOpacity={0.8}
+        style={styles.filterInputContainer}
+        onPress={() => setOpen(prev => !prev)}>
+        <Text
+          style={value ? styles.userValueText : styles.userPlaceholderText}
+          numberOfLines={1}>
+          {value ? value.name : 'Select user'}
+        </Text>
+        {value ? (
+          <TouchableOpacity
+            onPress={() => {
+              onSelect(null);
+              setQuery('');
+            }}
+            hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
+            <MaterialIcon name="close" size={16} color="#7a8fc4" />
+          </TouchableOpacity>
+        ) : (
+          <MaterialIcon
+            name={open ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
+            size={20}
+            color="#00e5ff"
+          />
+        )}
+      </TouchableOpacity>
+
+      {open && (
+        <View style={styles.userDropdownBox}>
+          <View style={styles.userSearchRow}>
+            <MaterialIcon name="search" size={16} color="#7a8fc4" />
+            <TextInput
+              placeholder="Search name or username..."
+              placeholderTextColor="#7a8fc4"
+              value={query}
+              onChangeText={setQuery}
+              style={styles.userSearchInput}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+          </View>
+
+          {loading ? (
+            <ActivityIndicator
+              size="small"
+              color="#00e5ff"
+              style={{marginVertical: 14}}
+            />
+          ) : (
+            <ScrollView
+              style={styles.userListScroll}
+              nestedScrollEnabled
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}>
+              {filtered.length === 0 ? (
+                <Text style={styles.userEmptyText}>No users found</Text>
+              ) : (
+                filtered.slice(0, 60).map(u => (
+                  <TouchableOpacity
+                    key={u.id}
+                    style={styles.userListItem}
+                    onPress={() => {
+                      onSelect(u);
+                      setOpen(false);
+                      setQuery('');
+                    }}>
+                    <Text style={styles.userListItemName}>{u.name}</Text>
+                    <Text style={styles.userListItemUsername}>
+                      @{u.username}
+                    </Text>
+                  </TouchableOpacity>
+                ))
+              )}
+            </ScrollView>
+          )}
+        </View>
+      )}
+    </View>
+  );
+};
+
+const InputField = ({label, placeholder, icon, value, onPress}) => (
+  <View style={styles.field}>
+    <Text style={styles.filterLabel}>{label}</Text>
+    <TouchableOpacity activeOpacity={0.8} onPress={onPress}>
+      <View style={styles.filterInputContainer}>
+        <TextInput
+          placeholder={placeholder}
+          placeholderTextColor="#7a8fc4"
+          style={styles.filterInput}
+          value={value}
+          editable={false}
+          pointerEvents="none"
+        />
+        {icon && <MaterialIcon name={icon} size={18} color="#00bcd4" />}
+      </View>
+    </TouchableOpacity>
+  </View>
+);
+
+// ─── Bottom-sheet advanced-filter modal (date range + user) ───────────────
+const AdvancedFilterModal = ({
+  visible,
+  onClose,
+  fromDate,
+  toDate,
+  onFromDateChange,
+  onToDateChange,
+  status,
+  onStatusChange,
+  selectedUser,
+  onSelectUser,
+  users,
+  usersLoading,
+  onApply,
+  onReset,
+}) => {
+  const slideAnim = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
+  const [mounted, setMounted] = useState(false);
+  const [showFromPicker, setShowFromPicker] = useState(false);
+  const [showToPicker, setShowToPicker] = useState(false);
+
+  useEffect(() => {
+    if (visible) {
+      setMounted(true);
+      slideAnim.setValue(SCREEN_HEIGHT);
+      requestAnimationFrame(() => {
+        Animated.spring(slideAnim, {
+          toValue: 0,
+          useNativeDriver: true,
+          damping: 18,
+        }).start();
+      });
+    } else if (mounted) {
+      Animated.timing(slideAnim, {
+        toValue: SCREEN_HEIGHT,
+        duration: 250,
+        useNativeDriver: true,
+      }).start(() => setMounted(false));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible]);
+
+  const handleClose = () => {
+    Animated.timing(slideAnim, {
+      toValue: SCREEN_HEIGHT,
+      duration: 250,
+      useNativeDriver: true,
+    }).start(() => {
+      setMounted(false);
+      onClose();
+    });
+  };
+
+  if (!mounted) return null;
+
+  return (
+    <Modal
+      transparent
+      visible
+      animationType="none"
+      statusBarTranslucent
+      onRequestClose={handleClose}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.bottomSheetOverlay}>
+        <TouchableOpacity
+          style={StyleSheet.absoluteFill}
+          activeOpacity={1}
+          onPress={handleClose}
+        />
+
+        <Animated.View
+          style={[
+            styles.bottomSheet,
+            {transform: [{translateY: slideAnim}]},
+          ]}>
+          <View style={styles.dragHandle} />
+
+          <View style={styles.sheetHeaderRow}>
+            <View style={{flexDirection: 'row', alignItems: 'center'}}>
+              <MaterialIcon name="filter-alt" size={18} color="#00e5ff" />
+              <Text style={styles.modalTitle}>Filter Notifications</Text>
+            </View>
+            <TouchableOpacity onPress={handleClose}>
+              <MaterialIcon name="close" size={20} color="#a0b4e8" />
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.modalDivider} />
+
+          <ScrollView
+            style={styles.filterScrollView}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            nestedScrollEnabled>
+            <View style={{flexDirection: 'row', justifyContent: 'space-between', width: '100%'}}>
+              <View style={{width: '48%'}}>
+                <InputField
+                  label="From Date"
+                  placeholder="YYYY-MM-DD"
+                  icon="calendar-today"
+                  value={fromDate}
+                  onPress={() => setShowFromPicker(true)}
+                />
+              </View>
+              <View style={{width: '48%'}}>
+                <InputField
+                  label="To Date"
+                  placeholder="YYYY-MM-DD"
+                  icon="calendar-today"
+                  value={toDate}
+                  onPress={() => setShowToPicker(true)}
+                />
+              </View>
+            </View>
+
+            <UserPicker
+              users={users}
+              loading={usersLoading}
+              value={selectedUser}
+              onSelect={onSelectUser}
+            />
+
+            <View style={styles.field}>
+              <Text style={styles.filterLabel}>Status</Text>
+              <View style={styles.statusChipRow}>
+                {STATUS_OPTIONS.map(opt => {
+                  const active = status === opt.value;
+                  return (
+                    <TouchableOpacity
+                      key={opt.label}
+                      style={[
+                        styles.statusChip,
+                        active && styles.statusChipActive,
+                      ]}
+                      onPress={() => onStatusChange(opt.value)}>
+                      <Text
+                        style={[
+                          styles.statusChipText,
+                          active && styles.statusChipTextActive,
+                        ]}>
+                        {opt.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
+            {showFromPicker && (
+              <DateTimePicker
+                value={fromDate ? new Date(fromDate) : new Date()}
+                mode="date"
+                display="default"
+                onChange={(e, d) => {
+                  setShowFromPicker(false);
+                  if (d) onFromDateChange(formatDate(d));
+                }}
+              />
+            )}
+            {showToPicker && (
+              <DateTimePicker
+                value={toDate ? new Date(toDate) : new Date()}
+                mode="date"
+                display="default"
+                onChange={(e, d) => {
+                  setShowToPicker(false);
+                  if (d) onToDateChange(formatDate(d));
+                }}
+              />
+            )}
+            <View style={{height: 8}} />
+          </ScrollView>
+
+          <View style={styles.modalDivider} />
+
+          <View style={styles.sheetBtnRow}>
+            <TouchableOpacity style={styles.resetBtn} onPress={onReset}>
+              <MaterialIcon name="refresh" size={14} color="#ff6b6b" />
+              <Text style={styles.resetBtnText}>Reset</Text>
+            </TouchableOpacity>
+
+            <View style={{flexDirection: 'row', gap: 10}}>
+              <TouchableOpacity style={styles.cancelBtn} onPress={handleClose}>
+                <Text style={styles.cancelBtnText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.applyBtn} onPress={onApply}>
+                <MaterialIcon name="check" size={14} color="#fff" />
+                <Text style={styles.applyBtnText}>Apply</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Animated.View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+};
+
+const NotificationScreen = ({setHideBottomNav}) => {
   const [selectAll, setSelectAll] = useState(false);
   const [checkedIds, setCheckedIds] = useState([]);
   const [filter, setFilter] = useState(FILTER_OPTIONS[0]); // {label, value}
@@ -94,6 +435,28 @@ const NotificationScreen = () => {
   const [expandedIds, setExpandedIds] = useState([]);
   const [actionLoading, setActionLoading] = useState(false);
 
+  // ── Advanced filter (From Date / To Date / User) ──
+  const [filterModalVisible, setFilterModalVisible] = useState(false);
+  const [modalFromDate, setModalFromDate] = useState(null);
+  const [modalToDate, setModalToDate] = useState(null);
+  const [modalUser, setModalUser] = useState(null);
+  const [modalStatus, setModalStatus] = useState('');
+  const [advancedFilter, setAdvancedFilter] = useState({
+    fromDate: null,
+    toDate: null,
+    user: null,
+    status: '',
+  });
+  const [userList, setUserList] = useState([]);
+  const [userListLoading, setUserListLoading] = useState(false);
+  const userListFetchedRef = useRef(false);
+
+  const isAdvancedFilterActive =
+    !!advancedFilter.fromDate ||
+    !!advancedFilter.toDate ||
+    !!advancedFilter.user ||
+    !!advancedFilter.status;
+
   const toggleExpand = id => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setExpandedIds(prev =>
@@ -101,14 +464,28 @@ const NotificationScreen = () => {
     );
   };
 
-  const fetchNotifications = useCallback(async type => {
+  const buildQueryParams = useCallback(() => {
+    if (isAdvancedFilterActive) {
+      const params = {type: 'FIL'};
+      if (advancedFilter.fromDate) params.fromDate = advancedFilter.fromDate;
+      if (advancedFilter.toDate) params.toDate = advancedFilter.toDate;
+      if (advancedFilter.user) params.user = advancedFilter.user.username;
+      if (advancedFilter.status) params.status = advancedFilter.status;
+      return params;
+    }
+    return filter.value ? {type: filter.value} : undefined;
+  }, [filter, advancedFilter, isAdvancedFilterActive]);
+
+  const fetchNotifications = useCallback(async params => {
     setLoading(true);
     setError(null);
     try {
-      const res = await api.get(API_PATH, {
-        params: type ? {type} : undefined,
-      });
+      // eslint-disable-next-line no-console
+      console.log('[Notifications] fetch params ->', params);
+      const res = await api.get(API_PATH, {params});
       const json = res.data;
+      // eslint-disable-next-line no-console
+      console.log('[Notifications] response filters ->', json?.filters, 'count ->', json?.uarray?.length);
 
       if (json?.status === false) {
         throw new Error(json?.error || 'Failed to load notifications');
@@ -126,16 +503,66 @@ const NotificationScreen = () => {
   }, []);
 
   useEffect(() => {
-    fetchNotifications(filter.value);
+    fetchNotifications(buildQueryParams());
     // reset selections when the filter changes
     setSelectAll(false);
     setCheckedIds([]);
     setExpandedIds([]);
-  }, [filter, fetchNotifications]);
+  }, [filter, advancedFilter, fetchNotifications, buildQueryParams]);
 
   const selectFilter = option => {
     setFilter(option);
     setDropdownOpen(false);
+    // quick category filter overrides the advanced (date/user) filter
+    setAdvancedFilter({fromDate: null, toDate: null, user: null});
+  };
+
+  const fetchUserList = useCallback(async () => {
+    if (userListFetchedRef.current) return;
+    setUserListLoading(true);
+    try {
+      const res = await api.get(USERLIST_API_PATH);
+      setUserList(res?.data?.data || []);
+      userListFetchedRef.current = true;
+    } catch (e) {
+      // silent — the search box will just show "No users found"
+    } finally {
+      setUserListLoading(false);
+    }
+  }, []);
+
+  const openFilterModal = () => {
+    setModalFromDate(advancedFilter.fromDate);
+    setModalToDate(advancedFilter.toDate);
+    setModalUser(advancedFilter.user);
+    setModalStatus(advancedFilter.status || '');
+    fetchUserList();
+    setHideBottomNav && setHideBottomNav(true);
+    setFilterModalVisible(true);
+  };
+
+  const closeFilterModal = () => {
+    setFilterModalVisible(false);
+    setHideBottomNav && setHideBottomNav(false);
+  };
+
+  const applyAdvancedFilter = () => {
+    setAdvancedFilter({
+      fromDate: modalFromDate,
+      toDate: modalToDate,
+      user: modalUser,
+      status: modalStatus,
+    });
+    closeFilterModal();
+  };
+
+  const resetAdvancedFilter = () => {
+    setModalFromDate(null);
+    setModalToDate(null);
+    setModalUser(null);
+    setModalStatus('');
+    setAdvancedFilter({fromDate: null, toDate: null, user: null, status: ''});
+    closeFilterModal();
   };
 
   // val: 2 = read, 1 = unread
@@ -147,13 +574,11 @@ const NotificationScreen = () => {
     setActionLoading(true);
     try {
       await Promise.all(
-        ids.map(id =>
-          api.post(STATUS_API_PATH, {chanstat: String(id), val}),
-        ),
+        ids.map(id => api.post(STATUS_API_PATH, {chanstat: String(id), val})),
       );
       setCheckedIds([]);
       setSelectAll(false);
-      await fetchNotifications(filter.value);
+      await fetchNotifications(buildQueryParams());
     } catch (e) {
       Alert.alert('Error', e?.response?.data?.message || 'Failed to update status');
     } finally {
@@ -213,7 +638,7 @@ const NotificationScreen = () => {
               );
               setCheckedIds([]);
               setSelectAll(false);
-              await fetchNotifications(filter.value);
+              await fetchNotifications(buildQueryParams());
             } catch (e) {
               Alert.alert('Error', e?.response?.data?.message || 'Failed to delete');
             } finally {
@@ -337,8 +762,11 @@ const NotificationScreen = () => {
               <MaterialIcon name="mark-email-read" size={24} color="#cfd8dc" />
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.filterIconBtn}>
+            <TouchableOpacity
+              style={styles.filterIconBtn}
+              onPress={openFilterModal}>
               <MaterialIcon name="filter-alt" size={22} color="#00e5ff" />
+              {isAdvancedFilterActive && <View style={styles.filterActiveDot} />}
             </TouchableOpacity>
           </View>
         </View>
@@ -355,7 +783,9 @@ const NotificationScreen = () => {
           <TouchableOpacity
             style={styles.filterPill}
             onPress={() => setDropdownOpen(prev => !prev)}>
-            <Text style={styles.filterPillText}>{filter.label}</Text>
+            <Text style={styles.filterPillText}>
+              {isAdvancedFilterActive ? 'Filtered' : filter.label}
+            </Text>
             <Icon
               name={dropdownOpen ? 'chevron-up' : 'chevron-down'}
               size={16}
@@ -366,7 +796,8 @@ const NotificationScreen = () => {
           {dropdownOpen && (
             <View style={styles.dropdown}>
               {FILTER_OPTIONS.map(option => {
-                const active = option.label === filter.label;
+                const active =
+                  option.label === filter.label && !isAdvancedFilterActive;
                 return (
                   <TouchableOpacity
                     key={option.label}
@@ -420,9 +851,26 @@ const NotificationScreen = () => {
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
           refreshing={loading}
-          onRefresh={() => fetchNotifications(filter.value)}
+          onRefresh={() => fetchNotifications(buildQueryParams())}
         />
       )}
+
+      <AdvancedFilterModal
+        visible={filterModalVisible}
+        onClose={closeFilterModal}
+        fromDate={modalFromDate}
+        toDate={modalToDate}
+        onFromDateChange={setModalFromDate}
+        onToDateChange={setModalToDate}
+        status={modalStatus}
+        onStatusChange={setModalStatus}
+        selectedUser={modalUser}
+        onSelectUser={setModalUser}
+        users={userList}
+        usersLoading={userListLoading}
+        onApply={applyAdvancedFilter}
+        onReset={resetAdvancedFilter}
+      />
     </SafeAreaView>
   );
 };
@@ -459,6 +907,18 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     flexDirection: 'row',
     alignItems: 'center',
+    position: 'relative',
+  },
+  filterActiveDot: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#FF5C5C',
+    borderWidth: 1,
+    borderColor: COLORS.bg,
   },
   topBarIconBtn: {
     marginRight: 10,
@@ -610,6 +1070,186 @@ const styles = StyleSheet.create({
     color: COLORS.subText,
     fontSize: 12,
     marginTop: 2,
+  },
+
+  /* ── Advanced filter modal (bottom sheet) ── */
+  bottomSheetOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    justifyContent: 'flex-end',
+    zIndex: 99999,
+    elevation: 99999,
+  },
+  bottomSheet: {
+    width: '100%',
+    maxHeight: SCREEN_HEIGHT * 0.85,
+    backgroundColor: '#1a1f6b',
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    borderWidth: 1,
+    borderColor: '#3d45b0',
+    borderBottomWidth: 0,
+    paddingHorizontal: 20,
+    paddingTop: 14,
+    paddingBottom: Platform.OS === 'ios' ? 30 : 20,
+    elevation: 99999,
+  },
+  sheetHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  sheetBtnRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  filterScrollView: {
+    width: '100%',
+    flexGrow: 0,
+  },
+  dragHandle: {
+    width: 40,
+    height: 4,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 14,
+  },
+  modalDivider: {
+    width: '100%',
+    height: 1,
+    backgroundColor: '#3d45b033',
+    marginVertical: 10,
+  },
+  modalTitle: {
+    color: '#00e5ff',
+    fontSize: 15,
+    marginLeft: 8,
+    fontWeight: 'bold',
+  },
+  resetBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255,82,82,0.35)',
+    backgroundColor: 'rgba(255,82,82,0.1)',
+  },
+  resetBtnText: {color: '#ff6b6b', fontSize: 13, fontWeight: '500'},
+  cancelBtn: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#ffffff20',
+  },
+  cancelBtnText: {color: '#fff', fontWeight: '500', fontSize: 13},
+  applyBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#00acc1',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    minWidth: 80,
+    justifyContent: 'center',
+  },
+  applyBtnText: {color: '#fff', fontWeight: '700', fontSize: 13},
+
+  field: {marginBottom: 12, width: '100%'},
+  filterLabel: {
+    color: '#a0b4e8',
+    fontSize: 12,
+    marginBottom: 5,
+    fontWeight: '500',
+  },
+  filterInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#ffffff12',
+    borderWidth: 1,
+    borderColor: '#3d55cc',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    height: 40,
+  },
+  filterInput: {flex: 1, color: '#fff', fontSize: 13, paddingVertical: 0},
+
+  userPlaceholderText: {color: '#7a8fc4', fontSize: 13, flex: 1},
+  userValueText: {color: '#fff', fontSize: 13, flex: 1, marginRight: 8},
+  userDropdownBox: {
+    marginTop: 6,
+    backgroundColor: '#151a54',
+    borderWidth: 1,
+    borderColor: '#3d55cc',
+    borderRadius: 8,
+    padding: 8,
+  },
+  userSearchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffffff12',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    height: 34,
+    marginBottom: 6,
+  },
+  userSearchInput: {
+    flex: 1,
+    color: '#fff',
+    fontSize: 13,
+    marginLeft: 6,
+    paddingVertical: 0,
+  },
+  userListScroll: {
+    maxHeight: 180,
+  },
+  userListItem: {
+    paddingVertical: 8,
+    paddingHorizontal: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: '#ffffff10',
+  },
+  userListItemName: {color: '#fff', fontSize: 13, fontWeight: '600'},
+  userListItemUsername: {color: '#7a8fc4', fontSize: 11, marginTop: 1},
+  userEmptyText: {
+    color: '#7a8fc4',
+    fontSize: 12,
+    textAlign: 'center',
+    paddingVertical: 12,
+  },
+  statusChipRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  statusChip: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 9,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#3d55cc',
+    backgroundColor: '#ffffff12',
+  },
+  statusChipActive: {
+    backgroundColor: '#00acc1',
+    borderColor: '#00acc1',
+  },
+  statusChipText: {
+    color: '#a0b4e8',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  statusChipTextActive: {
+    color: '#fff',
   },
 });
 
