@@ -26,11 +26,48 @@ const STATUSBAR_HEIGHT =
   Platform.OS === 'android' ? StatusBar.currentHeight : 44;
 
 /* ================= CALL ================= */
+// const makeCall = phoneNumber => {
+//   if (!phoneNumber) return;
+//   Alert.alert('Call', `Do you want to call ${phoneNumber}?`, [
+//     { text: 'Cancel', style: 'cancel' },
+//     { text: 'Call', onPress: () => Linking.openURL(`tel:${phoneNumber}`) },
+//   ]);
+// };
 const makeCall = phoneNumber => {
   if (!phoneNumber) return;
-  Alert.alert('Call', `Do you want to call ${phoneNumber}?`, [
-    { text: 'Cancel', style: 'cancel' },
-    { text: 'Call', onPress: () => Linking.openURL(`tel:${phoneNumber}`) },
+
+  const cleanNumber = phoneNumber.replace(/\D/g, '');
+
+  Alert.alert('Contact', `Choose an action for ${phoneNumber}`, [
+    {
+      text: 'Cancel',
+      style: 'cancel',
+    },
+    {
+      text: 'WhatsApp',
+      onPress: async () => {
+        const message = encodeURIComponent('Hello!');
+        const appUrl = `whatsapp://send?phone=${cleanNumber}&text=${message}`;
+        const webUrl = `https://wa.me/${cleanNumber}?text=${message}`;
+
+        try {
+          const supported = await Linking.canOpenURL(appUrl);
+
+          if (supported) {
+            await Linking.openURL(appUrl);
+          } else {
+            // Opens WhatsApp Web or the app if installed
+            await Linking.openURL(webUrl);
+          }
+        } catch (error) {
+          Alert.alert('Error', 'Unable to open WhatsApp.');
+        }
+      },
+    },
+    {
+      text: 'Call',
+      onPress: () => Linking.openURL(`tel:${phoneNumber}`),
+    },
   ]);
 };
 const sendMail = async (email) => {
@@ -197,6 +234,7 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
       </TouchableOpacity>
     </View>
     <View style={styles.rowBetween}>
+      <View style={styles.leftBox}>
       <Text style={styles.label}>
         Site Visit Date:
         <Text style={styles.value}>
@@ -204,6 +242,9 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
           {data?.propertyfeedbacks?.map(x => x?.site_visit_date).join(', ')}
         </Text>
       </Text>
+      </View>
+      <View style={styles.rightBox}>
+      
       <Text style={styles.label}>
         RM:{' '}
         <Text style={styles.value}>
@@ -211,7 +252,9 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
             ? `${data.relationshipManager.usr_fname} ${data.relationshipManager.usr_lname}`
             : 'N/A'}
         </Text>
+        
       </Text>
+      </View>
     </View>
 
     <Text style={{ color: '#fb9e08', fontSize: 12, marginTop: 4 }}>
@@ -762,7 +805,17 @@ const styles = StyleSheet.create({
     // flex: 1,
     // flexShrink: 1,
   },
+leftBox: {
+  flex: 1,
+  // paddingRight: 2,
+  minWidth: 0, // important for proper wrapping in RN
+},
 
+rightBox: {
+  flex: 1,
+  // paddingLeft: 2,
+  minWidth: 0, // important for long names
+},
   value: {
     color: '#fff',
     flexShrink: 1,

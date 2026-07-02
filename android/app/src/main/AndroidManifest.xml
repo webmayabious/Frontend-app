@@ -16,6 +16,13 @@
         </intent>
         <package android:name="com.microsoft.office.excel" />
         <package android:name="cn.wps.moffice_eng" />
+         <!-- WhatsApp -->
+    <package android:name="com.whatsapp" />
+
+    <intent>
+        <action android:name="android.intent.action.VIEW" />
+        <data android:scheme="whatsapp" />
+    </intent>
     </queries>
 
     <application

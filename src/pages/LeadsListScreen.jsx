@@ -25,11 +25,48 @@ import api from '../api/AxiosInstance';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 
+// const makeCall = phoneNumber => {
+//   if (!phoneNumber) return;
+//   Alert.alert('Call', `Do you want to call ${phoneNumber}?`, [
+//     { text: 'Cancel', style: 'cancel' },
+//     { text: 'Call', onPress: () => Linking.openURL(`tel:${phoneNumber}`) },
+//   ]);
+// };
 const makeCall = phoneNumber => {
   if (!phoneNumber) return;
-  Alert.alert('Call', `Do you want to call ${phoneNumber}?`, [
-    { text: 'Cancel', style: 'cancel' },
-    { text: 'Call', onPress: () => Linking.openURL(`tel:${phoneNumber}`) },
+
+  const cleanNumber = phoneNumber.replace(/\D/g, '');
+
+  Alert.alert('Contact', `Choose an action for ${phoneNumber}`, [
+    {
+      text: 'Cancel',
+      style: 'cancel',
+    },
+    {
+      text: 'WhatsApp',
+      onPress: async () => {
+        const message = encodeURIComponent('Hello!');
+        const appUrl = `whatsapp://send?phone=${cleanNumber}&text=${message}`;
+        const webUrl = `https://wa.me/${cleanNumber}?text=${message}`;
+
+        try {
+          const supported = await Linking.canOpenURL(appUrl);
+
+          if (supported) {
+            await Linking.openURL(appUrl);
+          } else {
+            // Opens WhatsApp Web or the app if installed
+            await Linking.openURL(webUrl);
+          }
+        } catch (error) {
+          Alert.alert('Error', 'Unable to open WhatsApp.');
+        }
+      },
+    },
+    {
+      text: 'Call',
+      onPress: () => Linking.openURL(`tel:${phoneNumber}`),
+    },
   ]);
 };
 const sendMail = async (email) => {

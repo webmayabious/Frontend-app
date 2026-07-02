@@ -92,7 +92,7 @@ const DobGenderRow = ({ form, onChange }) => {
 
   return (
     <View style={styles.row}>
-      <View style={{ flex: 1, marginRight: 10 }}>
+      {/* <View style={{ flex: 1, marginRight: 10 }}>
         <Text style={styles.label}>Date of Birth *</Text>
         <TouchableOpacity style={styles.inputWithIcon} onPress={() => setShow(true)}>
           <Text style={{ color: '#fff' }}>{displayDate}</Text>
@@ -107,8 +107,44 @@ const DobGenderRow = ({ form, onChange }) => {
             maximumDate={new Date()}
           />
         )}
-      </View>
+      </View> */}
+<View style={{ flex: 1, marginRight: 10 }}>
+  <Text style={styles.label}>Date of Birth</Text>
 
+ <TouchableOpacity
+  style={styles.inputWithIcon}
+  onPress={() => setShow(true)}
+>
+  <Text style={{ color: date ? '#fff' : '#aaa' }}>
+    {displayDate}
+  </Text>
+
+  {date ? (
+    <TouchableOpacity
+      onPress={(e) => {
+        e.stopPropagation(); // Prevent opening the date picker
+        setDate(null);
+        onChange('date_of_birth', null);
+      }}
+      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+    >
+      <Icon name="close" size={20} color="#ff5252" />
+    </TouchableOpacity>
+  ) : (
+    <Icon name="calendar-today" size={18} color="#00e5ff" />
+  )}
+</TouchableOpacity>
+
+  {show && (
+    <DateTimePicker
+      value={date || new Date()}
+      mode="date"
+      display="default"
+      onChange={handleDateChange}
+      maximumDate={new Date()}
+    />
+  )}
+</View>
       <View style={{ flex: 1 }}>
         <Text style={styles.label}>Gender *</Text>
         <View style={styles.genderRow}>
