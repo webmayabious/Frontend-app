@@ -69,7 +69,7 @@ const makeCall = phoneNumber => {
     },
   ]);
 };
-const sendMail = async (email) => {
+const sendMail = async email => {
   if (!email) return;
 
   try {
@@ -96,36 +96,38 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
     <View style={styles.cardHeader}>
       <View style={styles.nameRow}>
         <Text style={styles.name}>{data?.name || []}</Text>
-            <View
-        style={[
-          styles.activeBadge,
-          {
-            backgroundColor:
-              data?.active === '1'
-                ? '#4caf50'
-                : data?.active === '5'
-                ? '#6b7785'
-                : '#f44336',
-          },
-        ]}
-      >
-        <Text style={styles.activeText}>
-          {data?.active === '1'
-            ? 'Active'
-            : data?.active === '5'
-            ? 'Booking Done'
-            : 'Inactive'}
-        </Text>
-      </View>
+        <View
+          style={[
+            styles.activeBadge,
+            {
+              backgroundColor:
+                data?.active === '1'
+                  ? '#4caf50'
+                  : data?.active === '5'
+                  ? '#6b7785'
+                  : '#f44336',
+            },
+          ]}
+        >
+          <Text style={styles.activeText}>
+            {data?.active === '1'
+              ? 'Active'
+              : data?.active === '5'
+              ? 'Booking Done'
+              : 'Inactive'}
+          </Text>
+        </View>
       </View>
 
-      <View style={{ flexDirection: 'row', alignItems: 'center', flexShrink: 0 }}>
+      <View
+        style={{ flexDirection: 'row', alignItems: 'center', flexShrink: 0 }}
+      >
         <TouchableOpacity
           style={styles.remarksBtn}
           onPress={() => {
             setRemarksText(
               data?.propertyfeedbacks?.map(x => x?.remarks || []).join(', ') ||
-              'No remarks available',
+                'No remarks available',
             );
             setShowRemarks(true);
           }}
@@ -144,7 +146,8 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
     </View>
 
     <Text style={styles.location}>
-      {data?.propertyproject?.project_name || []} | {data?.propertylocation?.name || []}
+      {data?.propertyproject?.project_name || []} |{' '}
+      {data?.propertylocation?.name || []}
     </Text>
 
     {/* <View style={styles.rowBetween}>
@@ -166,31 +169,20 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
       </TouchableOpacity> */}
       <TouchableOpacity onPress={() => makeCall(data?.phone)}>
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <Text style={styles.label1}>Phone:{' '}</Text>
+          <Text style={styles.label1}>Phone: </Text>
 
           {/* <View style={styles.remarksBtn}> */}
-            <Text style={styles.phoneText}>
-              {data?.phone || 'N/A'}
-            </Text>
+          <Text style={styles.phoneText}>{data?.phone || 'N/A'}</Text>
           {/* </View> */}
         </View>
       </TouchableOpacity>
-
     </View>
     <View style={styles.rowBetween}>
-      <TouchableOpacity
-
-        onPress={() => sendMail(data?.email)}
-
-      >
+      <TouchableOpacity onPress={() => sendMail(data?.email)}>
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <Text style={styles.label1}>Email:{' '}</Text>
+          <Text style={styles.label1}>Email: </Text>
 
-
-          <Text style={styles.emailText}>
-            {data?.email || 'N/A'}
-          </Text>
-
+          <Text style={styles.emailText}>{data?.email || 'N/A'}</Text>
         </View>
       </TouchableOpacity>
     </View>
@@ -198,14 +190,19 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
       <Text style={styles.label}>
         Site Visit Date:
         <Text style={styles.value}>
-          {' '}{data?.propertyfeedbacks?.map(x => x?.site_visit_date || []).join(', ')}
+          {' '}
+          {data?.propertyfeedbacks
+            ?.map(x => x?.site_visit_date || [])
+            .join(', ')}
         </Text>
       </Text>
       <Text style={styles.label}>
         RM:{' '}
         <Text style={styles.value}>
           {data?.relationshipManager
-            ? `${data.relationshipManager.usr_fname || []} ${data.relationshipManager.usr_lname || []}`
+            ? `${data.relationshipManager.usr_fname || []} ${
+                data.relationshipManager.usr_lname || []
+              }`
             : 'N/A'}
         </Text>
       </Text>
@@ -219,12 +216,16 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
     <View style={styles.cardFooter}>
       <TouchableOpacity
         style={styles.button}
-        onPress={() => navigation.navigate('AllInteractionsScreen', { id: data?.id })}
+        onPress={() =>
+          navigation.navigate('AllInteractionsScreen', { id: data?.id })
+        }
       >
         <Text style={styles.buttonText}>View Interaction</Text>
       </TouchableOpacity>
       <Text style={styles.completed}>
-        {data?.propertyfeedbacks?.map(x => x.propertycallstatus?.name).join(', ') || 'N/A'}
+        {data?.propertyfeedbacks
+          ?.map(x => x.propertycallstatus?.name)
+          .join(', ') || 'N/A'}
       </Text>
     </View>
   </View>
@@ -296,6 +297,10 @@ const FilterModal = ({
   onApply,
   onReset,
   Property,
+  callStatusListfetch,
+  leadQualificationOptions,
+  leadStatusOptions,
+  leadSubStatusOptions,
   Rm,
   projectOptions,
   LeadStatus,
@@ -304,6 +309,8 @@ const FilterModal = ({
   setShowFromPicker,
   setShowToPicker,
   onDateChange,
+  setActivePicker,
+  activePicker,
 }) => {
   const scaleAnim = useRef(new Animated.Value(0.85)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
@@ -384,7 +391,13 @@ const FilterModal = ({
             onChange={value => onChange('rm_id', value)}
           />
 
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', width: '100%' }}>
+          <View
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              width: '100%',
+            }}
+          >
             <View style={{ width: '48%' }}>
               <InputField
                 label="From Date"
@@ -419,7 +432,80 @@ const FilterModal = ({
             value={filters.active}
             onChange={value => onChange('active', value)}
           />
+         <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 12, marginBottom: 10 }}>
+  <Text
+    style={{
+      color: '#eec34b',
+      fontSize: 14,
+      fontWeight: '500',
+    }}
+  >
+    FeedBack
+  </Text>
 
+  <View
+    style={{
+      flex: 1,
+      height: 1,
+      backgroundColor: '#6e6e6b',
+      marginLeft: 10,
+    }}
+  />
+</View>
+          <DropdownField
+            label="Call Status"
+            data={callStatusListfetch}
+            placeholder="Select Status"
+            value={filters.call_status}
+            onChange={value => onChange('call_status', value)}
+          />
+          <DropdownField
+            label="Lead Qualification"
+            data={leadQualificationOptions}
+            placeholder="Select Qualification"
+            value={filters.lead_qualification}
+            onChange={value => onChange('lead_qualification', value)}
+          />
+          <DropdownField
+            label="Lead Status"
+            data={leadStatusOptions}
+            placeholder="Select Status"
+            value={filters.lead_status}
+            onChange={value => onChange('lead_status', value)}
+          />
+          <DropdownField
+            label="Lead Sub Status"
+            data={leadSubStatusOptions}
+            placeholder="Select Sub Status"
+            value={filters.lead_sub_status}
+            onChange={value => onChange('lead_sub_status', value)}
+          />
+          <View
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              width: '100%',
+            }}
+          >
+            <View style={{ width: '48%' }}>
+              <InputField
+                label="Site Visit From Date"
+                placeholder="YYYY-MM-DD"
+                icon="calendar-today"
+                value={filters.siteVisitFromDate}
+                onPress={() => setActivePicker(true)}
+              />
+            </View>
+            <View style={{ width: '48%' }}>
+              <InputField
+                label="Site Visit To Date"
+                placeholder="YYYY-MM-DD"
+                icon="calendar-today"
+                value={filters.siteVisitToDate}
+                onPress={() => setActivePicker(true)}
+              />
+            </View>
+          </View>
           {showFromPicker && (
             <DateTimePicker
               value={filters.fromDate ? new Date(filters.fromDate) : new Date()}
@@ -434,6 +520,30 @@ const FilterModal = ({
               mode="date"
               display="default"
               onChange={(e, d) => onDateChange(e, d, 'toDate')}
+            />
+          )}
+          {activePicker && (
+            <DateTimePicker
+              value={
+                filters.siteVisitFromDate
+                  ? new Date(filters.siteVisitFromDate)
+                  : new Date()
+              }
+              mode="date"
+              display="default"
+              onChange={(e, d) => onDateChange(e, d, 'siteVisitFromDate')}
+            />
+          )}
+          {activePicker && (
+            <DateTimePicker
+              value={
+                filters.siteVisitToDate
+                  ? new Date(filters.siteVisitToDate)
+                  : new Date()
+              }
+              mode="date"
+              display="default"
+              onChange={(e, d) => onDateChange(e, d, 'siteVisitToDate')}
             />
           )}
           <View style={{ height: 8 }} />
@@ -451,7 +561,10 @@ const FilterModal = ({
           </Text>
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={onClose} style={{ marginTop: 12, marginBottom: 4 }}>
+        <TouchableOpacity
+          onPress={onClose}
+          style={{ marginTop: 12, marginBottom: 4 }}
+        >
           <Text style={{ color: '#a0b4e8', fontSize: 13 }}>Cancel</Text>
         </TouchableOpacity>
       </Animated.View>
@@ -478,9 +591,16 @@ const LeadsListScreen = () => {
     project: null,
     location: null,
     active: null,
+    lead_status: null,
+    lead_sub_status: null,
+    lead_qualification: null,
+    call_status: null,
+    siteVisitFromDate: null,
+    siteVisitToDate: null,
   });
   const [showFromPicker, setShowFromPicker] = useState(false);
   const [showToPicker, setShowToPicker] = useState(false);
+  const [activePicker, setActivePicker] = useState(null);
   const [appliedFilters, setAppliedFilters] = useState();
 
   const formatDate = date => {
@@ -492,35 +612,59 @@ const LeadsListScreen = () => {
     return `${year}-${month}-${day}`;
   };
 
+  // const onDateChange = (event, selectedDate, key) => {
+  //   key === 'fromDate' ? setShowFromPicker(false) : setShowToPicker(false);
+  //   if (selectedDate) onChange(key, formatDate(selectedDate));
+  // };
   const onDateChange = (event, selectedDate, key) => {
-    key === 'fromDate' ? setShowFromPicker(false) : setShowToPicker(false);
-    if (selectedDate) onChange(key, formatDate(selectedDate));
-  };
+    const isFrom = key === 'fromDate';
+    const isSiteVisitForm = key === 'siteVisitFromDate';
 
-  const { data: Lead = [], isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } =
-    useInfiniteQuery({
-      queryKey: ['leads_infinite', appliedFilters, searchText],
-      queryFn: async ({ pageParam = 1 }) => {
-        const res = await api.get('/api/pm/getAllPropertyLeads', {
-          params: {
-            page: pageParam,
-            search: searchText || undefined,
-            rm_id: filters.rm_id || undefined,
-            fromDate: filters.fromDate || undefined,
-            toDate: filters.toDate || undefined,
-            project: filters.project || undefined,
-            location: filters.location || undefined,
-            active: filters.active || undefined,
-          },
-        });
-        return res.data;
-      },
-      getNextPageParam: lastPage => {
-        const { currentPage, totalPages } = lastPage;
-        return currentPage < totalPages ? currentPage + 1 : undefined;
-      },
-      initialPageParam: 1,
-    });
+    if (isFrom) {
+      setShowFromPicker(false);
+    } else {
+      setActivePicker(false);
+    }
+
+    if (selectedDate) {
+      onChange(key, formatDate(selectedDate));
+    }
+  };
+  const {
+    data: Lead = [],
+    isLoading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
+    queryKey: ['leads_infinite', appliedFilters, searchText],
+    queryFn: async ({ pageParam = 1 }) => {
+      const res = await api.get('/api/pm/getAllPropertyLeads', {
+        params: {
+          page: pageParam,
+          search: searchText || undefined,
+          rm_id: filters.rm_id || undefined,
+          fromDate: filters.fromDate || undefined,
+          toDate: filters.toDate || undefined,
+          project: filters.project || undefined,
+          location: filters.location || undefined,
+          active: filters.active || undefined,
+          lead_status: filters.lead_status || undefined,
+          lead_sub_status: filters.lead_sub_status || undefined,
+          lead_qualification: filters.lead_qualification || undefined,
+          call_status: filters.call_status || undefined,
+          siteVisitFromDate: filters.siteVisitFromDate || undefined,
+          siteVisitToDate: filters.siteVisitToDate || undefined,
+        },
+      });
+      return res.data;
+    },
+    getNextPageParam: lastPage => {
+      const { currentPage, totalPages } = lastPage;
+      return currentPage < totalPages ? currentPage + 1 : undefined;
+    },
+    initialPageParam: 1,
+  });
 
   const leads = Lead?.pages?.flatMap(page => page.data) || [];
 
@@ -551,8 +695,55 @@ const LeadsListScreen = () => {
       return res.data.data || [];
     },
   });
-
-  const Property = AllProperty?.map(item => ({ label: item.name, value: item.id }));
+  const { data: callStatusList = [] } = useQuery({
+    queryKey: ['callStatus'],
+    queryFn: async () => {
+      const res = await api.get('/api/pm/getAllPropertyCallStatus');
+      console.log('callStatusList', res.data.data);
+      return res.data.data || [];
+    },
+  });
+  const { data: leadQualificationList = [] } = useQuery({
+    queryKey: ['leadQualification'],
+    queryFn: async () => {
+      const res = await api.get('/api/pm/getAllPropertyLeadQualification');
+      return res.data.data || [];
+    },
+  });
+  const { data: leadStatusList = [] } = useQuery({
+    queryKey: ['leadStatus'],
+    queryFn: async () => {
+      const res = await api.get('/api/pm/getAllPropertyLeadStatus');
+      return res.data.data || [];
+    },
+  });
+  const { data: leadSubStatusList = [] } = useQuery({
+    queryKey: ['leadSubStatus'],
+    queryFn: async () => {
+      const res = await api.get('/api/pm/getAllPropertyLeadSubStatus');
+      return res.data.data || [];
+    },
+  });
+  const leadQualificationOptions = leadQualificationList?.map(item => ({
+    label: item.name,
+    value: item.id,
+  }));
+  const leadStatusOptions = leadStatusList?.map(item => ({
+    label: item.name,
+    value: item.id,
+  }));
+  const leadSubStatusOptions = leadSubStatusList?.map(item => ({
+    label: item.name,
+    value: item.id,
+  }));
+  const callStatusListfetch = callStatusList?.map(item => ({
+    label: item.name,
+    value: item.id,
+  }));
+  const Property = AllProperty?.map(item => ({
+    label: item.name,
+    value: item.id,
+  }));
   const Rm = allRmList?.map(item => ({ label: item.name, value: item.id }));
   const projectOptions = projectList?.map(item => ({
     label: item.project_name,
@@ -562,10 +753,11 @@ const LeadsListScreen = () => {
   const LeadStatus = [
     { label: 'Active', value: '1' },
     { label: 'Inactive', value: '2' },
-     { label: 'Booking Done', value: '5' },
+    { label: 'Booking Done', value: '5' },
   ];
 
-  const onChange = (key, value) => setFilters(prev => ({ ...prev, [key]: value }));
+  const onChange = (key, value) =>
+    setFilters(prev => ({ ...prev, [key]: value }));
 
   const applyFilter = () => {
     setAppliedFilters(filters);
@@ -574,8 +766,13 @@ const LeadsListScreen = () => {
 
   const resetFilters = () => {
     const cleared = {
-      company_id: null, rm_id: null, fromDate: null,
-      toDate: null, project: null, location: null, active: null,
+      company_id: null,
+      rm_id: null,
+      fromDate: null,
+      toDate: null,
+      project: null,
+      location: null,
+      active: null,
     };
     setFilters(cleared);
     setAppliedFilters(cleared);
@@ -585,12 +782,18 @@ const LeadsListScreen = () => {
   const scrollToTop = () => {
     isScrollingToTop.current = true;
     scrollRef.current?.scrollTo({ y: 0, animated: true });
-    setTimeout(() => { isScrollingToTop.current = false; }, 600);
+    setTimeout(() => {
+      isScrollingToTop.current = false;
+    }, 600);
   };
 
   return (
     <View style={styles.container}>
-      <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
+      <StatusBar
+        translucent
+        backgroundColor="transparent"
+        barStyle="light-content"
+      />
 
       <View style={styles.topBarContainer}>
         <View style={styles.topBar}>
@@ -600,12 +803,18 @@ const LeadsListScreen = () => {
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <TouchableOpacity
-              style={[styles.backBtn, { marginRight: 8, borderColor: '#00e5ff' }]}
+              style={[
+                styles.backBtn,
+                { marginRight: 8, borderColor: '#00e5ff' },
+              ]}
               onPress={() => setShowFilterModal(true)}
             >
               <Icon name="filter-alt" size={18} color="#00e5ff" />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+            <TouchableOpacity
+              style={styles.backBtn}
+              onPress={() => navigation.goBack()}
+            >
               <View style={styles.backButton}>
                 <Image
                   source={require('../asset/image/icon/Arrow.png')}
@@ -622,11 +831,13 @@ const LeadsListScreen = () => {
         ref={scrollRef}
         showsVerticalScrollIndicator={false}
         onScroll={event => {
-          const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
+          const { layoutMeasurement, contentOffset, contentSize } =
+            event.nativeEvent;
           const y = contentOffset.y;
           setShowTopBtn(y > 200);
           if (isScrollingToTop.current) return;
-          const isNearBottom = layoutMeasurement.height + y >= contentSize.height - 150;
+          const isNearBottom =
+            layoutMeasurement.height + y >= contentSize.height - 150;
           if (isNearBottom) handleLoadMore();
         }}
         scrollEventThrottle={400}
@@ -646,7 +857,9 @@ const LeadsListScreen = () => {
         </View>
 
         {isLoading ? (
-          <Text style={{ color: '#fff', textAlign: 'center', marginTop: 20 }}>Loading...</Text>
+          <Text style={{ color: '#fff', textAlign: 'center', marginTop: 20 }}>
+            Loading...
+          </Text>
         ) : leads && leads.length > 0 ? (
           leads.map((visit, i) => (
             <SiteCard
@@ -658,11 +871,17 @@ const LeadsListScreen = () => {
             />
           ))
         ) : (
-          <Text style={{ color: '#fff', textAlign: 'center', marginTop: 20 }}>No Data Found</Text>
+          <Text style={{ color: '#fff', textAlign: 'center', marginTop: 20 }}>
+            No Data Found
+          </Text>
         )}
 
         {isFetchingNextPage && (
-          <ActivityIndicator size="small" color="#999" style={{ marginVertical: 12, alignSelf: 'center' }} />
+          <ActivityIndicator
+            size="small"
+            color="#999"
+            style={{ marginVertical: 12, alignSelf: 'center' }}
+          />
         )}
         <View style={{ height: 100 }} />
       </ScrollView>
@@ -676,7 +895,10 @@ const LeadsListScreen = () => {
             </View>
             <Text style={styles.modalTitle}>Latest Remarks</Text>
             <Text style={styles.modalText}>{remarksText}</Text>
-            <TouchableOpacity style={styles.modalCloseBtn} onPress={() => setShowRemarks(false)}>
+            <TouchableOpacity
+              style={styles.modalCloseBtn}
+              onPress={() => setShowRemarks(false)}
+            >
               <Text style={styles.modalCloseText}>OK</Text>
             </TouchableOpacity>
           </View>
@@ -692,6 +914,10 @@ const LeadsListScreen = () => {
         onApply={applyFilter}
         onReset={resetFilters}
         Property={Property}
+        callStatusListfetch={callStatusListfetch}
+        leadQualificationOptions={leadQualificationOptions}
+        leadStatusOptions={leadStatusOptions}
+        leadSubStatusOptions={leadSubStatusOptions}
         Rm={Rm}
         projectOptions={projectOptions}
         LeadStatus={LeadStatus}
@@ -700,6 +926,8 @@ const LeadsListScreen = () => {
         setShowFromPicker={setShowFromPicker}
         setShowToPicker={setShowToPicker}
         onDateChange={onDateChange}
+        setActivePicker={setActivePicker}
+        activePicker={activePicker}
       />
 
       {showTopBtn && (
@@ -769,8 +997,17 @@ const styles = StyleSheet.create({
     padding: 12,
     backgroundColor: '#ffffff20',
   },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-  nameRow: { flexDirection: 'row', alignItems: 'center', flex: 1, flexWrap: 'wrap' },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    flexWrap: 'wrap',
+  },
   name: { color: '#fff', fontWeight: 'bold', flexShrink: 1 },
   activeBadge: { borderRadius: 10, paddingHorizontal: 6, marginLeft: 6 },
   activeText: { color: '#fff', fontSize: 10 },
@@ -781,34 +1018,45 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     maxWidth: 80,
   },
-    phoneText: {
-  color: '#00acc1',
-  backgroundColor: 'rgba(0, 172, 193, 0.15)',
-  paddingHorizontal: 4,
-  paddingVertical: 2,
-  borderRadius: 4,
-  fontWeight: '600',
-},
+  phoneText: {
+    color: '#00acc1',
+    backgroundColor: 'rgba(0, 172, 193, 0.15)',
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    borderRadius: 4,
+    fontWeight: '600',
+  },
   remarksText: { color: '#fff', fontSize: 10 },
-  location: { color: '#00e5ff', marginTop: 5, flexWrap: 'wrap', lineHeight: 16 },
-  rowBetween: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 5, gap: 6 },
+  location: {
+    color: '#00e5ff',
+    marginTop: 5,
+    flexWrap: 'wrap',
+    lineHeight: 16,
+  },
+  rowBetween: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 5,
+    gap: 6,
+  },
   label: {
-    color: '#FFB85D', fontSize: 12,
-    flex: 1, flexWrap: 'wrap',
-    paddingTop: 2
+    color: '#FFB85D',
+    fontSize: 12,
+    flex: 1,
+    flexWrap: 'wrap',
+    paddingTop: 2,
   },
-    label1: {
-    color: '#FFB85D', fontSize: 12,
+  label1: {
+    color: '#FFB85D',
+    fontSize: 12,
     // flex: 1, flexWrap: 'wrap',
-    paddingTop: 2
+    paddingTop: 2,
   },
-    emailText: {
+  emailText: {
     color: '#00acc1',
     textDecorationLine: 'underline',
     fontWeight: '500',
     fontSize: 12,
-
-
   },
   value: { color: '#fff', flexShrink: 1 },
   cardFooter: {
@@ -842,12 +1090,15 @@ const styles = StyleSheet.create({
   /* ✅ Centered overlay — justifyContent: center */
   modalOverlay: {
     position: 'absolute',
-    top: 0, left: 0, right: 0, bottom: 0,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     backgroundColor: 'rgba(0,0,0,0.65)',
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 1000,
-    bottom: 85
+    bottom: 85,
   },
 
   /* Remarks modal */
@@ -903,7 +1154,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#3d45b033',
     marginVertical: 10,
   },
-  modalTitle: { color: '#00e5ff', fontSize: 18, marginBottom: 10, fontWeight: 'bold' },
+  modalTitle: {
+    color: '#00e5ff',
+    fontSize: 18,
+    marginBottom: 10,
+    fontWeight: 'bold',
+  },
   modalText: { color: '#fff', textAlign: 'center', marginBottom: 15 },
   modalCloseBtn: {
     backgroundColor: '#00acc1',
@@ -917,7 +1173,12 @@ const styles = StyleSheet.create({
   modalCloseText: { color: '#fff', fontWeight: '600', fontSize: 14 },
 
   filterInputWrapper: { width: '100%', marginBottom: 12 },
-  filterLabel: { color: '#a0b4e8', fontSize: 12, marginBottom: 5, fontWeight: '500' },
+  filterLabel: {
+    color: '#a0b4e8',
+    fontSize: 12,
+    marginBottom: 5,
+    fontWeight: '500',
+  },
   filterDropdown: {
     height: 40,
     backgroundColor: '#ffffff12',
