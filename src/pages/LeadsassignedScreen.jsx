@@ -128,8 +128,35 @@ const DropdownField = ({ label, data, placeholder, value, onChange }) => {
     </View>
   );
 };
+const RemarksText = ({ remarks }) => {
+  const [expanded, setExpanded] = useState(false);
 
-const FollowCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
+  const shouldShowReadMore = remarks.length > 80;
+
+  return (
+    <Text style={styles.remarksCardText}>
+      {expanded || !shouldShowReadMore
+        ? remarks
+        : `${remarks.substring(0, 80)}... `}
+
+      {shouldShowReadMore && (
+        <Text
+          style={styles.readMore}
+          onPress={() => setExpanded(!expanded)}
+        >
+          {expanded ? ' Read Less' : ' Read More'}
+        </Text>
+      )}
+    </Text>
+  );
+};
+const FollowCard = ({ data, navigation, setShowRemarks, setRemarksText }) => {
+    const remarks =
+  data?.propertyfeedbacks
+    ?.map(x => x?.remarks)
+    ?.filter(Boolean)
+    ?.join(', ') || 'No Remarks Available';
+  return(
   <View style={styles.card}>
     <View style={styles.cardHeader}>
       <View style={styles.nameRow}>
@@ -170,7 +197,7 @@ const FollowCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
       </View>
 
       <View style={{ flexDirection: 'row', alignItems: 'center', flexShrink: 0 }}>
-        <TouchableOpacity
+        {/* <TouchableOpacity
           style={styles.remarksBtn}
            onPress={() => {
             // setRemarksText(data?.propertyfeedbacks?.map(x=>x.remarks)|| 'No remarks available');
@@ -186,7 +213,7 @@ const FollowCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
           }}
         >
           <Text style={styles.remarksText}>Remarks</Text>
-        </TouchableOpacity>
+        </TouchableOpacity> */}
 
         <Icon
           name="edit"
@@ -267,7 +294,28 @@ const FollowCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
       Lead Source:{' '}
       <Text style={styles.value}>{data?.mrreference?.mrf_name || 'N/A'}</Text>
     </Text>
+  <View
+  style={{
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginTop: 8,
+  }}
+>
+  <Text
+    style={{
+      color: '#fb9e08',
+      fontSize: 12,
+      fontWeight: '600',
+      marginRight: 5,
+    }}
+  >
+    Remarks:
+  </Text>
 
+  <View style={{ flex: 1 }}>
+    <RemarksText remarks={remarks} />
+  </View>
+</View>
     <View style={styles.cardFooter}>
       <TouchableOpacity
         style={styles.button}
@@ -286,7 +334,7 @@ const FollowCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
       </Text>
     </View>
   </View>
-);
+)};
 
 const LeadsassignedScreen = () => {
   const navigation = useNavigation();
@@ -625,7 +673,17 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#070c4d' },
 
   topBarContainer: { paddingHorizontal: 15, marginTop: 10 },
+  remarksCardText: {
+  fontSize: 13,
+  color: '#ffffff',
+  lineHeight: 20,
+},
 
+readMore: {
+  color: '#00a8ff',
+  fontWeight: '600',
+  marginTop: 3,
+},
   topBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',

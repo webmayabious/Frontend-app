@@ -129,10 +129,36 @@ const DropdownField = ({ label, data, placeholder, value, onChange }) => {
     </View>
   );
 };
+const RemarksText = ({ remarks }) => {
+  const [expanded, setExpanded] = useState(false);
+
+  const shouldShowReadMore = remarks.length > 80;
+
+  return (
+    <Text style={styles.remarksCardText}>
+      {expanded || !shouldShowReadMore
+        ? remarks
+        : `${remarks.substring(0, 80)}... `}
+
+      {shouldShowReadMore && (
+        <Text
+          style={styles.readMore}
+          onPress={() => setExpanded(!expanded)}
+        >
+          {expanded ? ' Read Less' : ' Read More'}
+        </Text>
+      )}
+    </Text>
+  );
+};
 /* ================= CARD ================= */
 const LeadCard = ({ item, navigation, setShowRemarks, setRemarksText }) => {
   const feedback = item?.propertyfeedbacks?.[0];
-
+ const remarks =
+  item?.propertyfeedbacks
+    ?.map(x => x?.remarks)
+    ?.filter(Boolean)
+    ?.join(', ') || 'No Remarks Available';
   return (
     <View style={styles.card}>
       {/* HEADER */}
@@ -180,7 +206,7 @@ const LeadCard = ({ item, navigation, setShowRemarks, setRemarksText }) => {
         </View>
 
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <TouchableOpacity
+          {/* <TouchableOpacity
             style={styles.remarksBtn}
             onPress={() => {
               setRemarksText(feedback?.remarks || 'No remarks available');
@@ -188,7 +214,7 @@ const LeadCard = ({ item, navigation, setShowRemarks, setRemarksText }) => {
             }}
           >
             <Text style={styles.remarksText}>Remarks</Text>
-          </TouchableOpacity>
+          </TouchableOpacity> */}
 
           <Icon
             name="edit"
@@ -266,7 +292,28 @@ const LeadCard = ({ item, navigation, setShowRemarks, setRemarksText }) => {
         Lead Source:{' '}
         <Text style={styles.value}>{item?.mrreference?.mrf_name}</Text>
       </Text>
+  <View
+  style={{
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginTop: 8,
+  }}
+>
+  <Text
+    style={{
+      color: '#fb9e08',
+      fontSize: 12,
+      fontWeight: '600',
+      marginRight: 5,
+    }}
+  >
+    Remarks:
+  </Text>
 
+  <View style={{ flex: 1 }}>
+    <RemarksText remarks={remarks} />
+  </View>
+</View>
       {/* FOOTER */}
       <View style={styles.cardFooter}>
         <TouchableOpacity
@@ -663,7 +710,17 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     marginBottom: 10,
   },
+  remarksCardText: {
+  fontSize: 13,
+  color: '#ffffff',
+  lineHeight: 20,
+},
 
+readMore: {
+  color: '#00a8ff',
+  fontWeight: '600',
+  marginTop: 3,
+},
   screenTitle: { color: '#cfd8dc', fontSize: 13, marginLeft: 6 },
   backButton: {
   flexDirection: 'row',

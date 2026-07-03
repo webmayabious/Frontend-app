@@ -1,4 +1,3 @@
-// LeadsListScreen.js — Centered filter modal with scale+fade animation
 import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
@@ -91,12 +90,64 @@ const sendMail = async email => {
     Alert.alert('Error', 'Unable to open email app.');
   }
 };
-const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
-  <View style={styles.card}>
-    <View style={styles.cardHeader}>
-      <View style={styles.nameRow}>
-        <Text style={styles.name}>{data?.name || []}</Text>
-        <View
+// const RemarksText = ({ remarks }) => {
+//   const [expanded, setExpanded] = useState(false);
+
+//   const shouldShowReadMore = remarks.length > 80;
+
+//   return (
+//     <View>
+//       <Text
+//         style={styles.remarksCardText}
+//         numberOfLines={expanded ? 0 : 1}
+//       >
+//         {remarks}
+//       </Text>
+
+//       {shouldShowReadMore && (
+//         <TouchableOpacity onPress={() => setExpanded(!expanded)}>
+//           <Text style={styles.readMore}>
+//             {expanded ? 'Read Less' : 'Read More'}
+//           </Text>
+//         </TouchableOpacity>
+//       )}
+//     </View>
+//   );
+// };
+const RemarksText = ({ remarks }) => {
+  const [expanded, setExpanded] = useState(false);
+
+  const shouldShowReadMore = remarks.length > 80;
+
+  return (
+    <Text style={styles.remarksCardText}>
+      {expanded || !shouldShowReadMore
+        ? remarks
+        : `${remarks.substring(0, 80)}... `}
+
+      {shouldShowReadMore && (
+        <Text
+          style={styles.readMore}
+          onPress={() => setExpanded(!expanded)}
+        >
+          {expanded ? ' Read Less' : ' Read More'}
+        </Text>
+      )}
+    </Text>
+  );
+};
+const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => {
+  const remarks =
+  data?.propertyfeedbacks
+    ?.map(x => x?.remarks)
+    ?.filter(Boolean)
+    ?.join(', ') || 'No Remarks Available';
+  return (
+    <View style={styles.card}>
+      <View style={styles.cardHeader}>
+        <View style={styles.nameRow}>
+          <Text style={styles.name}>{data?.name || []}</Text>
+          <View
           style={[
             styles.activeBadge,
             {
@@ -122,7 +173,7 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
       <View
         style={{ flexDirection: 'row', alignItems: 'center', flexShrink: 0 }}
       >
-        <TouchableOpacity
+        {/* <TouchableOpacity
           style={styles.remarksBtn}
           onPress={() => {
             setRemarksText(
@@ -133,7 +184,7 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
           }}
         >
           <Text style={styles.remarksText}>Remarks</Text>
-        </TouchableOpacity>
+        </TouchableOpacity> */}
 
         <Icon
           name="edit"
@@ -213,6 +264,30 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
       <Text style={styles.value}>{data?.mrreference?.mrf_name || []}</Text>
     </Text>
 
+  <View
+  style={{
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginTop: 8,
+  }}
+>
+  <Text
+    style={{
+      color: '#fb9e08',
+      fontSize: 12,
+      fontWeight: '600',
+      marginRight: 5,
+    }}
+  >
+    Remarks:
+  </Text>
+
+  <View style={{ flex: 1 }}>
+    <RemarksText remarks={remarks} />
+  </View>
+</View>
+
+
     <View style={styles.cardFooter}>
       <TouchableOpacity
         style={styles.button}
@@ -229,7 +304,7 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
       </Text>
     </View>
   </View>
-);
+)};
 
 const DropdownField = ({ label, data, placeholder, value, onChange }) => {
   const [isFocus, setIsFocus] = useState(false);
@@ -633,9 +708,11 @@ const Totalleadscreen1 = () => {
   const {
     data: Lead = [],
     isLoading,
+    isFetching,
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
+    refetch,
   } = useInfiniteQuery({
     queryKey: ['leads_infinite', appliedFilters, searchText],
     queryFn: async ({ pageParam = 1 }) => {
@@ -866,7 +943,7 @@ const Totalleadscreen1 = () => {
           />
         </View>
 
-        {isLoading ? (
+        {/* {isLoading ? (
           <Text style={{ color: '#fff', textAlign: 'center', marginTop: 20 }}>
             Loading...
           </Text>
@@ -884,15 +961,38 @@ const Totalleadscreen1 = () => {
           <Text style={{ color: '#fff', textAlign: 'center', marginTop: 20 }}>
             No Data Found
           </Text>
-        )}
+        )} */}
+{isLoading ? (
+  <Text style={{ color: '#fff', textAlign: 'center', marginTop: 20 }}>
+    Loading...
+  </Text>
+) : isFetching && !isFetchingNextPage && leads.length > 0 ? (
+  <Text style={{ color: '#fff', textAlign: 'center', marginTop: 20 }}>
+    Refreshing...
+  </Text>
+) : leads && leads.length > 0 ? (
+  leads.map((visit, i) => (
+    <SiteCard
+      key={visit.id || i}
+      data={visit}
+      setShowRemarks={setShowRemarks}
+      setRemarksText={setRemarksText}
+      navigation={navigation}
+    />
+  ))
+) : (
+  <Text style={{ color: '#fff', textAlign: 'center', marginTop: 20 }}>
+    No Data Found
+  </Text>
+)}
 
-        {isFetchingNextPage && (
-          <ActivityIndicator
-            size="small"
-            color="#999"
-            style={{ marginVertical: 12, alignSelf: 'center' }}
-          />
-        )}
+{isFetchingNextPage && (
+  <ActivityIndicator
+    size="small"
+    color="#999"
+    style={{ marginVertical: 12, alignSelf: 'center' }}
+  />
+)}
         <View style={{ height: 100 }} />
       </ScrollView>
 
@@ -1031,6 +1131,17 @@ const styles = StyleSheet.create({
     flex: 1,
     flexWrap: 'wrap',
   },
+  remarksCardText: {
+  fontSize: 13,
+  color: '#ffffff',
+  lineHeight: 20,
+},
+
+readMore: {
+  color: '#00a8ff',
+  fontWeight: '600',
+  marginTop: 3,
+},
   name: { color: '#fff', fontWeight: 'bold', flexShrink: 1 },
   activeBadge: { borderRadius: 10, paddingHorizontal: 6, marginLeft: 6 },
   activeText: { color: '#fff', fontSize: 10 },

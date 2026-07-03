@@ -131,14 +131,42 @@ const DropdownField = ({ label, data, placeholder, value, onChange }) => {
     </View>
   );
 };
+const RemarksText = ({ remarks }) => {
+  const [expanded, setExpanded] = useState(false);
 
+  const shouldShowReadMore = remarks.length > 80;
+
+  return (
+    <Text style={styles.remarksCardText}>
+      {expanded || !shouldShowReadMore
+        ? remarks
+        : `${remarks.substring(0, 80)}... `}
+
+      {shouldShowReadMore && (
+        <Text
+          style={styles.readMore}
+          onPress={() => setExpanded(!expanded)}
+        >
+          {expanded ? ' Read Less' : ' Read More'}
+        </Text>
+      )}
+    </Text>
+  );
+};
 /* ================= SITE CARD ================= */
-const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
-  <View style={styles.card}>
-    {/* Header */}
-    <View style={styles.cardHeader}>
-      <View style={styles.nameRow}>
-        <Text style={styles.name}>{data?.name}</Text>
+const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => {
+  const remarks =
+    data?.propertyfeedbacks
+      ?.map(x => x?.remarks)
+      ?.filter(Boolean)
+      ?.join(', ') || 'No Remarks Available';
+
+  return (
+    <View style={styles.card}>
+      {/* Header */}
+      <View style={styles.cardHeader}>
+        <View style={styles.nameRow}>
+          <Text style={styles.name}>{data?.name}</Text>
              <View
          style={[
            styles.activeBadge,
@@ -170,7 +198,7 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
         }}
       >
         {/* REMARKS BUTTON */}
-        <TouchableOpacity
+        {/* <TouchableOpacity
           style={styles.remarksBtn}
           onPress={() => {
             setRemarksText(
@@ -181,7 +209,7 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
           }}
         >
           <Text style={styles.remarksText}>Remarks</Text>
-        </TouchableOpacity>
+        </TouchableOpacity> */}
 
         <Icon
           name="edit"
@@ -261,7 +289,28 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
       Lead Source:{' '}
       <Text style={styles.value}>{data?.mrreference?.mrf_name}</Text>
     </Text>
+  <View
+  style={{
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginTop: 8,
+  }}
+>
+  <Text
+    style={{
+      color: '#fb9e08',
+      fontSize: 12,
+      fontWeight: '600',
+      marginRight: 5,
+    }}
+  >
+    Remarks:
+  </Text>
 
+  <View style={{ flex: 1 }}>
+    <RemarksText remarks={remarks} />
+  </View>
+</View>
     {/* Footer */}
     <View style={styles.cardFooter}>
       <TouchableOpacity
@@ -282,7 +331,7 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
       </Text>
     </View>
   </View>
-);
+)};
 
 /* ================= MAIN SCREEN ================= */
 const TotalLeadScreen = () => {
@@ -690,6 +739,17 @@ const styles = StyleSheet.create({
 
 
   },
+    remarksCardText: {
+  fontSize: 13,
+  color: '#ffffff',
+  lineHeight: 20,
+},
+
+readMore: {
+  color: '#00a8ff',
+  fontWeight: '600',
+  marginTop: 3,
+},
   topBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',

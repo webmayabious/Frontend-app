@@ -60,8 +60,35 @@ const SectionHeader = ({ navigation, route }) => (
 );
 
 // ─── Interaction Card ─────────────────────────────────────────────────────────
+const RemarksText = ({ remarks }) => {
+  const [expanded, setExpanded] = useState(false);
 
-const InteractionCard = ({ item, setShowRemarks, setRemarksText }) => (
+  const shouldShowReadMore = remarks.length > 80;
+
+  return (
+    <Text style={styles.remarksCardText}>
+      {expanded || !shouldShowReadMore
+        ? remarks
+        : `${remarks.substring(0, 80)}... `}
+
+      {shouldShowReadMore && (
+        <Text
+          style={styles.readMore}
+          onPress={() => setExpanded(!expanded)}
+        >
+          {expanded ? ' Read Less' : ' Read More'}
+        </Text>
+      )}
+    </Text>
+  );
+};
+const InteractionCard = ({ item, setShowRemarks, setRemarksText }) => {
+  const remarks =
+  item?.propertyfeedbacks
+    ?.map(x => x?.remarks)
+    ?.filter(Boolean)
+    ?.join(', ') || 'No Remarks Available';
+  return(
   <View style={styles.card}>
     {/* Card Header */}
     <View style={styles.cardHeader}>
@@ -69,7 +96,7 @@ const InteractionCard = ({ item, setShowRemarks, setRemarksText }) => (
         <Text style={styles.cardName}>{item?.lead?.name}</Text>
         <Text style={styles.cardTemp}> | {item?.rating?.name}</Text>
       </View>
-      <TouchableOpacity
+      {/* <TouchableOpacity
         style={styles.remarksBtn}
         onPress={() => {
           setRemarksText(item?.remarks || 'No remarks available');
@@ -78,7 +105,7 @@ const InteractionCard = ({ item, setShowRemarks, setRemarksText }) => (
         activeOpacity={0.8}
       >
         <Text style={styles.remarksBtnText}>Remarks</Text>
-      </TouchableOpacity>
+      </TouchableOpacity> */}
     </View>
 
     {/* Lead Qualification */}
@@ -130,8 +157,30 @@ const InteractionCard = ({ item, setShowRemarks, setRemarksText }) => (
         {item?.call_status?.name}
       </Text>
     </View>
+     <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        marginTop: 8,
+      }}
+    >
+      <Text
+        style={{
+          color: '#fb9e08',
+          fontSize: 12,
+          fontWeight: '600',
+          marginRight: 5,
+        }}
+      >
+        Remarks:
+      </Text>
+    
+      <View style={{ flex: 1 }}>
+        <RemarksText remarks={remarks} />
+      </View>
+    </View>
   </View>
-);
+)};
 
 // ─── Remarks Modal ────────────────────────────────────────────────────────────
 
@@ -269,7 +318,17 @@ const styles = StyleSheet.create({
     fontSize: 14,
     opacity: 0.7,
   },
+  remarksCardText: {
+  fontSize: 13,
+  color: '#ffffff',
+  lineHeight: 20,
+},
 
+readMore: {
+  color: '#00a8ff',
+  fontWeight: '600',
+  marginTop: 3,
+},
   // ── Section Header ──
   sectionHeader: {
     flexDirection: 'row',
