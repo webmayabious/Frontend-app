@@ -81,7 +81,7 @@ const FILTER_OPTIONS = [
   { label: 'Assigned', value: 'ASG' },
   { label: 'Follow Up Date', value: 'FLOWUPDT' },
   { label: 'Site Visit Date', value: 'VISITDT' },
-  { label: 'Reminder', value: 'REMINDER' },
+  // { label: 'Reminder', value: 'REMINDER' },
 ];
 
 // Strip basic HTML tags/entities from the API's `body` field.
@@ -98,6 +98,16 @@ const STATUS_OPTIONS = [
   { label: 'Read', value: '2' },
 ];
 
+// When the quick filter is "All" (no specific type picked), the list should
+// still only ever show these 4 categories — never anything outside them.
+// This now applies REGARDLESS of whether an advanced filter (user/date/status)
+// is active, so selecting a "User" still only shows that user's notifications
+// among the allowed types — same behavior as plain "All".
+// NOTE: assumes each notification item has a `type` field matching the same
+// codes used in FILTER_OPTIONS (ASG / FLOWUPDT / VISITDT / REMINDER). If the
+// API returns the type under a different key, change `n.type` below.
+const ALLOWED_TYPES = FILTER_OPTIONS.filter(o => o.value).map(o => o.value);
+
 const formatDate = date => {
   if (!date) return '';
   const d = new Date(date);
@@ -111,8 +121,7 @@ const formatDate = date => {
 const UserPicker = ({ users, loading, value, onSelect }) => {
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
-console.log('users',users)
-console.log('value',value)
+
   const filtered = !query
     ? users
     : users.filter(
@@ -121,7 +130,7 @@ console.log('value',value)
           u.username?.toLowerCase().includes(query.toLowerCase()),
       );
   const selectedUser = users.find(u => u.id === value);
-  console.log('selectedUser', selectedUser);
+
   return (
     <View style={styles.field}>
       <Text style={styles.filterLabel}>User</Text>
@@ -206,6 +215,65 @@ console.log('value',value)
               )}
             </ScrollView>
           )}
+        </View>
+      )}
+    </View>
+  );
+};
+
+// ─── Status dropdown (replaces the old chip-row selector) ─────────────────
+const StatusPicker = ({ value, onSelect }) => {
+  const [open, setOpen] = useState(false);
+  const selected =
+    STATUS_OPTIONS.find(opt => opt.value === value) || STATUS_OPTIONS[0];
+
+  return (
+    <View style={styles.field}>
+      <Text style={styles.filterLabel}>Status</Text>
+
+      <TouchableOpacity
+        activeOpacity={0.8}
+        style={styles.filterInputContainer}
+        onPress={() => setOpen(prev => !prev)}
+      >
+        <Text style={styles.userValueText}>{selected.label}</Text>
+        <MaterialIcon
+          name={open ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
+          size={20}
+          color="#00e5ff"
+        />
+      </TouchableOpacity>
+
+      {open && (
+        <View style={styles.userDropdownBox}>
+          {STATUS_OPTIONS.map(opt => {
+            const active = opt.value === value;
+            return (
+              <TouchableOpacity
+                key={opt.label}
+                style={[
+                  styles.statusDropdownItem,
+                  active && styles.statusDropdownItemActive,
+                ]}
+                onPress={() => {
+                  onSelect(opt.value);
+                  setOpen(false);
+                }}
+              >
+                <Text
+                  style={[
+                    styles.statusDropdownItemText,
+                    active && styles.statusDropdownItemTextActive,
+                  ]}
+                >
+                  {opt.label}
+                </Text>
+                {active && (
+                  <MaterialIcon name="check" size={16} color="#00e5ff" />
+                )}
+              </TouchableOpacity>
+            );
+          })}
         </View>
       )}
     </View>
@@ -365,33 +433,7 @@ const AdvancedFilterModal = ({
               onSelect={onSelectUser}
             />
 
-            <View style={styles.field}>
-              <Text style={styles.filterLabel}>Status</Text>
-              <View style={styles.statusChipRow}>
-                {STATUS_OPTIONS.map(opt => {
-                  const active = status === opt.value;
-                  return (
-                    <TouchableOpacity
-                      key={opt.label}
-                      style={[
-                        styles.statusChip,
-                        active && styles.statusChipActive,
-                      ]}
-                      onPress={() => onStatusChange(opt.value)}
-                    >
-                      <Text
-                        style={[
-                          styles.statusChipText,
-                          active && styles.statusChipTextActive,
-                        ]}
-                      >
-                        {opt.label}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </View>
+            <StatusPicker value={status} onSelect={onStatusChange} />
 
             {showFromPicker && (
               <DateTimePicker
@@ -476,6 +518,16 @@ const NotificationScreen = ({ setHideBottomNav }) => {
     !!advancedFilter.user ||
     !!advancedFilter.status;
 
+  // ✅ Restrict to the known/allowed notification types (ASG / FLOWUPDT /
+  // VISITDT / ...) whenever the quick filter is plain "All" — regardless of
+  // whether an advanced filter (user / date / status) is also active.
+  // Previously this only applied when NO advanced filter was active, which
+  // meant picking a "User" would leak notifications of unknown/unsupported
+  // types for that user. Now "Select User" behaves exactly like "All":
+  // it only ever shows the same 4 allowed categories, just scoped to that
+  // user.
+  const shouldRestrictToKnownTypes = filter.value === null;
+
   const toggleExpand = id => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setExpandedIds(prev =>
@@ -483,37 +535,27 @@ const NotificationScreen = ({ setHideBottomNav }) => {
     );
   };
 
-  // const buildQueryParams = useCallback(() => {
-  //   if (isAdvancedFilterActive) {
-  //     const params = { type: 'FIL' };
-  //     if (advancedFilter.fromDate) params.fromDate = advancedFilter.fromDate;
-  //     if (advancedFilter.toDate) params.toDate = advancedFilter.toDate;
-  //     if (advancedFilter.user)   params.user = advancedFilter.user;
-  //     if (advancedFilter.status) params.status = advancedFilter.status;
-  //     return params;
-  //   }
-  //   return filter.value ? { type: filter.value } : undefined;
-  // }, [filter, advancedFilter, isAdvancedFilterActive]);
-const buildQueryParams = useCallback(() => {
-  const params = {
-    type: filter.value, // always include type
-  };
+  const buildQueryParams = useCallback(() => {
+    const params = {
+      type: filter.value, // always include type
+    };
 
-  // advanced filters only when active
-  if (isAdvancedFilterActive) {
-    if (advancedFilter.fromDate) params.fromDate = advancedFilter.fromDate;
-    if (advancedFilter.toDate) params.toDate = advancedFilter.toDate;
-    if (advancedFilter.user) params.user = advancedFilter.user;
-  }
+    // advanced filters only when active
+    if (isAdvancedFilterActive) {
+      if (advancedFilter.fromDate) params.fromDate = advancedFilter.fromDate;
+      if (advancedFilter.toDate) params.toDate = advancedFilter.toDate;
+      if (advancedFilter.user) params.user = advancedFilter.user;
+    }
 
-  // ✅ ALWAYS include status if present
-  if (advancedFilter.status) {
-    params.status = advancedFilter.status;
-  }
+    // ✅ ALWAYS include status if present
+    if (advancedFilter.status) {
+      params.status = advancedFilter.status;
+    }
 
-  return params;
-}, [filter, advancedFilter, isAdvancedFilterActive]);
-  const fetchNotifications = useCallback(async params => {
+    return params;
+  }, [filter, advancedFilter, isAdvancedFilterActive]);
+
+  const fetchNotifications = useCallback(async (params, restrictToKnownTypes = false) => {
     setLoading(true);
     setError(null);
     try {
@@ -533,7 +575,12 @@ const buildQueryParams = useCallback(() => {
         throw new Error(json?.error || 'Failed to load notifications');
       }
 
-      setNotifications(json?.uarray || []);
+      let list = json?.uarray || [];
+      if (restrictToKnownTypes) {
+        list = list.filter(n => ALLOWED_TYPES.includes(n.type));
+      }
+
+      setNotifications(list);
     } catch (e) {
       const message =
         e?.response?.data?.error ||
@@ -547,11 +594,12 @@ const buildQueryParams = useCallback(() => {
   }, []);
 
   useEffect(() => {
-    fetchNotifications(buildQueryParams());
+    fetchNotifications(buildQueryParams(), shouldRestrictToKnownTypes);
     // reset selections when the filter changes
     setSelectAll(false);
     setCheckedIds([]);
     setExpandedIds([]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filter, advancedFilter, fetchNotifications, buildQueryParams]);
 
   const selectFilter = option => {
@@ -625,7 +673,7 @@ const buildQueryParams = useCallback(() => {
       );
       setCheckedIds([]);
       setSelectAll(false);
-      await fetchNotifications(buildQueryParams());
+      await fetchNotifications(buildQueryParams(), shouldRestrictToKnownTypes);
     } catch (e) {
       Alert.alert(
         'Error',
@@ -691,7 +739,7 @@ const buildQueryParams = useCallback(() => {
               );
               setCheckedIds([]);
               setSelectAll(false);
-              await fetchNotifications(buildQueryParams());
+              await fetchNotifications(buildQueryParams(), shouldRestrictToKnownTypes);
             } catch (e) {
               Alert.alert(
                 'Error',
@@ -923,7 +971,9 @@ const buildQueryParams = useCallback(() => {
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
           refreshing={loading}
-          onRefresh={() => fetchNotifications(buildQueryParams())}
+          onRefresh={() =>
+            fetchNotifications(buildQueryParams(), shouldRestrictToKnownTypes)
+          }
         />
       )}
 
@@ -1298,30 +1348,27 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingVertical: 12,
   },
-  statusChipRow: {
+
+  /* ── Status dropdown items ── */
+  statusDropdownItem: {
     flexDirection: 'row',
-    gap: 8,
-  },
-  statusChip: {
-    flex: 1,
     alignItems: 'center',
-    paddingVertical: 9,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#3d55cc',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    borderRadius: 6,
+  },
+  statusDropdownItemActive: {
     backgroundColor: '#ffffff12',
   },
-  statusChipActive: {
-    backgroundColor: '#00acc1',
-    borderColor: '#00acc1',
-  },
-  statusChipText: {
+  statusDropdownItemText: {
     color: '#a0b4e8',
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: '500',
   },
-  statusChipTextActive: {
+  statusDropdownItemTextActive: {
     color: '#fff',
+    fontWeight: '700',
   },
 });
 

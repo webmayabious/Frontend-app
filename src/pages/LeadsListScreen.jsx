@@ -805,12 +805,23 @@ const LeadsListScreen = () => {
             <TouchableOpacity
               style={[
                 styles.backBtn,
-                { marginRight: 8, borderColor: '#00e5ff' },
+                { marginRight: 5, borderColor: '#00e5ff' },
               ]}
               onPress={() => setShowFilterModal(true)}
             >
               <Icon name="filter-alt" size={18} color="#00e5ff" />
             </TouchableOpacity>
+             <TouchableOpacity
+                    style={styles.addNewBtn}
+                    onPress={() =>
+                      navigation.navigate('Totalleadscreen1')
+                      
+                      
+                    }
+                    activeOpacity={0.75}
+                  >
+                    <Text style={styles.addNewText}>Total Leads</Text>
+                  </TouchableOpacity>
             <TouchableOpacity
               style={styles.backBtn}
               onPress={() => navigation.goBack()}
@@ -1007,6 +1018,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flex: 1,
     flexWrap: 'wrap',
+  },
+    addNewBtn: {
+    backgroundColor: '#2488B5',
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderWidth: 1.5,
+    borderColor: '#1784b7',
+    marginRight:5
+  },
+  addNewText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '600',
   },
   name: { color: '#fff', fontWeight: 'bold', flexShrink: 1 },
   activeBadge: { borderRadius: 10, paddingHorizontal: 6, marginLeft: 6 },

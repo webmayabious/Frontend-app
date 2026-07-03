@@ -802,15 +802,25 @@ const Totalleadscreen1 = () => {
             <Text style={styles.screenTitle}>Total Leads</Text>
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+
             <TouchableOpacity
               style={[
                 styles.backBtn,
-                { marginRight: 8, borderColor: '#00e5ff' },
+                { marginRight: 5, borderColor: '#00e5ff' },
               ]}
               onPress={() => setShowFilterModal(true)}
             >
               <Icon name="filter-alt" size={18} color="#00e5ff" />
             </TouchableOpacity>
+              <TouchableOpacity
+                                style={styles.addNewBtn}
+                                onPress={() =>
+                                  navigation.navigate('LeadsListScreen')
+                                }
+                                activeOpacity={0.75}
+                              >
+                                <Text style={styles.addNewText}> Assign Leads</Text>
+                              </TouchableOpacity>
             <TouchableOpacity
               style={styles.backBtn}
               onPress={() => navigation.goBack()}
@@ -965,7 +975,20 @@ const styles = StyleSheet.create({
   },
   backText: { color: '#fff', fontSize: 12 },
   backButton: { flexDirection: 'row', alignItems: 'center' },
-
+    addNewBtn: {
+    backgroundColor: '#2488B5',
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderWidth: 1.5,
+    borderColor: '#1784b7',
+    marginRight:5
+  },
+  addNewText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '600',
+  },
   searchBox: {
     flexDirection: 'row',
     alignItems: 'center',
