@@ -10,6 +10,7 @@ import api from './src/api/AxiosInstance';
 import socket from './src/socket';
 import { openFile } from './src/pages/utils/openFile';
 import  { EventType } from '@notifee/react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 const queryClient = new QueryClient();
 
 // ✅ MAIN APP (ALL LOGIC HERE)
@@ -17,7 +18,6 @@ function MainApp() {
   const stateRef = useRef(store.getState());
   const lastMessageId = useRef(null);
   const isLoggedIn = useSelector(state => state.isLoggedIn);
-
 
   useEffect(() => {
     const unsubscribe = notifee.onForegroundEvent(async ({ type, detail }) => {
@@ -32,7 +32,6 @@ function MainApp() {
         }
       }
     });
-
     return () => unsubscribe();
   }, []);
 
@@ -245,10 +244,12 @@ function MainApp() {
 // ✅ ROOT APP
 export default function App() {
   return (
-    <Provider store={store}>
-      <QueryClientProvider client={queryClient}>
-        <MainApp />
-      </QueryClientProvider>
-    </Provider>
+    <SafeAreaProvider>
+      <Provider store={store}>
+        <QueryClientProvider client={queryClient}>
+          <MainApp />
+        </QueryClientProvider>
+      </Provider>
+    </SafeAreaProvider>
   );
 }

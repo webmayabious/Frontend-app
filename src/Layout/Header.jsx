@@ -17,11 +17,16 @@ import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import messaging from '@react-native-firebase/messaging'; 
 import socket from '../socket';                            
-import api from '../api/AxiosInstance';             
+import api from '../api/AxiosInstance';       
+import { useSafeAreaInsets } from "react-native-safe-area-context";      
 
-const STATUSBAR_HEIGHT = Platform.OS === "android" ? StatusBar.currentHeight : 44;
+// const STATUSBAR_HEIGHT = Platform.OS === "android" ? StatusBar.currentHeight : 44;
 
 const Header = ({ routeName }) => {
+   const insets = useSafeAreaInsets();
+const statusBarHeight = Platform.OS === "android"
+  ? (StatusBar.currentHeight || insets.top || 24)
+  : insets.top;
 
   const userInfo = useSelector(state => state.userInfo);
   const [profileModalVisible, setProfileModalVisible] = useState(false);
@@ -87,7 +92,7 @@ const Header = ({ routeName }) => {
   }
 };
   return (
-    <View style={styles.header}>
+    <View style={[styles.header, { paddingTop: statusBarHeight + 10 }]}>
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
       {/* Left Section */}
@@ -172,7 +177,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 15,
     paddingBottom: 12,
-     paddingTop: STATUSBAR_HEIGHT + 10,
+    
     // paddingTop: insets.top,
     backgroundColor: "#2B2E81",
     borderBottomLeftRadius: 20,
@@ -192,7 +197,7 @@ const styles = StyleSheet.create({
   },
   modalContainer: {
     position: 'absolute',
-    top: STATUSBAR_HEIGHT + 40,
+    top: 90,
     right: 12,
     width: 240,
     backgroundColor: 'rgba(20, 20, 25, 0.98)',

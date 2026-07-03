@@ -512,7 +512,7 @@ const TotalLeadScreen = () => {
         <View style={styles.topBar}>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <Icon name="people" size={18} color="#cfd8dc" />
-            <Text style={styles.screenTitle}>Total Leads</Text>
+            <Text style={styles.screenTitle}>Active Leads / Total Leads</Text>
           </View>
 
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
