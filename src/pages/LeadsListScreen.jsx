@@ -1,5 +1,5 @@
 // LeadsListScreen.js — Centered filter modal with scale+fade animation
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -114,43 +114,43 @@ const RemarksText = ({ remarks }) => {
   );
 };
 const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => {
-    const remarks =
-  data?.propertyfeedbacks
-    ?.map(x => x?.remarks)
-    ?.filter(Boolean)
-    ?.join(', ') || 'No Remarks Available';
-  return(
-  <View style={styles.card}>
-    <View style={styles.cardHeader}>
-      <View style={styles.nameRow}>
-        <Text style={styles.name}>{data?.name || []}</Text>
-        <View
-          style={[
-            styles.activeBadge,
-            {
-              backgroundColor:
-                data?.active === '1'
-                  ? '#4caf50'
-                  : data?.active === '5'
-                  ? '#6b7785'
-                  : '#f44336',
-            },
-          ]}
-        >
-          <Text style={styles.activeText}>
-            {data?.active === '1'
-              ? 'Active'
-              : data?.active === '5'
-              ? 'Booking Done'
-              : 'Inactive'}
-          </Text>
+  const remarks =
+    data?.propertyfeedbacks
+      ?.map(x => x?.remarks)
+      ?.filter(Boolean)
+      ?.join(', ') || 'No Remarks Available';
+  return (
+    <View style={styles.card}>
+      <View style={styles.cardHeader}>
+        <View style={styles.nameRow}>
+          <Text style={styles.name}>{data?.name || []}</Text>
+          <View
+            style={[
+              styles.activeBadge,
+              {
+                backgroundColor:
+                  data?.active === '1'
+                    ? '#4caf50'
+                    : data?.active === '5'
+                      ? '#6b7785'
+                      : '#f44336',
+              },
+            ]}
+          >
+            <Text style={styles.activeText}>
+              {data?.active === '1'
+                ? 'Active'
+                : data?.active === '5'
+                  ? 'Booking Done'
+                  : 'Inactive'}
+            </Text>
+          </View>
         </View>
-      </View>
 
-      <View
-        style={{ flexDirection: 'row', alignItems: 'center', flexShrink: 0 }}
-      >
-        {/* <TouchableOpacity
+        <View
+          style={{ flexDirection: 'row', alignItems: 'center', flexShrink: 0 }}
+        >
+          {/* <TouchableOpacity
           style={styles.remarksBtn}
           onPress={() => {
             setRemarksText(
@@ -163,25 +163,25 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => {
           <Text style={styles.remarksText}>Remarks</Text>
         </TouchableOpacity> */}
 
-        <Icon
-          name="edit"
-          size={18}
-          color="#00e5ff"
-          style={{ marginLeft: 8 }}
-          onPress={() => navigation.navigate('MeetingsEdit', { id: data?.id })}
-        />
+          <Icon
+            name="edit"
+            size={18}
+            color="#00e5ff"
+            style={{ marginLeft: 8 }}
+            onPress={() => navigation.navigate('MeetingsEdit', { id: data?.id })}
+          />
+        </View>
       </View>
-    </View>
-  
 
 
 
-    <Text style={styles.location}>
-      {data?.propertyproject?.project_name || []} |{' '}
-      {data?.propertylocation?.name || []}
-    </Text>
 
-    {/* <View style={styles.rowBetween}>
+      <Text style={styles.location}>
+        {data?.propertyproject?.project_name || []} |{' '}
+        {data?.propertylocation?.name || []}
+      </Text>
+
+      {/* <View style={styles.rowBetween}>
       <TouchableOpacity onPress={() => makeCall(data?.phone)}>
         <Text style={styles.label}>
           Phone: <Text style={styles.value}>{data?.phone || 'N/A'}</Text>
@@ -191,97 +191,109 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => {
         Email: <Text style={styles.value}>{data?.email || 'N/A'}</Text>
       </Text>
     </View> */}
-    <View style={styles.rowBetween}>
-      {/* <TouchableOpacity onPress={() => makeCall(data?.propertylead?.phone)}>
+      <View style={styles.rowBetween}>
+        {/* <TouchableOpacity onPress={() => makeCall(data?.propertylead?.phone)}>
         <Text style={styles.label}>
           Phone:{' '}
           <Text style={styles.remarksBtn}>{data?.propertylead?.phone || 'N/A'}</Text>
         </Text>
       </TouchableOpacity> */}
-      <TouchableOpacity onPress={() => makeCall(data?.phone)}>
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <Text style={styles.label1}>Phone: </Text>
+        <TouchableOpacity onPress={() => makeCall(data?.phone)}>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Text style={styles.label1}>Phone: </Text>
 
-          {/* <View style={styles.remarksBtn}> */}
-          <Text style={styles.phoneText}>{data?.phone || 'N/A'}</Text>
-          {/* </View> */}
-        </View>
-      </TouchableOpacity>
-    </View>
-    <View style={styles.rowBetween}>
-      <TouchableOpacity onPress={() => sendMail(data?.email)}>
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <Text style={styles.label1}>Email: </Text>
+            {/* <View style={styles.remarksBtn}> */}
+            <Text style={styles.phoneText}>{data?.phone || 'N/A'}</Text>
+            {/* </View> */}
+          </View>
+        </TouchableOpacity>
+      </View>
+      <View style={styles.rowBetween}>
+        <TouchableOpacity onPress={() => sendMail(data?.email)}>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Text style={styles.label1}>Email: </Text>
 
-          <Text style={styles.emailText}>{data?.email || 'N/A'}</Text>
+            <Text style={styles.emailText}>{data?.email || 'N/A'}</Text>
+          </View>
+        </TouchableOpacity>
+      </View>
+      <View style={styles.rowBetween}>
+        <View style={styles.leftBox}>
+          <Text style={styles.label}>
+            Site Visit Date:
+            <Text style={styles.value}>
+              {' '}
+              {data?.propertyfeedbacks?.map(x => x?.site_visit_date).filter(Boolean).join(', ') || 'N/A'}
+            </Text>
+          </Text>
         </View>
-      </TouchableOpacity>
-    </View>
-    <View style={styles.rowBetween}>
-      <Text style={styles.label}>
-        Site Visit Date:
+        <View style={styles.rightBox}>
+          <Text style={styles.label}>
+            RM:{' '}
+            <Text style={styles.value}>
+              {data?.relationshipManager
+                ? `${data.relationshipManager.usr_fname} ${data.relationshipManager.usr_lname}`
+                : 'N/A'}
+            </Text>
+          </Text>
+        </View>
+      </View>
+
+      {/* নতুন: Call Back Date & Time */}
+      <Text style={{ color: '#fb9e08', fontSize: 12, marginTop: 4 }}>
+        Call Back Date & Time:{' '}
         <Text style={styles.value}>
-          {' '}
           {data?.propertyfeedbacks
-            ?.map(x => x?.site_visit_date || [])
-            .join(', ')}
+            ?.filter(x => x?.call_back_date)
+            ?.map(x => `${x.call_back_date}${x.call_back_time ? ' / ' + x.call_back_time : ''}`)
+            ?.join(', ') || 'N/A'}
         </Text>
       </Text>
-      <Text style={styles.label}>
-        RM:{' '}
-        <Text style={styles.value}>
-          {data?.relationshipManager
-            ? `${data.relationshipManager.usr_fname || []} ${
-                data.relationshipManager.usr_lname || []
-              }`
-            : 'N/A'}
-        </Text>
+
+      <Text style={{ color: '#fb9e08', fontSize: 12, marginTop: 4 }}>
+        Lead Source:{' '}
+        <Text style={styles.value}>{data?.mrreference?.mrf_name || []}</Text>
       </Text>
-    </View>
-
-    <Text style={{ color: '#fb9e08', fontSize: 12, marginTop: 4 }}>
-      Lead Source:{' '}
-      <Text style={styles.value}>{data?.mrreference?.mrf_name || []}</Text>
-    </Text>
- <View
-  style={{
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginTop: 8,
-  }}
->
-  <Text
-    style={{
-      color: '#fb9e08',
-      fontSize: 12,
-      fontWeight: '600',
-      marginRight: 5,
-    }}
-  >
-    Remarks:
-  </Text>
-
-  <View style={{ flex: 1 }}>
-    <RemarksText remarks={remarks} />
-  </View>
-</View>
-    <View style={styles.cardFooter}>
-      <TouchableOpacity
-        style={styles.button}
-        onPress={() =>
-          navigation.navigate('AllInteractionsScreen', { id: data?.id })
-        }
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'flex-start',
+          marginTop: 8,
+        }}
       >
-        <Text style={styles.buttonText}>View Interaction</Text>
-      </TouchableOpacity>
-      <Text style={styles.completed}>
-        {data?.propertyfeedbacks
-          ?.map(x => x.propertycallstatus?.name)
-          .join(', ') || 'N/A'}
-      </Text>
+        <Text
+          style={{
+            color: '#fb9e08',
+            fontSize: 12,
+            fontWeight: '600',
+            marginRight: 5,
+          }}
+        >
+          Remarks:
+        </Text>
+
+        <View style={{ flex: 1 }}>
+          <RemarksText remarks={remarks} />
+        </View>
+      </View>
+      <View style={styles.cardFooter}>
+        <TouchableOpacity
+          style={styles.button}
+          onPress={() =>
+            navigation.navigate('AllInteractionsScreen', { id: data?.id })
+          }
+        >
+          <Text style={styles.buttonText}>View Interaction</Text>
+        </TouchableOpacity>
+        <Text style={styles.completed}>
+          {data?.propertyfeedbacks
+            ?.map(x => x.propertycallstatus?.name)
+            .join(', ') || 'N/A'}
+        </Text>
+      </View>
     </View>
-  </View>
-)};
+  )
+};
 
 const DropdownField = ({ label, data, placeholder, value, onChange }) => {
   const [isFocus, setIsFocus] = useState(false);
@@ -484,26 +496,26 @@ const FilterModal = ({
             value={filters.active}
             onChange={value => onChange('active', value)}
           />
-         <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 12, marginBottom: 10 }}>
-  <Text
-    style={{
-      color: '#eec34b',
-      fontSize: 14,
-      fontWeight: '500',
-    }}
-  >
-    FeedBack
-  </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 12, marginBottom: 10 }}>
+            <Text
+              style={{
+                color: '#eec34b',
+                fontSize: 14,
+                fontWeight: '500',
+              }}
+            >
+              FeedBack
+            </Text>
 
-  <View
-    style={{
-      flex: 1,
-      height: 1,
-      backgroundColor: '#6e6e6b',
-      marginLeft: 10,
-    }}
-  />
-</View>
+            <View
+              style={{
+                flex: 1,
+                height: 1,
+                backgroundColor: '#6e6e6b',
+                marginLeft: 10,
+              }}
+            />
+          </View>
           <DropdownField
             label="Call Status"
             data={callStatusListfetch}
@@ -710,6 +722,7 @@ const LeadsListScreen = () => {
           siteVisitToDate: filters.siteVisitToDate || undefined,
         },
       });
+      console.log('lead data:', JSON.stringify(res?.data?.data?.[0], null, 2));
       return res.data;
     },
     getNextPageParam: lastPage => {
@@ -719,7 +732,15 @@ const LeadsListScreen = () => {
     initialPageParam: 1,
   });
 
-  const leads = Lead?.pages?.flatMap(page => page.data) || [];
+  const leads = React.useMemo(() => {
+    const all = Lead?.pages?.flatMap(page => page.data) || [];
+    const seen = new Set();
+    return all.filter(item => {
+      if (!item?.id || seen.has(item.id)) return false;
+      seen.add(item.id);
+      return true;
+    });
+  }, [Lead]);
 
   const handleLoadMore = () => {
     if (hasNextPage && !isFetchingNextPage) fetchNextPage();
@@ -864,17 +885,17 @@ const LeadsListScreen = () => {
             >
               <Icon name="filter-alt" size={18} color="#00e5ff" />
             </TouchableOpacity>
-             <TouchableOpacity
-                    style={styles.addNewBtn}
-                    onPress={() =>
-                      navigation.navigate('Totalleadscreen1')
-                      
-                      
-                    }
-                    activeOpacity={0.75}
-                  >
-                    <Text style={styles.addNewText}>Total Leads</Text>
-                  </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.addNewBtn}
+              onPress={() =>
+                navigation.navigate('Totalleadscreen1')
+
+
+              }
+              activeOpacity={0.75}
+            >
+              <Text style={styles.addNewText}>Total Leads</Text>
+            </TouchableOpacity>
             <TouchableOpacity
               style={styles.backBtn}
               onPress={() => navigation.goBack()}
@@ -928,10 +949,10 @@ const LeadsListScreen = () => {
           <Text style={{ color: '#fff', textAlign: 'center', marginTop: 20 }}>
             Refreshing...
           </Text>
-        ): leads && leads.length > 0 ? (
+        ) : leads && leads.length > 0 ? (
           leads.map((visit, i) => (
             <SiteCard
-              key={visit.id || i}
+              key={visit?.id != null ? `lead-${visit.id}` : `lead-idx-${i}`}
               data={visit}
               setShowRemarks={setShowRemarks}
               setRemarksText={setRemarksText}
@@ -1065,17 +1086,17 @@ const styles = StyleSheet.create({
     padding: 12,
     backgroundColor: '#ffffff20',
   },
-   remarksCardText: {
-  fontSize: 13,
-  color: '#ffffff',
-  lineHeight: 20,
-},
+  remarksCardText: {
+    fontSize: 13,
+    color: '#ffffff',
+    lineHeight: 20,
+  },
 
-readMore: {
-  color: '#00a8ff',
-  fontWeight: '600',
-  marginTop: 3,
-},
+  readMore: {
+    color: '#00a8ff',
+    fontWeight: '600',
+    marginTop: 3,
+  },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1087,14 +1108,14 @@ readMore: {
     flex: 1,
     flexWrap: 'wrap',
   },
-    addNewBtn: {
+  addNewBtn: {
     backgroundColor: '#2488B5',
     borderRadius: 16,
     paddingHorizontal: 12,
     paddingVertical: 5,
     borderWidth: 1.5,
     borderColor: '#1784b7',
-    marginRight:5
+    marginRight: 5
   },
   addNewText: {
     color: '#FFFFFF',

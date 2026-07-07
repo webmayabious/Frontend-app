@@ -39,7 +39,7 @@ const DropdownField = ({ label, data, value, onChange, error }) => (
   </View>
 );
 
-const InputField = ({ label, placeholder, icon, value, onChange, onPress, error }) => (
+const InputField = ({ label, placeholder, icon, value, onChange, onPress, onClear, error }) => (
   <View style={styles.field}>
     <Text style={styles.label}>{label}</Text>
     <TouchableOpacity activeOpacity={0.8} onPress={onPress}>
@@ -51,8 +51,21 @@ const InputField = ({ label, placeholder, icon, value, onChange, onPress, error 
           value={value}
           onChangeText={onChange}
           editable={!onPress}
+          pointerEvents="none"
         />
-        {icon && <Icon name={icon} size={18} color="#00bcd4" />}
+        {value && onClear ? (
+          <TouchableOpacity
+            onPress={(e) => {
+              e.stopPropagation();
+              onClear();
+            }}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Icon name="close" size={18} color="#ff5252" />
+          </TouchableOpacity>
+        ) : (
+          icon && <Icon name={icon} size={18} color="#00bcd4" />
+        )}
       </View>
     </TouchableOpacity>
     {error ? <Text style={styles.errorText}>{error}</Text> : null}
@@ -223,7 +236,7 @@ export default function AddNewInteraction({ route }) {
 
   return (
     <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: '#050a3a',marginBottom:50}}
+      style={{ flex: 1, backgroundColor: '#050a3a', marginBottom: 50 }}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 0}
     >
@@ -296,6 +309,10 @@ export default function AddNewInteraction({ route }) {
               icon="calendar-today"
               value={interaction.site_visit_date}
               onPress={() => setShowSiteVisitPicker(true)}
+              onClear={() => {
+                setSiteVisitDate(new Date());
+                updateField('site_visit_date', '');
+              }}
             />
             {showSiteVisitPicker && (
               <DateTimePicker value={siteVisitDate} mode="date" display="default"
@@ -308,6 +325,10 @@ export default function AddNewInteraction({ route }) {
               icon="calendar-today"
               value={interaction.call_back_date}
               onPress={() => setShowCallBackPicker(true)}
+              onClear={() => {
+                setCallBackDate(new Date());
+                updateField('call_back_date', '');
+              }}
             />
             {showCallBackPicker && (
               <DateTimePicker value={callBackDate} mode="date" display="default"
@@ -320,6 +341,10 @@ export default function AddNewInteraction({ route }) {
               icon="access-time"
               value={interaction.call_back_time}
               onPress={() => setShowTimePicker(true)}
+              onClear={() => {
+                setCallBackTime(new Date());
+                updateField('call_back_time', '');
+              }}
             />
             {showTimePicker && (
               <DateTimePicker value={callBackTime} mode="time" display="default"
@@ -332,13 +357,17 @@ export default function AddNewInteraction({ route }) {
               icon="calendar-today"
               value={interaction.expected_closure_date}
               onPress={() => setShowExpectedClosurePicker(true)}
+              onClear={() => {
+                setExpectedClosureDate(new Date());
+                updateField('expected_closure_date', '');
+              }}
             />
             {showExpectedClosurePicker && (
               <DateTimePicker value={expectedClosureDate} mode="date" display="default"
                 onChange={(e, d) => onChangeDate(e, d, 'expected_closure_date')} />
             )}
 
-            {/* ✅ Remarks — focus হলে auto scroll */}
+            {/* ✅ Remarks — focus auto scroll */}
             <View
               ref={remarksRef}
               style={styles.field}
@@ -351,7 +380,7 @@ export default function AddNewInteraction({ route }) {
                 multiline
                 value={interaction.remarks}
                 onChangeText={text => updateField('remarks', text)}
-                onFocus={handleRemarksFocus}  // ✅ focus হলে scroll
+                onFocus={handleRemarksFocus}  
               />
               {errors.remarks ? <Text style={styles.errorText}>{errors.remarks}</Text> : null}
             </View>

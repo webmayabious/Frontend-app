@@ -331,6 +331,7 @@ const SiteVisitsScreen = () => {
     project: null,
     location: null,
     status: null,
+    lead_source: null,
   });
   const [appliedFilters, setAppliedFilters] = useState();
   const [showTopBtn, setShowTopBtn] = useState(false);
@@ -372,6 +373,7 @@ const SiteVisitsScreen = () => {
           project: filters.project || undefined,
           location: filters.location || undefined,
           status: filters.status || undefined,
+          lead_source: filters.lead_source || undefined,
           page: pageNum,
         },
       });
@@ -443,6 +445,17 @@ const SiteVisitsScreen = () => {
     },
   });
 
+  // Fetch Lead Source (Mr References)
+  const { data: mrReferenceList = [] } = useQuery({
+    queryKey: ['mrReferences'],
+    queryFn: async () => {
+      const res = await api.get('/api/pm/getAllMrReferences', {
+        params: { limit: 'all' },
+      });
+      return res.data.data || [];
+    },
+  });
+
   /* ================= DATA MAPPING ================= */
   const Property = AllProperty?.map(item => ({
     label: item.name,
@@ -451,6 +464,10 @@ const SiteVisitsScreen = () => {
   const Rm = allRmList?.map(item => ({ label: item.name, value: item.id }));
   const projectOptions = projectList?.map(item => ({
     label: item.project_name,
+    value: item.id,
+  }));
+  const leadSourceOptions = mrReferenceList?.map(item => ({
+    label: item.mrf_name,
     value: item.id,
   }));
 
@@ -482,6 +499,7 @@ const SiteVisitsScreen = () => {
       project: null,
       location: null,
       status: null,
+      lead_source: null,
     };
 
     setFilters(cleared);
@@ -640,6 +658,13 @@ const SiteVisitsScreen = () => {
               style={{ width: '100%' }}
               showsVerticalScrollIndicator={false}
             >
+              <DropdownField
+                label="Lead Source"
+                data={leadSourceOptions}
+                placeholder="Select"
+                value={filters.lead_source}
+                onChange={value => onChange('lead_source', value)}
+              />
               <DropdownField
                 label="Property Location"
                 data={Property}

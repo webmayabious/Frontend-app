@@ -1,11 +1,12 @@
-// FollowUpsScreen.js (Fixed - useNavigation inside component)
-import React, { useRef, useState } from 'react';
+// FollowUpsScreen.js (Fixed - Real server-side infinite scroll with useInfiniteQuery)
+import React, { useRef, useState, useEffect } from 'react';
 import { Dropdown } from 'react-native-element-dropdown';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
+  FlatList,
   TouchableOpacity,
   TextInput,
   StatusBar,
@@ -13,23 +14,18 @@ import {
   Alert,
   Linking,
   Image,
+  ActivityIndicator,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import Header from '../Layout/Header';
 import BottomNav from '../navigations/BottomNav';
 import { useNavigation } from '@react-navigation/native';
 import api from '../api/AxiosInstance';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useInfiniteQuery } from '@tanstack/react-query';
 
 const STATUSBAR_HEIGHT =
   Platform.OS === 'android' ? StatusBar.currentHeight : 44;
-// const makeCall = phoneNumber => {
-//   if (!phoneNumber) return;
-//   Alert.alert('Call', `Do you want to call ${phoneNumber}?`, [
-//     { text: 'Cancel', style: 'cancel' },
-//     { text: 'Call', onPress: () => Linking.openURL(`tel:${phoneNumber}`) },
-//   ]);
-// };
+
 const makeCall = phoneNumber => {
   if (!phoneNumber) return;
 
@@ -67,6 +63,7 @@ const makeCall = phoneNumber => {
     },
   ]);
 };
+
 const sendMail = async (email) => {
   if (!email) return;
 
@@ -89,6 +86,28 @@ const sendMail = async (email) => {
     Alert.alert('Error', 'Unable to open email app.');
   }
 };
+
+/* ================= FORMAT CALL BACK DATE/TIME ================= */
+const formatCallBackDateTime = (date, time) => {
+  if (!date) return null;
+
+  const d = new Date(date);
+  const formattedDate = d.toLocaleDateString('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+
+  if (!time) return formattedDate;
+
+  const [h, m] = time.split(':').map(Number);
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const hour = h % 12 || 12;
+  const formattedTime = `${hour}:${String(m).padStart(2, '0')} ${ampm}`;
+
+  return `${formattedDate}, ${formattedTime}`;
+};
+
 const RemarksText = ({ remarks }) => {
   const [expanded, setExpanded] = useState(false);
 
@@ -111,168 +130,159 @@ const RemarksText = ({ remarks }) => {
     </Text>
   );
 };
+
 const FollowCard = ({ data, navigation, setShowRemarks, setRemarksText }) => {
-   const remarks =
-  data?.remarks || 'No Remarks Available';
-  return(
-  
-  <View style={styles.card}>
-    {/* Header */}
-    <View style={styles.cardHeader}>
-      <View style={styles.nameRow}>
-        <Text style={styles.name}>{data?.propertylead?.name}</Text>
+  const remarks = data?.remarks || 'No Remarks Available';
+
+  return (
+    <View style={styles.card}>
+      {/* Header */}
+      <View style={styles.cardHeader}>
+        <View style={styles.nameRow}>
+          <Text style={styles.name}>{data?.propertylead?.name}</Text>
+
+          <View
+            style={[
+              styles.activeBadge,
+              {
+                backgroundColor: data?.active === '1' ? '#4caf50' : '#f44336',
+              },
+            ]}
+          >
+            <Text style={styles.activeText}>
+              {data?.active === '1' ? 'Active' : 'Inactive'}
+            </Text>
+          </View>
+        </View>
 
         <View
-                  style={[
-                    styles.activeBadge,
-                    {
-                      backgroundColor: data?.active === '1' ? '#4caf50' : '#f44336',
-                    },
-                  ]}
-                >
-                  <Text style={styles.activeText}>
-                    {data?.active === '1' ? 'Active' : 'Inactive'}
-                  </Text>
-                </View>
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            flexShrink: 0,
+          }}
+        >
+          <Icon
+            name="edit"
+            size={18}
+            color="#00e5ff"
+            style={{ marginLeft: 8 }}
+            onPress={() =>
+              navigation.navigate('MeetingsEdit', {
+                id: data?.property_lead_id,
+              })
+            }
+          />
+        </View>
       </View>
+
+      {/* Info */}
+      <Text style={styles.location}>
+        {data?.propertylead?.propertyproject?.project_name} |{' '}
+        {data?.propertylead?.propertylocation?.name}
+      </Text>
+
+      <View style={styles.rowBetween}>
+        <TouchableOpacity onPress={() => makeCall(data?.propertylead?.phone)}>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Text style={styles.label1}>Phone:{' '}</Text>
+            <Text style={styles.phoneText}>
+              {data?.propertylead?.phone || 'N/A'}
+            </Text>
+          </View>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.rowBetween}>
+        <TouchableOpacity onPress={() => sendMail(data?.propertylead?.email)}>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Text style={styles.label1}>Email:{' '}</Text>
+            <Text style={styles.emailText}>
+              {data?.propertylead?.email || 'N/A'}
+            </Text>
+          </View>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.rowBetween}>
+        <Text style={styles.label}>
+          <Text style={styles.label}>
+            Site Visit Date:
+            <Text style={styles.value}> {data?.site_visit_date}</Text>
+          </Text>
+        </Text>
+
+        <Text style={styles.label}>
+          RM:{' '}
+          <Text style={styles.value}>
+            {data?.propertylead?.relationshipManager
+              ? `${data.propertylead.relationshipManager.usr_fname} ${data.propertylead.relationshipManager.usr_lname}`
+              : 'N/A'}
+          </Text>
+        </Text>
+      </View>
+
+      {/* Call Back Date & Time */}
+      <View style={styles.rowBetween}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.label}>
+            Call Back:{' '}
+            <Text style={styles.value}>
+              {formatCallBackDateTime(data?.call_back_date, data?.call_back_time) || 'N/A'}
+            </Text>
+          </Text>
+        </View>
+      </View>
+
+      <Text style={{ color: '#fb9e08', fontSize: 12, marginTop: 4 }}>
+        Lead Source:{' '}
+        <Text style={styles.value}>
+          {data?.propertylead?.mrreference?.mrf_name}
+        </Text>
+      </Text>
 
       <View
         style={{
           flexDirection: 'row',
-          alignItems: 'center',
-          flexShrink: 0,
+          alignItems: 'flex-start',
+          marginTop: 8,
         }}
       >
-        {/* ✅ REMARKS BUTTON */}
-        {/* <TouchableOpacity
-          style={styles.remarksBtn}
-          onPress={() => {
-            setRemarksText(data?.remarks || 'No remarks available');
-            setShowRemarks(true);
+        <Text
+          style={{
+            color: '#fb9e08',
+            fontSize: 12,
+            fontWeight: '600',
+            marginRight: 5,
           }}
         >
-          <Text style={styles.remarksText}>Remarks</Text>
-        </TouchableOpacity> */}
+          Remarks:
+        </Text>
 
-        <Icon
-          name="edit"
-          size={18}
-          color="#00e5ff"
-          style={{ marginLeft: 8 }}
+        <View style={{ flex: 1 }}>
+          <RemarksText remarks={remarks} />
+        </View>
+      </View>
+
+      {/* Footer */}
+      <View style={styles.cardFooter}>
+        <TouchableOpacity
+          style={styles.button}
           onPress={() =>
-            navigation.navigate('MeetingsEdit', {
+            navigation.navigate('AllInteractionsScreen', {
               id: data?.property_lead_id,
             })
           }
-        />
-      </View>
-    </View>
-
-    {/* Info */}
-    <Text style={styles.location}>
-      {data?.propertylead?.propertyproject?.project_name} |{' '}
-      {data?.propertylead?.propertylocation?.name}
-    </Text>
-   <View style={styles.rowBetween}>
-        {/* <TouchableOpacity onPress={() => makeCall(data?.propertylead?.phone)}>
-          <Text style={styles.label}>
-            Phone:{' '}
-            <Text style={styles.remarksBtn}>{data?.propertylead?.phone || 'N/A'}</Text>
-          </Text>
-        </TouchableOpacity> */}
-        <TouchableOpacity onPress={() => makeCall(data?.propertylead?.phone)}>
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Text style={styles.label1}>Phone:{' '}</Text>
-  
-            {/* <View style={styles.remarksBtn}> */}
-              <Text style={styles.phoneText}>
-                {data?.propertylead?.phone || 'N/A'}
-              </Text>
-            {/* </View> */}
-          </View>
+        >
+          <Text style={styles.buttonText}>View Interaction</Text>
         </TouchableOpacity>
-       
+
+        <Text style={styles.completed}>{data?.propertycallstatus?.name}</Text>
       </View>
-        <View style={styles.rowBetween}> 
-            <TouchableOpacity
-      
-              onPress={() => sendMail(data?.propertylead?.email)}
-      
-            >
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <Text style={styles.label1}>Email:{' '}</Text>
-      
-      
-                <Text style={styles.emailText}>
-                  {data?.propertylead?.email || 'N/A'}
-                </Text>
-      
-              </View>
-            </TouchableOpacity>
-          </View>
-    <View style={styles.rowBetween}>
-      <Text style={styles.label}>
-        <Text style={styles.label}>
-          Site Visit Date:
-          <Text style={styles.value}> {data?.site_visit_date}</Text>
-        </Text>
-      </Text>
-
-      <Text style={styles.label}>
-        RM:{' '}
-        <Text style={styles.value}>
-          {data?.propertylead?.relationshipManager
-            ? `${data.propertylead.relationshipManager.usr_fname} ${data.propertylead.relationshipManager.usr_lname}`
-            : 'N/A'}
-        </Text>
-      </Text>
     </View>
+  );
+};
 
-    <Text style={{ color: '#fb9e08', fontSize: 12, marginTop: 4 }}>
-      Lead Source:{' '}
-      <Text style={styles.value}>
-        {data?.propertylead?.mrreference?.mrf_name}
-      </Text>
-    </Text>
-  <View
-  style={{
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginTop: 8,
-  }}
->
-  <Text
-    style={{
-      color: '#fb9e08',
-      fontSize: 12,
-      fontWeight: '600',
-      marginRight: 5,
-    }}
-  >
-    Remarks:
-  </Text>
-
-  <View style={{ flex: 1 }}>
-    <RemarksText remarks={remarks} />
-  </View>
-</View>
-    {/* Footer */}
-    <View style={styles.cardFooter}>
-      <TouchableOpacity
-        style={styles.button}
-        onPress={() =>
-          navigation.navigate('AllInteractionsScreen', {
-            id: data?.property_lead_id,
-          })
-        }
-      >
-        <Text style={styles.buttonText}>View Interaction</Text>
-      </TouchableOpacity>
-
-      <Text style={styles.completed}>{data?.propertycallstatus?.name}</Text>
-    </View>
-  </View>
-)};
 const DropdownField = ({ label, data, placeholder, value, onChange }) => {
   const [isFocus, setIsFocus] = useState(false);
   return (
@@ -311,6 +321,7 @@ const DropdownField = ({ label, data, placeholder, value, onChange }) => {
     </View>
   );
 };
+
 const InputField = ({ label, placeholder, icon, value, onChange, onPress }) => {
   return (
     <View style={styles.field}>
@@ -323,8 +334,8 @@ const InputField = ({ label, placeholder, icon, value, onChange, onPress }) => {
             placeholderTextColor="#8aa0c8"
             style={styles.input}
             value={value}
-            onChangeText={onChange} // <-- Use onChangeText for TextInput
-            editable={!onPress} // <-- Disable typing if onPress is used (like for date picker)
+            onChangeText={onChange}
+            editable={!onPress}
           />
 
           {icon && <Icon name={icon} size={18} color="#00bcd4" />}
@@ -333,6 +344,7 @@ const InputField = ({ label, placeholder, icon, value, onChange, onPress }) => {
     </View>
   );
 };
+
 const FollowUpsScreen = () => {
   const navigation = useNavigation();
   const [showRemarks, setShowRemarks] = useState(false);
@@ -347,35 +359,26 @@ const FollowUpsScreen = () => {
     project: null,
     location: null,
     status: null,
+    reference: null,
   });
-  // Add these with your other useState hooks
   const [showFromPicker, setShowFromPicker] = useState(false);
   const [showToPicker, setShowToPicker] = useState(false);
   const [appliedFilters, setAppliedFilters] = useState();
-  // Formatting helper: Converts Date object to 'YYYY-MM-DD' for API or 'DD-MM-YYYY' for UI
-  // const formatDate = date => {
-  //   if (!date) return '';
-  //   const d = new Date(date);
-  //   const day = String(d.getDate()).padStart(2, '0');
-  //   const month = String(d.getMonth() + 1).padStart(2, '0');
-  //   const year = d.getFullYear();
-  //   return `${year}-${month}-${day}`; // Using YYYY-MM-DD for backend compatibility
-  // };
 
-  // const onDateChange = (event, selectedDate, key) => {
-  //   // Hide picker
-  //   key === 'fromDate' ? setShowFromPicker(false) : setShowToPicker(false);
-
-  //   if (selectedDate) {
-  //     onChange(key, formatDate(selectedDate));
-  //   }
-  // };
-  /* ================= API CALL ================= */
-  const { data, isLoading } = useQuery({
-    queryKey: ['TodaysFollowUpsandMeetings',appliedFilters],
-    queryFn: async () => {
+  /* ================= API CALL (Real server-side pagination) ================= */
+  const {
+    data,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    isLoading,
+  } = useInfiniteQuery({
+    queryKey: ['TodaysFollowUpsandMeetings', appliedFilters],
+    queryFn: async ({ pageParam = 1 }) => {
       const res = await api.get('/api/pm/followUpAndMeetingsData', {
         params: {
+          page: pageParam,
+          limit: 20,
           company_id: filters.company_id || undefined,
           rm_id: filters.rm_id || undefined,
           fromDate: filters.fromDate || undefined,
@@ -383,31 +386,49 @@ const FollowUpsScreen = () => {
           project: filters.project || undefined,
           location: filters.location || undefined,
           status: filters.status || undefined,
+          reference: filters.reference || undefined,
         },
       });
       return res.data.data;
     },
+    getNextPageParam: lastPage => {
+      const { currentPage, totalPages } = lastPage.pagination || {};
+      return currentPage < totalPages ? currentPage + 1 : undefined;
+    },
+    initialPageParam: 1,
+    staleTime: 1000 * 60 * 5, // 5 minute porjonto data "fresh" dhora hobe, tai back kore ashle abar sob page refetch hobe na
+    gcTime: 1000 * 60 * 10, // 10 minute cache-e thakbe, screen unmount hoyeo data muche jabe na
+    refetchOnMount: false, // screen a re-focus/re-mount hole auto refetch bondho
   });
 
-  const followUps = data?.todays_followUps || [];
+  // ✅ সব pages থেকে followUps ও meetings flatten করা হচ্ছে
+  const followUps = data?.pages?.flatMap(page => page.todays_followUps) || [];
+  const meetings = data?.pages?.flatMap(page => page.todays_meetings) || [];
+
   const filteredfollowUps = followUps.filter(item => {
     const name = item?.propertylead?.name?.toLowerCase() || '';
     const phone = item?.propertylead?.phone || '';
     const email = item?.propertylead?.email?.toLowerCase() || '';
-  const project =item?.propertylead?.propertyproject?.project_name?.toLowerCase() || '';
+    const project = item?.propertylead?.propertyproject?.project_name?.toLowerCase() || '';
+    const remarks = (item?.remarks || 'no remarks available').toLowerCase();
     const search = searchText.toLowerCase();
 
     return (
-      name.includes(search) || phone.includes(search) || email.includes(search)||project.includes(search))
+      name.includes(search) ||
+      phone.includes(search) ||
+      email.includes(search) ||
+      project.includes(search) ||
+      remarks.includes(search)
+    );
   });
-  const meetings = data?.todays_meetings || [];
-  // console.log('followUps', followUps);
+
   const { data: AllProperty } = useQuery({
     queryKey: ['AllProperty'],
     queryFn: async () => {
       const res = await api.get('/api/pm/getAllPropertyLocation');
       return res.data.data;
     },
+    staleTime: 1000 * 60 * 10, // filter dropdown data ghono ghono change hoy na, tai 10 minute cache rakha hocche
   });
 
   // Fetch RMs
@@ -417,6 +438,7 @@ const FollowUpsScreen = () => {
       const res = await api.get('/api/pm/getAllRM');
       return res?.data?.data;
     },
+    staleTime: 1000 * 60 * 10,
   });
 
   // Fetch Projects
@@ -426,6 +448,19 @@ const FollowUpsScreen = () => {
       const res = await api.get('/api/pm/getAllPropertyProjects');
       return res.data.data || [];
     },
+    staleTime: 1000 * 60 * 10,
+  });
+
+  // Fetch Lead Sources (MR References)
+  const { data: mrReferenceList = [] } = useQuery({
+    queryKey: ['mrReferenceList'],
+    queryFn: async () => {
+      const res = await api.get('/api/pm/getAllMrReferences', {
+        params: { limit: 'all' },
+      });
+      return res.data.data || [];
+    },
+    staleTime: 1000 * 60 * 10,
   });
 
   /* ================= DATA MAPPING ================= */
@@ -438,14 +473,15 @@ const FollowUpsScreen = () => {
     label: item.project_name,
     value: item.id,
   }));
+  const leadSourceOptions = mrReferenceList?.map(item => ({
+    label: item.mrf_name,
+    value: item.id,
+  }));
 
   const LeadStatus = [
     { label: 'Active', value: '1' },
     { label: 'Inactive', value: '2' },
-     { label: 'Booking Done', value: '5' },
-    // { label: 'Site Visit', value: '3' },
-    // { label: 'Meeting Done', value: '4' },
-    // { label: 'Booking Done', value: '5' },
+    { label: 'Booking Done', value: '5' },
   ];
 
   /* ================= HANDLERS ================= */
@@ -467,17 +503,19 @@ const FollowUpsScreen = () => {
       project: null,
       location: null,
       status: null,
+      reference: null,
     };
 
     setFilters(cleared);
     setAppliedFilters(cleared);
     setShowFilterModal(false);
   };
+
   const [showTopBtn, setShowTopBtn] = useState(false);
   const scrollRef = useRef();
 
   const scrollToTop = () => {
-    scrollRef.current?.scrollTo({ y: 0, animated: true });
+    scrollRef.current?.scrollToOffset({ offset: 0, animated: true });
   };
 
   return (
@@ -487,9 +525,6 @@ const FollowUpsScreen = () => {
         backgroundColor="transparent"
         barStyle="light-content"
       />
-
-      {/* Header */}
-      {/* <Header /> */}
 
       {/* Title Row */}
       <View style={styles.topBarContainer}>
@@ -516,62 +551,82 @@ const FollowUpsScreen = () => {
               onPress={() => navigation.goBack()}
             >
               <View style={styles.backButton}>
-                            <Image
-                              source={require('../asset/image/icon/Arrow.png')}
-                              style={{ width:12, height: 12, marginRight: 6 }}
-                            />
-                            <Text style={styles.backText}>Back</Text>
-                          </View>
+                <Image
+                  source={require('../asset/image/icon/Arrow.png')}
+                  style={{ width: 12, height: 12, marginRight: 6 }}
+                />
+                <Text style={styles.backText}>Back</Text>
+              </View>
             </TouchableOpacity>
           </View>
         </View>
       </View>
 
-      {/* List */}
-      <ScrollView
-        ref={scrollRef}
-        showsVerticalScrollIndicator={false}
-        onScroll={event => {
-          const y = event.nativeEvent.contentOffset.y;
-          setShowTopBtn(y > 200);
-        }}
-        scrollEventThrottle={16}
-      >
-        {/* Search */}
-        <View style={styles.searchBox}>
-          <Icon name="search" size={18} color="#aaa" />
-          <TextInput
-            placeholder="Search name / phone / email..."
-            placeholderTextColor="#aaa"
-            value={searchText}
-            onChangeText={setSearchText}
-            style={{ marginLeft: 8, color: '#fff', flex: 1 }}
-          />
-        </View>
-
-        {/* ✅ navigation prop pass করা হচ্ছে প্রতিটি card এ */}
-        {isLoading ? (
-          <Text style={{ color: '#fff', textAlign: 'center', marginTop: 20 }}>
-            Loading...
-          </Text>
-        ) : filteredfollowUps?.length > 0 ? (
-          filteredfollowUps.map((visit, i) => (
+      {/* List - FlatList byabohar kora hocche jate sudhu screen a dekha jawa card gulo render hoy (virtualization), na hole beshi page load hole re-open korte time lagbe */}
+      {isLoading ? (
+        <Text style={{ color: '#fff', textAlign: 'center', marginTop: 20 }}>
+          Loading...
+        </Text>
+      ) : (
+        <FlatList
+          ref={scrollRef}
+          data={filteredfollowUps}
+          keyExtractor={(visit, i) => String(visit.id || i)}
+          renderItem={({ item }) => (
             <FollowCard
-              key={visit.id || i}
-              data={visit}
+              data={item}
               setShowRemarks={setShowRemarks}
               setRemarksText={setRemarksText}
               navigation={navigation}
             />
-          ))
-        ) : (
-          <Text
-            style={{ textAlign: 'center', marginTop: 20, color: '#ffffff' }}
-          >
-            No data found
-          </Text>
-        )}
-      </ScrollView>
+          )}
+          showsVerticalScrollIndicator={false}
+          ListHeaderComponent={
+            <View style={styles.searchBox}>
+              <Icon name="search" size={18} color="#aaa" />
+              <TextInput
+                placeholder="Search name / phone / email..."
+                placeholderTextColor="#aaa"
+                value={searchText}
+                onChangeText={setSearchText}
+                style={{ marginLeft: 8, color: '#fff', flex: 1 }}
+              />
+            </View>
+          }
+          ListEmptyComponent={
+            <Text
+              style={{ textAlign: 'center', marginTop: 20, color: '#ffffff' }}
+            >
+              No data found
+            </Text>
+          }
+          ListFooterComponent={
+            isFetchingNextPage ? (
+              <View style={{ paddingVertical: 15 }}>
+                <ActivityIndicator size="small" color="#00e5ff" />
+              </View>
+            ) : (
+              <View style={{ height: 100 }} />
+            )
+          }
+          onEndReached={() => {
+            if (hasNextPage && !isFetchingNextPage) {
+              fetchNextPage();
+            }
+          }}
+          onEndReachedThreshold={0.4}
+          onScroll={event => {
+            const y = event.nativeEvent.contentOffset.y;
+            setShowTopBtn(y > 200);
+          }}
+          scrollEventThrottle={16}
+          initialNumToRender={10}
+          maxToRenderPerBatch={10}
+          windowSize={7}
+          removeClippedSubviews={true}
+        />
+      )}
+
       {/* ✅ REMARKS MODAL */}
       {showRemarks && (
         <View style={styles.modalOverlay}>
@@ -593,82 +648,88 @@ const FollowUpsScreen = () => {
           </View>
         </View>
       )}
-          {/* ✅ FILTER MODAL */}
+
+      {/* ✅ FILTER MODAL */}
       {showFilterModal && (
-  <View style={styles.modalOverlay}>
-    <View style={styles.filterModalCard}>
-      <View style={styles.dragHandle} />
-      <Text style={styles.modalTitle}>Filter Leads</Text>
-      <View style={styles.modalDivider} />
+        <View style={styles.modalOverlay}>
+          <View style={styles.filterModalCard}>
+            <View style={styles.dragHandle} />
+            <Text style={styles.modalTitle}>Filter Leads</Text>
+            <View style={styles.modalDivider} />
 
-      <ScrollView
-        style={{ width: '100%' }}
-        showsVerticalScrollIndicator={false}
-      >
-        <DropdownField
-          label="Property Location"
-          data={Property}
-          placeholder="Select Location"
-          value={filters.location}
-          onChange={value => onChange('location', value)}
-        />
+            <ScrollView
+              style={{ width: '100%' }}
+              showsVerticalScrollIndicator={false}
+            >
+              <DropdownField
+                label="Property Location"
+                data={Property}
+                placeholder="Select Location"
+                value={filters.location}
+                onChange={value => onChange('location', value)}
+              />
 
-        <DropdownField
-          label="Relationship Manager"
-          data={Rm}
-          placeholder="Select RM"
-          value={filters.rm_id}
-          onChange={value => onChange('rm_id', value)}
-        />
+              <DropdownField
+                label="Lead Source"
+                data={leadSourceOptions}
+                placeholder="Select Lead Source"
+                value={filters.reference}
+                onChange={value => onChange('reference', value)}
+              />
 
-        <DropdownField
-          label="Project"
-          data={projectOptions}
-          placeholder="Select Project"
-          value={filters.project}
-          onChange={value => onChange('project', value)}
-        />
+              <DropdownField
+                label="Relationship Manager"
+                data={Rm}
+                placeholder="Select RM"
+                value={filters.rm_id}
+                onChange={value => onChange('rm_id', value)}
+              />
 
-        <DropdownField
-          label="Lead Status"
-          data={LeadStatus}
-          placeholder="Select Status"
-          value={filters.status}
-          onChange={value => onChange('status', value)}
-        />
-      </ScrollView>
+              <DropdownField
+                label="Project"
+                data={projectOptions}
+                placeholder="Select Project"
+                value={filters.project}
+                onChange={value => onChange('project', value)}
+              />
 
-      <View style={styles.modalDivider} />
+              <DropdownField
+                label="Lead Status"
+                data={LeadStatus}
+                placeholder="Select Status"
+                value={filters.status}
+                onChange={value => onChange('status', value)}
+              />
+            </ScrollView>
 
-      <TouchableOpacity
-        style={styles.modalCloseBtn}
-        onPress={applyFilter}
-      >
-        <Text style={styles.modalCloseText}>Apply Filter</Text>
-      </TouchableOpacity>
+            <View style={styles.modalDivider} />
 
-      <TouchableOpacity onPress={resetFilters} style={{ marginTop: 14 }}>
-        <Text style={styles.resetText}>Reset All</Text>
-      </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.modalCloseBtn}
+              onPress={applyFilter}
+            >
+              <Text style={styles.modalCloseText}>Apply Filter</Text>
+            </TouchableOpacity>
 
-      <TouchableOpacity
-        onPress={() => setShowFilterModal(false)}
-        style={{ marginTop: 12 }}
-      >
-        <Text style={styles.cancelText}>Cancel</Text>
-      </TouchableOpacity>
-    </View>
-  </View>
-)}
+            <TouchableOpacity onPress={resetFilters} style={{ marginTop: 14 }}>
+              <Text style={styles.resetText}>Reset All</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => setShowFilterModal(false)}
+              style={{ marginTop: 12 }}
+            >
+              <Text style={styles.cancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
       {showTopBtn && (
         <TouchableOpacity style={styles.topButton} onPress={scrollToTop}>
           <Icon name="keyboard-arrow-up" size={26} color="#fff" />
         </TouchableOpacity>
       )}
-
-      {/* Bottom Nav */}
-      {/* <BottomNav /> */}
-      <View style={{paddingBottom: 100}}/>
     </View>
   );
 };
@@ -690,16 +751,16 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   remarksCardText: {
-  fontSize: 13,
-  color: '#ffffff',
-  lineHeight: 20,
-},
+    fontSize: 13,
+    color: '#ffffff',
+    lineHeight: 20,
+  },
 
-readMore: {
-  color: '#00a8ff',
-  fontWeight: '600',
-  marginTop: 3,
-},
+  readMore: {
+    color: '#00a8ff',
+    fontWeight: '600',
+    marginTop: 3,
+  },
   screenTitle: {
     color: '#cfd8dc',
     fontSize: 13,
@@ -744,8 +805,6 @@ readMore: {
     alignItems: 'flex-start',
   },
 
-  name: { color: '#fff', fontWeight: 'bold' },
-
   activeBadge: {
     backgroundColor: '#4caf50',
     borderRadius: 10,
@@ -764,14 +823,14 @@ readMore: {
   },
 
   remarksText: { color: '#fff', fontSize: 10 },
-phoneText: {
-  color: '#00acc1',
-  backgroundColor: 'rgba(0, 172, 193, 0.15)',
-  paddingHorizontal: 4,
-  paddingVertical: 2,
-  borderRadius: 4,
-  fontWeight: '600',
-},
+  phoneText: {
+    color: '#00acc1',
+    backgroundColor: 'rgba(0, 172, 193, 0.15)',
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    borderRadius: 4,
+    fontWeight: '600',
+  },
   location: {
     color: '#00e5ff',
     marginTop: 5,
@@ -792,27 +851,21 @@ phoneText: {
     flex: 1,
     flexWrap: 'wrap',
     paddingTop: 2,
-    paddingBottom:5,
-    // fontStyle: 'italic',
+    paddingBottom: 5,
     fontWeight: '500',
   },
-    label1: {
+  label1: {
     color: '#eae8e5df',
     fontSize: 12,
-    // flex: 1,
-    // flexWrap: 'wrap',
     paddingTop: 2,
-    paddingBottom:5,
-    // fontStyle: 'italic',
+    paddingBottom: 5,
     fontWeight: '500',
   },
-    emailText: {
+  emailText: {
     color: '#00acc1',
     textDecorationLine: 'underline',
     fontWeight: '500',
     fontSize: 12,
-
-
   },
   value: {
     color: '#fff',
@@ -859,21 +912,12 @@ phoneText: {
     position: 'absolute',
     width: '100%',
     height: '100%',
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: 'rgba(0,0,0,0.65)',
     justifyContent: 'center',
     alignItems: 'center',
+    zIndex: 1000,
+    bottom: 45,
   },
-
-  modalOverlay: {
-  position: 'absolute',
-  width: '100%',
-  height: '100%',
-  backgroundColor: 'rgba(0,0,0,0.65)',
-  justifyContent: 'center',
-  alignItems: 'center',
-  zIndex: 1000,
-  bottom:45
-},
   modalCard: {
     width: '85%',
     backgroundColor: '#2f2f8f',
@@ -892,12 +936,12 @@ phoneText: {
     marginBottom: 10,
   },
 
-modalTitle: {
-  color: '#00e5ff',
-  fontSize: 18,
-  marginBottom: 10,
-  fontWeight: 'bold',
-},
+  modalTitle: {
+    color: '#00e5ff',
+    fontSize: 18,
+    marginBottom: 10,
+    fontWeight: 'bold',
+  },
 
   modalText: {
     color: '#fff',
@@ -905,21 +949,21 @@ modalTitle: {
     marginBottom: 15,
   },
 
- modalCloseBtn: {
-  backgroundColor: '#00acc1',
-  paddingHorizontal: 20,
-  paddingVertical: 10,
-  borderRadius: 24,
-  marginTop: 6,
-  width: '100%',
-  alignItems: 'center',
-},
+  modalCloseBtn: {
+    backgroundColor: '#00acc1',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 24,
+    marginTop: 6,
+    width: '100%',
+    alignItems: 'center',
+  },
 
- modalCloseText: {
-  color: '#fff',
-  fontWeight: '600',
-  fontSize: 14,
-},
+  modalCloseText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 14,
+  },
   nameRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -932,7 +976,7 @@ modalTitle: {
     fontWeight: 'bold',
     flexShrink: 1,
   },
-    field: {
+  field: {
     marginBottom: 12,
     width: '100%',
   },
@@ -950,9 +994,10 @@ modalTitle: {
     flex: 1,
     color: '#fff',
     fontSize: 13,
-    paddingVertical: 0,paddingVertical: Platform.OS === 'ios' ? 0 : 6,   height: '100%',     
+    paddingVertical: Platform.OS === 'ios' ? 0 : 6,
+    height: '100%',
   },
-   inputWrapper: { width: '100%', marginBottom: 12 },
+  inputWrapper: { width: '100%', marginBottom: 12 },
   dropdown: {
     height: 40,
     backgroundColor: '#ffffff10',
@@ -965,39 +1010,39 @@ modalTitle: {
   placeholderStyle: { color: '#aaa', fontSize: 14 },
   selectedTextStyle: { color: '#fff', fontSize: 14 },
   filterModalCard: {
-  width: '88%',
-  backgroundColor: '#1a1f6b',
-  borderWidth: 1,
-  borderColor: '#3d45b0',
-  borderRadius: 18,
-  padding: 20,
-  alignItems: 'center',
-  maxHeight: '88%',
-},
-dragHandle: {
-  width: 36,
-  height: 4,
-  backgroundColor: '#3d55cc',
-  borderRadius: 2,
-  marginBottom: 14,
-},
-modalDivider: {
-  width: '100%',
-  height: 1,
-  backgroundColor: '#3d45b033',
-  marginVertical: 10,
-},
-resetText: {
-  color: '#ff6b6b',
-  fontWeight: 'bold',
-  fontSize: 14,
-},
+    width: '88%',
+    backgroundColor: '#1a1f6b',
+    borderWidth: 1,
+    borderColor: '#3d45b0',
+    borderRadius: 18,
+    padding: 20,
+    alignItems: 'center',
+    maxHeight: '78%',
+  },
+  dragHandle: {
+    width: 36,
+    height: 4,
+    backgroundColor: '#3d55cc',
+    borderRadius: 2,
+    marginBottom: 14,
+  },
+  modalDivider: {
+    width: '100%',
+    height: 1,
+    backgroundColor: '#3d45b033',
+    marginVertical: 10,
+  },
+  resetText: {
+    color: '#ff6b6b',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
   backButton: {
-  flexDirection: 'row',
-  alignItems: 'center',
-},
-cancelText: {
-  color: '#a0b4e8',
-  fontSize: 13,
-},
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  cancelText: {
+    color: '#a0b4e8',
+    fontSize: 13,
+  },
 });

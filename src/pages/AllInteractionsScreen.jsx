@@ -83,11 +83,7 @@ const RemarksText = ({ remarks }) => {
   );
 };
 const InteractionCard = ({ item, setShowRemarks, setRemarksText }) => {
-  const remarks =
-  item?.propertyfeedbacks
-    ?.map(x => x?.remarks)
-    ?.filter(Boolean)
-    ?.join(', ') || 'No Remarks Available';
+   const remarks = item?.remarks || 'No Remarks Available';
   return(
   <View style={styles.card}>
     {/* Card Header */}
@@ -221,6 +217,7 @@ const AllInteractionsScreen = ({ route }) => {
     queryKey: ['feedback', id],
     queryFn: async () => {
       const res = await api.get(`/api/pm/getAllLeadFeedbacksById/${id}`);
+      console.log('feedback data:', JSON.stringify(res?.data?.data, null, 2));
       return res?.data?.data || [];
     },
     onError: err => {
