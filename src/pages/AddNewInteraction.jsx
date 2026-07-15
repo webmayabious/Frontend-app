@@ -235,8 +235,11 @@ export default function AddNewInteraction({ route }) {
   };
 
   return (
+    // ✅ FIX: marginBottom: 50 সরানো হয়েছে — এটাই white background overlap-এর মূল কারণ ছিল।
+    // এই margin পুরো screen-কে flex area থেকে নিচে নামিয়ে দিত, ফলে নিচে React Navigation-এর
+    // default (সাদা) background দেখা যেত, বিশেষ করে keyboard খোলার সময়।
     <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: '#050a3a', marginBottom: 50 }}
+      style={{ flex: 1, backgroundColor: '#050a3a' }}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 0}
     >
@@ -264,7 +267,9 @@ export default function AddNewInteraction({ route }) {
           ref={scrollRef}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
-          contentContainerStyle={{ paddingBottom: 40 }}
+          // ✅ FIX: BottomNav-এর জন্য জায়গা এখন এখানে paddingBottom দিয়ে রাখা হচ্ছে
+          // (আগে outer view-এর marginBottom দিয়ে যেটা করা হচ্ছিল সেটাই সমস্যা তৈরি করছিল)
+          contentContainerStyle={{ paddingBottom: 70 }}
         >
           <View style={styles.card}>
             <DropdownField
@@ -380,7 +385,7 @@ export default function AddNewInteraction({ route }) {
                 multiline
                 value={interaction.remarks}
                 onChangeText={text => updateField('remarks', text)}
-                onFocus={handleRemarksFocus}  
+                onFocus={handleRemarksFocus}
               />
               {errors.remarks ? <Text style={styles.errorText}>{errors.remarks}</Text> : null}
             </View>
@@ -399,7 +404,6 @@ export default function AddNewInteraction({ route }) {
               </TouchableOpacity>
             </View>
           </View>
-          {/* <View style={{paddingBottom:100}}/> */}
         </ScrollView>
       </View>
     </KeyboardAvoidingView>

@@ -153,7 +153,7 @@ const Dashboard = () => {
     setRefreshing(false);
   };
 
-  const paddingTop = Platform.OS === 'ios' ? insets.top + 14 : 14;
+  const paddingTop = Platform.OS === 'ios' ? insets.top + 14: 14;
   const bottomNavHeight = 60 + insets.bottom;
 
   return (
@@ -165,7 +165,7 @@ const Dashboard = () => {
         contentContainerStyle={[
           styles.scroll,
           {
-            paddingTop: paddingTop + 10,
+            paddingTop: paddingTop,
             paddingBottom: bottomNavHeight + 10,
           },
         ]}

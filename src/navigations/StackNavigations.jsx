@@ -1,5 +1,5 @@
-import React, { useRef, useState } from 'react';
-import { View } from 'react-native';
+import React, { useRef, useState, useEffect } from 'react';
+import { View, Keyboard, Platform } from 'react-native';
 import {
   NavigationContainer,
   createNavigationContainerRef,
@@ -39,11 +39,37 @@ export default function StackNavigations() {
   const [isReady, setIsReady] = useState(false);
   const [currentRoute, setCurrentRoute] = useState('');
   const [hideBottomNav, setHideBottomNav] = useState(false);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
 
+  // ✅ FIX: keyboard খোলার সাথে সাথেই (কোনো delay/animation ছাড়া) bottom nav হাইড করার জন্য
+  // Android-এ 'keyboardDidShow' পুরো keyboard animation শেষ হওয়ার পরে fire হয় — তাই
+  // আগের কোডে nav কিছুক্ষণ keyboard-এর উপরে ভেসে থেকে তারপর হঠাৎ disappear করতো।
+  // এখানে 'keyboardDidShow'-এর পাশাপাশি Android-এ 'keyboardWillShow' listener-ও যোগ করা হলো —
+  // যেসব ডিভাইসে এটা সাপোর্ট করে (most modern Android + RN 0.73+), সেটা keyboard ওঠা শুরুর
+  // সাথে সাথেই fire হয়, ফলে nav সাথে সাথে সরে যায়, কোনো "কিছুক্ষণ থেকে যাওয়া" থাকে না।
+  useEffect(() => {
+    const showSub = Keyboard.addListener('keyboardDidShow', () => setKeyboardVisible(true));
+    const hideSub = Keyboard.addListener('keyboardDidHide', () => setKeyboardVisible(false));
+
+    // Android/iOS উভয় জায়গাতেই যেখানে 'keyboardWillShow' পাওয়া যায় সেখানে সেটাও শোনা হচ্ছে,
+    // কারণ এটা keyboard ওঠা শুরুর মুহূর্তেই fire করে (didShow-এর চেয়ে আগে)।
+    const willShowSub = Keyboard.addListener('keyboardWillShow', () => setKeyboardVisible(true));
+    const willHideSub = Keyboard.addListener('keyboardWillHide', () => setKeyboardVisible(false));
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+      willShowSub.remove();
+      willHideSub.remove();
+    };
+  }, []);
+
+  // ✅ কোনো Animated/transition নেই — showBottomNav false হওয়া মাত্র nav সাথে সাথে unmount হয়ে যায়
   const showBottomNav =
     isReady &&
     !NO_BOTTOM_NAV_SCREENS.includes(currentRoute) &&
-    !hideBottomNav;
+    !hideBottomNav &&
+    !keyboardVisible;
 
   return (
     <NavigationContainer
@@ -67,7 +93,13 @@ export default function StackNavigations() {
 
         {/* SCREENS */}
         <View style={{ flex: 1 }}>
-          <Stack.Navigator screenOptions={{ headerShown: false }}>
+          <Stack.Navigator
+            screenOptions={{
+              headerShown: false,
+              // ✅ FIX: white background overlap ঠেকাতে default screen background ফিক্স করা হলো
+              contentStyle: { backgroundColor: '#070c4d' },
+            }}
+          >
             <Stack.Screen name="Login" component={LoginUI} />
             <Stack.Screen name="Dashboard" component={Dashboard} />
             <Stack.Screen name="ChangeRM">
@@ -105,7 +137,7 @@ export default function StackNavigations() {
           </Stack.Navigator>
         </View>
 
-        {/* ✅ BOTTOM NAV — absolute fixed, no glitch */}
+        {/* ✅ BOTTOM NAV — instant hide, no animation/delay */}
         {showBottomNav && (
           <View style={{
             position: 'absolute',
