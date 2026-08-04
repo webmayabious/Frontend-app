@@ -1,5 +1,5 @@
 // FollowUpsScreen.js (Fixed - useNavigation inside component)
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -12,6 +12,8 @@ import {
   Linking,
   Alert,
   Image,
+  Dimensions,
+  Animated,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import Header from '../Layout/Header';
@@ -19,9 +21,11 @@ import BottomNav from '../navigations/BottomNav';
 import { useNavigation } from '@react-navigation/native';
 import { useQuery } from '@tanstack/react-query';
 import api from '../api/AxiosInstance';
-
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { Dropdown } from 'react-native-element-dropdown';
 const STATUSBAR_HEIGHT =
   Platform.OS === 'android' ? StatusBar.currentHeight : 44;
+  const SCREEN_HEIGHT = Dimensions.get('window').height;
 /* ================= CALL ================= */
 // const makeCall = phoneNumber => {
 //   if (!phoneNumber) return;
@@ -88,6 +92,246 @@ const sendMail = async (email) => {
   } catch (error) {
     Alert.alert('Error', 'Unable to open email app.');
   }
+};
+const DropdownField = ({ label, data, placeholder, value, onChange }) => {
+  const [isFocus, setIsFocus] = useState(false);
+  return (
+    <View style={styles.filterInputWrapper}>
+      <Text style={styles.filterLabel}>{label}</Text>
+      <Dropdown
+        style={[
+          styles.filterDropdown,
+          isFocus && { borderColor: '#00e5ff', borderWidth: 1.5 },
+        ]}
+        containerStyle={styles.dropdownContainer}
+        placeholderStyle={styles.placeholderStyle}
+        selectedTextStyle={styles.selectedTextStyle}
+        itemTextStyle={{ color: '#0b0b0b', fontWeight: '500' }}
+        activeColor="#e6f7ff"
+        data={data || []}
+        labelField="label"
+        valueField="value"
+        placeholder={placeholder}
+        value={value}
+        onFocus={() => setIsFocus(true)}
+        onBlur={() => setIsFocus(false)}
+        onChange={item => {
+          setIsFocus(false);
+          onChange && onChange(item.value);
+        }}
+        renderRightIcon={() => (
+          <Icon
+            name={isFocus ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
+            size={20}
+            color="#00e5ff"
+          />
+        )}
+      />
+    </View>
+  );
+};
+
+const InputField = ({ label, placeholder, icon, value, onChange, onPress }) => (
+  <View style={styles.field}>
+    <Text style={styles.filterLabel}>{label}</Text>
+    <TouchableOpacity activeOpacity={0.8} onPress={onPress}>
+      <View style={styles.filterInputContainer}>
+        <TextInput
+          placeholder={placeholder}
+          placeholderTextColor="#7a8fc4"
+          style={styles.filterInput}
+          value={value}
+          onChangeText={onChange}
+          editable={!onPress}
+        />
+        {icon && <Icon name={icon} size={18} color="#00bcd4" />}
+      </View>
+    </TouchableOpacity>
+  </View>
+);
+/* ================= FILTER MODAL (same as LeadsListScreen) ================= */
+const FilterModal = ({
+  visible,
+  onClose,
+  filters,
+  onChange,
+  onApply,
+  onReset,
+  Property,
+  callStatusListfetch,
+  leadQualificationOptions,
+  leadStatusOptions,
+  leadSubStatusOptions,
+  leadSourceOptions,
+  Rm,
+  projectOptions,
+  LeadStatus,
+  showFromPicker,
+  showToPicker,
+  setShowFromPicker,
+  setShowToPicker,
+  onDateChange,
+  setActivePicker,
+  activePicker,
+}) => {
+  const scaleAnim = useRef(new Animated.Value(0.85)).current;
+  const opacityAnim = useRef(new Animated.Value(0)).current;
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    if (visible) {
+      setMounted(true);
+      Animated.parallel([
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          useNativeDriver: true,
+          bounciness: 5,
+          speed: 16,
+        }),
+        Animated.timing(opacityAnim, {
+          toValue: 1,
+          duration: 220,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(scaleAnim, {
+          toValue: 0.85,
+          duration: 180,
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacityAnim, {
+          toValue: 0,
+          duration: 180,
+          useNativeDriver: true,
+        }),
+      ]).start(() => setMounted(false));
+    }
+  }, [visible]);
+
+  if (!mounted) return null;
+
+  return (
+    <Animated.View style={[styles.modalOverlay, { opacity: opacityAnim }]}>
+      {/* Backdrop tap to close */}
+      <TouchableOpacity
+        style={StyleSheet.absoluteFill}
+        activeOpacity={1}
+        onPress={onClose}
+      />
+
+      {/* Modal card */}
+      <Animated.View
+        style={[
+          styles.filterModalCard,
+          { transform: [{ scale: scaleAnim }], opacity: opacityAnim },
+        ]}
+      >
+        <View style={styles.dragHandle} />
+        <Text style={styles.modalTitle}>Filter Leads</Text>
+        <View style={styles.modalDivider} />
+
+        <ScrollView
+          style={styles.filterScrollView}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          nestedScrollEnabled={true}
+        >
+          <DropdownField
+            label="Property Location"
+            data={Property}
+            placeholder="Select Location"
+            value={filters.location}
+            onChange={value => onChange('location', value)}
+          />
+          <DropdownField
+            label="Relationship Manager"
+            data={Rm}
+            placeholder="Select RM"
+            value={filters.rm}
+            onChange={value => onChange('rm', value)}
+          />
+          <DropdownField
+            label="Project"
+            data={projectOptions}
+            placeholder="Select Project"
+            value={filters.project}
+            onChange={value => onChange('project', value)}
+          />
+          <DropdownField
+            label="Approval Status"
+            data={LeadStatus}
+            placeholder="Select Status"
+            value={filters.booking_approval_status}
+            onChange={value => onChange('booking_approval_status', value)}
+          />
+          <View
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              width: '100%',
+            }}
+          >
+            <View style={{ width: '48%' }}>
+              <InputField
+                label="From Date"
+                placeholder="YYYY-MM-DD"
+                icon="calendar-today"
+                value={filters.fromDate}
+                onPress={() => setShowFromPicker(true)}
+              />
+            </View>
+            <View style={{ width: '48%' }}>
+              <InputField
+                label="To Date"
+                placeholder="YYYY-MM-DD"
+                icon="calendar-today"
+                value={filters.toDate}
+                onPress={() => setShowToPicker(true)}
+              />
+            </View>
+          </View>
+  {showFromPicker && (
+            <DateTimePicker
+              value={filters.fromDate ? new Date(filters.fromDate) : new Date()}
+              mode="date"
+              display="default"
+              onChange={(e, d) => onDateChange(e, d, 'fromDate')}
+            />
+          )}
+          {showToPicker && (
+            <DateTimePicker
+              value={filters.toDate ? new Date(filters.toDate) : new Date()}
+              mode="date"
+              display="default"
+              onChange={(e, d) => onDateChange(e, d, 'toDate')}
+            />
+          )}
+          <View style={{ height: 8 }} />
+        </ScrollView>
+
+        <View style={styles.modalDivider} />
+
+        <TouchableOpacity style={styles.modalCloseBtn} onPress={onApply}>
+          <Text style={styles.modalCloseText}>Apply Filter</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity onPress={onReset} style={{ marginTop: 14 }}>
+          <Text style={{ color: '#ff6b6b', fontWeight: 'bold', fontSize: 14 }}>
+            Reset All
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={onClose}
+          style={{ marginTop: 12, marginBottom: 4 }}
+        >
+          <Text style={{ color: '#a0b4e8', fontSize: 13 }}>Cancel</Text>
+        </TouchableOpacity>
+      </Animated.View>
+    </Animated.View>
+  );
 };
 //  navigation prop টা বাইরে থেকে pass করা হচ্ছে
 const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
@@ -284,11 +528,53 @@ const TotalBookingsAgreementsTillDateScreen = () => {
   const [showRemarks, setShowRemarks] = useState(false);
   const [remarksText, setRemarksText] = useState('');
   const [searchText, setSearchText] = useState('');
+   const [showFilterModal, setShowFilterModal] = useState(false);
+  
+    const [filters, setFilters] = useState({
+      company_id: null,
+      rm: null,
+      fromDate: null,
+      toDate: null,
+      project: null,
+      location: null,
+      booking_approval_status: null,
+      lead_status: null,
+      lead_sub_status: null,
+      lead_qualification: null,
+      call_status: null,
+      siteVisitFromDate: null,
+      siteVisitToDate: null,
+      lead_source: null,
+    });
+    const [appliedFilters, setAppliedFilters] = useState();
+    const [showFromPicker, setShowFromPicker] = useState(false);
+    const [showToPicker, setShowToPicker] = useState(false);
+    const [activePicker, setActivePicker] = useState(null);
   /* ================= API ================= */
   const { data: Lead, isLoading } = useQuery({
-    queryKey: ['totalBookingAndAgreementTillDate'],
-    queryFn: async () => {
-      const res = await api.get('/api/pm/totalBookingAndAgreementTillDate');
+    queryKey: ['totalBookingAndAgreementTillDate',appliedFilters],
+    queryFn: async ({ pageParam = 1 }) => {
+      const res = await api.get('/api/pm/totalBookingAndAgreementTillDate', {
+          params: {
+            page: pageParam,
+            limit: 20,
+            company_id: filters.company_id || undefined,
+            rm: filters.rm || undefined,
+            fromDate: filters.fromDate || undefined,
+            toDate: filters.toDate || undefined,
+            project: filters.project || undefined,
+            location: filters.location || undefined,
+            // active: filters.active || undefined,
+            booking_approval_status: filters.booking_approval_status || undefined,
+            lead_status: filters.lead_status || undefined,
+            lead_sub_status: filters.lead_sub_status || undefined,
+            lead_qualification: filters.lead_qualification || undefined,
+            call_status: filters.call_status || undefined,
+            siteVisitFromDate: filters.siteVisitFromDate || undefined,
+            siteVisitToDate: filters.siteVisitToDate || undefined,
+            reference: filters.lead_source || undefined,
+          },
+        },);
       return res?.data?.data?.Bookings;
     },
   });
@@ -304,9 +590,88 @@ const TotalBookingsAgreementsTillDateScreen = () => {
     );
   });
   // console.log('siteVisits1', Lead);
+   const { data: AllProperty } = useQuery({
+    queryKey: ['AllProperty'],
+    queryFn: async () => {
+      const res = await api.get('/api/pm/getAllPropertyLocation');
+      return res.data.data;
+    },
+  });
+
+  const { data: allRmList = [] } = useQuery({
+    queryKey: ['allRMList'],
+    queryFn: async () => {
+      const res = await api.get('/api/pm/getAllRM');
+      return res?.data?.data;
+    },
+  });
+
+  const { data: projectList = [] } = useQuery({
+    queryKey: ['project'],
+    queryFn: async () => {
+      const res = await api.get('/api/pm/getAllPropertyProjects');
+      return res.data.data || [];
+    },
+  });
+  const Property = AllProperty?.map(item => ({
+    label: item.name,
+    value: item.id,
+  }));
+  const Rm = allRmList?.map(item => ({ label: item.name, value: item.id }));
+  const projectOptions = projectList?.map(item => ({
+    label: item.project_name,
+    value: item.id,
+  }));
+
+  const LeadStatus = [
+    { label: 'PENDING', value: '1' },
+    { label: 'APPROVED BY CITY HEAD / BUSINESS HEAD / ADMIN', value: '2' },
+  ];
+  /* ================= HANDLERS ================= */
+  const onChange = (key, value) => {
+    setFilters(prev => ({ ...prev, [key]: value }));
+  };
+
+  const applyFilter = () => {
+    setAppliedFilters(filters);
+    setShowFilterModal(false);
+  };
+
+  const resetFilters = () => {
+    const cleared = {
+      company_id: null,
+      rm: null,
+      fromDate: null,
+      toDate: null,
+      project: null,
+      location: null,
+      booking_approval_status: null,
+      lead_status: null,
+      lead_sub_status: null,
+      lead_qualification: null,
+      call_status: null,
+      siteVisitFromDate: null,
+      siteVisitToDate: null,
+      lead_source: null,
+    };
+    setFilters(cleared);
+    setAppliedFilters(cleared);
+    setShowFilterModal(false);
+  };
+
   const [showTopBtn, setShowTopBtn] = useState(false);
   const scrollRef = useRef();
 
+
+ const onDateChange = (event, selectedDate, key) => {
+  const isFrom = key === 'fromDate';
+
+  if (isFrom) {
+    setShowFromPicker(false);
+  } else {
+    setActivePicker(false);
+  }
+}
   const scrollToTop = () => {
     scrollRef.current?.scrollTo({ y: 0, animated: true });
   };
@@ -369,7 +734,17 @@ const TotalBookingsAgreementsTillDateScreen = () => {
             style={{ marginLeft: 8, color: '#fff', flex: 1,height: '100%',   paddingVertical: Platform.OS === 'ios' ? 0 : 6, }}
           />
         </View>
-
+ <TouchableOpacity
+          style={{
+            alignSelf: 'flex-end',
+            marginRight: 16,
+                marginTop: 8,
+            marginBottom:8
+          }}
+          onPress={() => setShowFilterModal(true)}
+        >
+          <Icon name="filter-alt" size={18} color="#00e5ff" />
+        </TouchableOpacity>
         {isLoading ? (
           <Text style={{ color: '#fff', textAlign: 'center', marginTop: 20 }}>
             Loading...
@@ -414,6 +789,25 @@ const TotalBookingsAgreementsTillDateScreen = () => {
           </View>
         </View>
       )}
+       <FilterModal
+        visible={showFilterModal}
+        onClose={() => setShowFilterModal(false)}
+        filters={filters}
+        onChange={onChange}
+        onApply={applyFilter}
+        onReset={resetFilters}
+        Property={Property}
+        Rm={Rm}
+        projectOptions={projectOptions}
+        LeadStatus={LeadStatus}
+        showFromPicker={showFromPicker}
+        showToPicker={showToPicker}
+        onDateChange={onDateChange}
+        setActivePicker={setActivePicker}
+        activePicker={activePicker}
+        setShowFromPicker={setShowFromPicker}
+setShowToPicker={setShowToPicker}
+      />
       {showTopBtn && (
         <TouchableOpacity style={styles.topButton} onPress={scrollToTop}>
           <Icon name="keyboard-arrow-up" size={26} color="#fff" />
@@ -463,6 +857,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     margin: 15,
+    marginBottom:0,
     borderWidth: 1,
     borderColor: '#444',
     borderRadius: 20,
@@ -584,15 +979,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 
-  modalOverlay: {
-    position: 'absolute',
-    width: '100%',
-    height: '100%',
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
+  // modalOverlay: {
+  //   position: 'absolute',
+  //   width: '100%',
+  //   height: '100%',
+  //   backgroundColor: 'rgba(0,0,0,0.6)',
+  //   justifyContent: 'center',
+  //   alignItems: 'center',
+  // },
+modalOverlay: {
+  position: 'absolute',
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 80, // BottomNav height
+  backgroundColor: 'rgba(0,0,0,0.6)',
+  justifyContent: 'center',
+  alignItems: 'center',
+  zIndex: 999,
+  elevation: 999,
+},
   modalCard: {
     width: '85%',
     backgroundColor: '#2f2f8f',
@@ -650,4 +1056,102 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
+   filterModalCard: {
+    width: '88%',
+    maxHeight: SCREEN_HEIGHT * 0.72,
+    backgroundColor: '#1a1f6b',
+    borderWidth: 1,
+    borderColor: '#3d45b0',
+    borderRadius: 18,
+    paddingHorizontal: 20,
+    paddingTop: 14,
+    paddingBottom: 18,
+    alignItems: 'center',
+  },
+
+  /* ScrollView inside modal */
+  filterScrollView: {
+    width: '100%',
+    flexGrow: 0,
+  },
+
+  modalTitle: {
+    color: '#00e5ff',
+    fontSize: 18,
+    marginBottom: 10,
+    fontWeight: 'bold',
+  },
+
+  modalDivider: {
+    width: '100%',
+    height: 1,
+    backgroundColor: '#3d45b033',
+    marginVertical: 10,
+  },
+
+  modalText: {
+    color: '#fff',
+    textAlign: 'center',
+    marginBottom: 15,
+  },
+
+  modalCloseBtn: {
+    backgroundColor: '#00acc1',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 24,
+    marginTop: 6,
+    width: '100%',
+    alignItems: 'center',
+  },
+
+  modalCloseText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+
+  filterInputWrapper: { width: '100%', marginBottom: 12 },
+  filterLabel: {
+    color: '#a0b4e8',
+    fontSize: 12,
+    marginBottom: 5,
+    fontWeight: '500',
+  },
+  filterDropdown: {
+    height: 40,
+    backgroundColor: '#ffffff12',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    borderWidth: 1,
+    borderColor: '#3d55cc',
+  },
+
+  dragHandle: {
+    width: 36,
+    height: 4,
+    backgroundColor: '#3d55cc',
+    borderRadius: 2,
+    marginBottom: 14,
+  },
+  backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  dropdownContainer: { backgroundColor: '#fff', borderRadius: 8 },
+  placeholderStyle: { color: '#7a8fc4', fontSize: 13 },
+  selectedTextStyle: { color: '#fff', fontSize: 13 },
+
+  field: { marginBottom: 12, width: '100%' },
+  filterInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffffff12',
+    borderWidth: 1,
+    borderColor: '#3d55cc',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    height: 40,
+  },
+  filterInput: { flex: 1, color: '#fff', fontSize: 13, paddingVertical: 0 },
 });
