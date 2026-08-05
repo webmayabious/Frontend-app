@@ -155,13 +155,23 @@ const LoginUI = () => {
 
         {/* User ID */}
         <View style={styles.inputBox}>
-          <TextInput
-            placeholder="User Id"
-            placeholderTextColor="#888"
-            style={styles.input}
-            value={loginData.userid}
-            onChangeText={text => setLoginData({ ...loginData, userid: text })}
-          />
+    <TextInput
+  placeholder="User Id"
+  placeholderTextColor="#888"
+  style={styles.input}
+  value={loginData.userid}
+ onChangeText={text =>
+  setLoginData(prev => ({
+    ...prev,
+    userid: text,
+  }))
+}
+  textContentType="username"
+  autoComplete="username"
+  importantForAutofill="yes"
+  autoCapitalize="none"
+  autoCorrect={false}
+/>
           <Image
             source={require('../asset/image/icon/face-scanner.png')}
             style={styles.icon}
@@ -176,9 +186,15 @@ const LoginUI = () => {
             secureTextEntry={!showPassword}
             style={styles.input}
             value={loginData.password}
-            onChangeText={text =>
-              setLoginData({ ...loginData, password: text })
-            }
+          onChangeText={text =>
+  setLoginData(prev => ({
+    ...prev,
+    password: text,
+  }))
+}
+              textContentType="password"
+  autoComplete="password"
+  importantForAutofill="yes"
           />
           <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
             <Image
