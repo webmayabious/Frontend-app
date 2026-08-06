@@ -689,7 +689,7 @@ const TotalLeadScreen = () => {
   const [showFromPicker, setShowFromPicker] = useState(false);
   const [showToPicker, setShowToPicker] = useState(false);
   const [activePicker, setActivePicker] = useState(null);
-
+ const [pagination, setPagination] = useState(null);
   const [showTopBtn, setShowTopBtn] = useState(false);
   const scrollRef = useRef(null);
 
@@ -750,6 +750,12 @@ const TotalLeadScreen = () => {
           },
         );
         console.log('LEAD API RESPONSE:', JSON.stringify(res.data?.data?.[0], null, 2)); 
+      setPagination({
+    total_records: res.data.totalRecords,
+    total_pages: res.data.totalPages,
+    current_page: res.data.currentPage,
+    per_page: res.data.limit,
+  });
         return res.data;
       },
       getNextPageParam: lastPage => {
@@ -789,6 +795,16 @@ const TotalLeadScreen = () => {
     );
   });
   // ✅ Infinite scroll handler — scroll position দেখে trigger করে
+  const startEntry = pagination
+  ? (pagination.current_page - 1) * pagination.per_page + 1
+  : 0;
+
+const endEntry = pagination
+  ? Math.min(
+      pagination.current_page * pagination.per_page,
+      pagination.total_records
+    )
+  : 0;
   const handleLoadMore = () => {
     if (hasNextPage && !isFetchingNextPage) {
       fetchNextPage();
@@ -1016,7 +1032,19 @@ const TotalLeadScreen = () => {
             }}
           />
         </View>
-
+{pagination && (
+  <Text  style={{
+                      alignSelf: 'flex-start',
+                    marginLeft: 15,
+                    // marginTop: 2,
+                    marginBottom: 8,
+                    color:'#a0b4e8',
+                    fontSize:12,
+                    fontWeight:'600'
+                  }}>
+    Showing {startEntry} to {endEntry} of {pagination.total_records} entries
+  </Text>
+)}
         {isLoading ? (
           <Text style={{ color: '#fff', textAlign: 'center', marginTop: 20 }}>
             Loading...
@@ -1170,6 +1198,7 @@ readMore: {
     flexDirection: 'row',
     alignItems: 'center',
     margin: 15,
+    marginBottom:5,
     borderWidth: 1,
     borderColor: '#444',
     borderRadius: 20,

@@ -360,6 +360,7 @@ const SiteVisitsScreen = () => {
   const [isFetchingMore, setIsFetchingMore] = useState(false);
     const [showFromPicker, setShowFromPicker] = useState(false);
     const [showToPicker, setShowToPicker] = useState(false);
+    const [pagination, setPagination] = useState(null);
   // const { data, isLoading } = useQuery({
   //   queryKey: ['SiteVisitandBookingsData', appliedFilters],
   //   queryFn: async () => {
@@ -402,7 +403,9 @@ const SiteVisitsScreen = () => {
       });
       const newData = res.data.data?.site_visits_till_dates || [];
       const totalPages = res.data.data?.pagination?.total_pages || 1;
+const paginationData = res.data.data.pagination;
 
+setPagination(paginationData);
       setAllData(prev => (reset ? newData : [...prev, ...newData]));
       setHasMore(pageNum < totalPages);
       setPage(pageNum);
@@ -424,7 +427,16 @@ const SiteVisitsScreen = () => {
   }, [appliedFilters]);
 
   const siteVisits = allData;
+const startEntry = pagination
+  ? (pagination.current_page - 1) * pagination.per_page + 1
+  : 0;
 
+const endEntry = pagination
+  ? Math.min(
+      pagination.current_page * pagination.per_page,
+      pagination.total_records
+    )
+  : 0;
   // const siteVisits = data?.todays_siteVisit || [];
   // const siteVisits = data?.site_visits_till_dates || [];
   const filteredSiteVisits = siteVisits.filter(item => {
@@ -627,7 +639,22 @@ const SiteVisitsScreen = () => {
             }}
           />
         </View>
-
+{pagination && (
+  <Text  style={{
+                     alignSelf: 'flex-start',
+                    marginLeft: 15,
+                    // marginTop: 2,
+                    marginBottom: 8,
+                    color:'#a0b4e8',
+                    fontSize:12,
+                    fontWeight:'600'
+                  }}>
+    Showing {startEntry} to {endEntry} of {pagination.total_records} entries
+  </Text>
+)}
+  {/* <Text style={{ color: '#fff', textAlign: 'center', marginVertical: 10 }}>
+    Showing {filteredSiteVisits?.length }
+  </Text> */}
         {/* Cards */}
         {isLoading ? (
           <Text style={{ color: '#fff', textAlign: 'center', marginTop: 20 }}>
@@ -891,6 +918,7 @@ readMore: {
     flexDirection: 'row',
     alignItems: 'center',
     margin: 15,
+    marginBottom:5,
     borderWidth: 1,
     borderColor: '#444',
     borderRadius: 20,

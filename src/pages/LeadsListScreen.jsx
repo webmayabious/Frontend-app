@@ -666,7 +666,7 @@ const LeadsListScreen = () => {
   const [showToPicker, setShowToPicker] = useState(false);
   const [activePicker, setActivePicker] = useState(null);
   const [appliedFilters, setAppliedFilters] = useState();
-
+ const [pagination, setPagination] = useState(null);
   const formatDate = date => {
     if (!date) return '';
     const d = new Date(date);
@@ -723,6 +723,12 @@ const LeadsListScreen = () => {
         },
       });
       console.log('lead data:', JSON.stringify(res?.data?.data?.[0], null, 2));
+          setPagination({
+    total_records: res.data.totalRecords,
+    total_pages: res.data.totalPages,
+    current_page: res.data.currentPage,
+    per_page: res.data.limit,
+  });
       return res.data;
     },
     getNextPageParam: lastPage => {
@@ -852,7 +858,16 @@ const LeadsListScreen = () => {
     setAppliedFilters(cleared);
     setShowFilterModal(false);
   };
+  const startEntry = pagination
+  ? (pagination.current_page - 1) * pagination.per_page + 1
+  : 0;
 
+const endEntry = pagination
+  ? Math.min(
+      pagination.current_page * pagination.per_page,
+      pagination.total_records
+    )
+  : 0;
   const scrollToTop = () => {
     isScrollingToTop.current = true;
     scrollRef.current?.scrollTo({ y: 0, animated: true });
@@ -940,7 +955,19 @@ const LeadsListScreen = () => {
             clearButtonMode="while-editing"
           />
         </View>
-
+{pagination && (
+  <Text  style={{
+                    alignSelf: 'flex-start',
+                    marginLeft: 15,
+                    // marginTop: 2,
+                    marginBottom: 8,
+                    color:'#a0b4e8',
+                    fontSize:12,
+                    fontWeight:'600'
+                  }}>
+    Showing {startEntry} to {endEntry} of {pagination.total_records} entries
+  </Text>
+)}
         {isLoading ? (
           <Text style={{ color: '#fff', textAlign: 'center', marginTop: 20 }}>
             Loading...
@@ -1059,7 +1086,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginHorizontal: 15,
-    marginBottom: 12,
+    marginBottom: 5,
     borderWidth: 1,
     borderColor: '#444',
     borderRadius: 22,
