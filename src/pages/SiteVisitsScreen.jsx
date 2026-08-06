@@ -1,4 +1,3 @@
-// FollowUpsScreen.js
 import React, { useRef, useState } from 'react';
 import {
   View,
@@ -20,6 +19,7 @@ import { useNavigation } from '@react-navigation/native';
 import { useQuery } from '@tanstack/react-query';
 import api from '../api/AxiosInstance';
 import { Dropdown } from 'react-native-element-dropdown';
+import DateTimePicker from '@react-native-community/datetimepicker';
 const STATUSBAR_HEIGHT =
   Platform.OS === 'android' ? StatusBar.currentHeight : 44;
 /* ================= CALL ================= */
@@ -314,7 +314,24 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => {
     </View>
   </View>
 )};
-
+const InputField = ({ label, placeholder, icon, value, onChange, onPress }) => (
+  <View style={styles.field}>
+    <Text style={styles.filterLabel}>{label}</Text>
+    <TouchableOpacity activeOpacity={0.8} onPress={onPress}>
+      <View style={styles.filterInputContainer}>
+        <TextInput
+          placeholder={placeholder}
+          placeholderTextColor="#7a8fc4"
+          style={styles.filterInput}
+          value={value}
+          onChangeText={onChange}
+          editable={!onPress}
+        />
+        {icon && <Icon name={icon} size={18} color="#00bcd4" />}
+      </View>
+    </TouchableOpacity>
+  </View>
+);
 // ✅ MAIN SCREEN
 const SiteVisitsScreen = () => {
   const navigation = useNavigation();
@@ -332,6 +349,8 @@ const SiteVisitsScreen = () => {
     location: null,
     status: null,
     lead_source: null,
+    siteVisitFromDate:null,
+    siteVisitToDate:null
   });
   const [appliedFilters, setAppliedFilters] = useState();
   const [showTopBtn, setShowTopBtn] = useState(false);
@@ -339,6 +358,8 @@ const SiteVisitsScreen = () => {
   const [allData, setAllData] = useState([]);
   const [hasMore, setHasMore] = useState(true);
   const [isFetchingMore, setIsFetchingMore] = useState(false);
+    const [showFromPicker, setShowFromPicker] = useState(false);
+    const [showToPicker, setShowToPicker] = useState(false);
   // const { data, isLoading } = useQuery({
   //   queryKey: ['SiteVisitandBookingsData', appliedFilters],
   //   queryFn: async () => {
@@ -374,6 +395,8 @@ const SiteVisitsScreen = () => {
           location: filters.location || undefined,
           status: filters.status || undefined,
           lead_source: filters.lead_source || undefined,
+          siteVisitFromDate:filters.siteVisitFromDate || undefined,
+          siteVisitToDate:filters.siteVisitToDate || undefined,
           page: pageNum,
         },
       });
@@ -419,6 +442,22 @@ const SiteVisitsScreen = () => {
     );
   });
   const scrollRef = useRef();
+ const onDateChange = (event, selectedDate, key) => {
+  if (key === 'siteVisitFromDate') {
+    setShowFromPicker(false);
+  } else if (key === 'siteVisitToDate') {
+    setShowToPicker(false);
+  }
+
+  if (event.type === 'dismissed' || !selectedDate) return;
+
+  const date = selectedDate.toISOString().split('T')[0];
+
+  setFilters(prev => ({
+    ...prev,
+    [key]: date,
+  }));
+};
   const { data: AllProperty } = useQuery({
     queryKey: ['AllProperty'],
     queryFn: async () => {
@@ -500,6 +539,8 @@ const SiteVisitsScreen = () => {
       location: null,
       status: null,
       lead_source: null,
+       siteVisitFromDate: null,
+  siteVisitToDate: null,
     };
 
     setFilters(cleared);
@@ -703,6 +744,48 @@ const SiteVisitsScreen = () => {
                 value={filters.status}
                 onChange={value => onChange('status', value)}
               />
+                  <View
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              width: '100%',
+            }}
+          >
+            <View style={{ width: '48%' }}>
+              <InputField
+                label="Site Visit From Date"
+                placeholder="YYYY-MM-DD"
+                icon="calendar-today"
+                value={filters.siteVisitFromDate }
+                onPress={() => setShowFromPicker(true)}
+              />
+            </View>
+            <View style={{ width: '48%' }}>
+              <InputField
+                label="Site Visit To Date"
+                placeholder="YYYY-MM-DD"
+                icon="calendar-today"
+                value={filters.siteVisitToDate}
+                onPress={() => setShowToPicker(true)}
+              />
+            </View>
+          </View>
+          {showFromPicker && (
+            <DateTimePicker
+              value={filters.siteVisitFromDate ? new Date(filters.siteVisitFromDate) : new Date()}
+              mode="date"
+              display="default"
+              onChange={(e, d) => onDateChange(e, d, 'siteVisitFromDate')}
+            />
+          )}
+          {showToPicker && (
+            <DateTimePicker
+              value={filters.siteVisitToDate ? new Date(filters.siteVisitToDate) : new Date()}
+              mode="date"
+              display="default"
+              onChange={(e, d) => onDateChange(e, d, 'siteVisitToDate')}
+            />
+          )}
             </ScrollView>
 
             <TouchableOpacity
@@ -934,16 +1017,27 @@ readMore: {
     alignItems: 'center',
   },
 
-  modalOverlay: {
-    position: 'absolute',
-    width: '100%',
-    height: '100%',
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    bottom: 45
-  },
-
+  // modalOverlay: {
+  //   position: 'absolute',
+  //   width: '100%',
+  //   height: '100%',
+  //   backgroundColor: 'rgba(0,0,0,0.6)',
+  //   justifyContent: 'center',
+  //   alignItems: 'center',
+  //   bottom: 45
+  // },
+modalOverlay: {
+  position: 'absolute',
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 80, // BottomNav height
+  backgroundColor: 'rgba(0,0,0,0.6)',
+  justifyContent: 'center',
+  alignItems: 'center',
+  zIndex: 999,
+  elevation: 999,
+},
   modalCard: {
     width: '88%',
     backgroundColor: '#1a1f6b', // deep navy base
@@ -1005,4 +1099,24 @@ readMore: {
     fontWeight: 'bold',
     flexShrink: 1,
   },
+   placeholderStyle: { color: '#7a8fc4', fontSize: 13 },
+  selectedTextStyle: { color: '#fff', fontSize: 13 },
+   field: { marginBottom: 12, width: '100%' },
+  filterInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffffff12',
+    borderWidth: 1,
+    borderColor: '#3d55cc',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    height: 40,
+  },
+    filterLabel: {
+    color: '#a0b4e8',
+    fontSize: 12,
+    marginBottom: 5,
+    fontWeight: '500',
+  },
+  filterInput: { flex: 1, color: '#fff', fontSize: 13, paddingVertical: 0 },
 });
