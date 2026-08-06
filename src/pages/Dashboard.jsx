@@ -66,7 +66,7 @@ const CARDS = (d, nav) => [
   },
   {
     icon: 'receipt-long',
-    label: 'Total Bookings / Total Agreements (Rs.) / Total Basebrokerage (Rs.)',
+    label: 'Total Bookings / Total Agreements (Rs.) / Total Brokerage (Rs.)',
     period: 'Month',
     accent: '#f472b6',
     value: `${d?.total_bookings_per_month ?? 0}  /  ₹${d?.total_agreement_value_per_month ?? 0}  /  ₹${d?.total_basebrokerage_value_per_month ?? 0}`,
@@ -74,7 +74,7 @@ const CARDS = (d, nav) => [
   },
   {
     icon: 'history',
-    label: 'Total Bookings / Total Agreements (Rs.) / Total Basebrokerage (Rs.)',
+    label: 'Total Bookings / Total Agreements (Rs.) / Total Brokerage (Rs.)',
     period: 'Till Date',
     accent: '#a78bfa',
     value: `${d?.total_booking_till_date ?? 0}  /  ₹${d?.total_agreement_value_till_date ?? 0}  /  ₹${d?.total_basebrokerage_value_till_date ?? 0}`,

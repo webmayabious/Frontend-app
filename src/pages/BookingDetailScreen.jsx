@@ -182,7 +182,7 @@ const BookingDetailScreen = ({ navigation, route }) => {
         {/* SALES */}
         <SectionCard title="SALES, DOCUMENTS & STATUS">
 
-          <InfoRow label="Base Brokerage:" value={data?.base_brokerage} />
+          <InfoRow label="Total Brokerage:" value={data?.base_brokerage} />
           <InfoRow label="Ladder Brokerage:" value={data?.ladder_brokerage} />
           <InfoRow label="Source:" value={data?.source} />
           <InfoRow label="Sales Manager:" value={data?.sales_manager} />

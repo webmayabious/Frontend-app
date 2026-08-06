@@ -25,7 +25,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { Dropdown } from 'react-native-element-dropdown';
 const STATUSBAR_HEIGHT =
   Platform.OS === 'android' ? StatusBar.currentHeight : 44;
-  const SCREEN_HEIGHT = Dimensions.get('window').height;
+const SCREEN_HEIGHT = Dimensions.get('window').height;
 /* ================= CALL ================= */
 // const makeCall = phoneNumber => {
 //   if (!phoneNumber) return;
@@ -292,7 +292,7 @@ const FilterModal = ({
               />
             </View>
           </View>
-  {showFromPicker && (
+          {showFromPicker && (
             <DateTimePicker
               value={filters.fromDate ? new Date(filters.fromDate) : new Date()}
               mode="date"
@@ -339,38 +339,9 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
     {/* Header */}
     <View style={styles.cardHeader}>
       <View style={styles.nameRow}>
-        <Text style={styles.name}>{data?.name}</Text>
+        <Text style={styles.name}>{data?.name || 'N/A'}</Text>
 
-        {/* <View
-          style={[
-            styles.activeBadge,
-            {
-              backgroundColor:
-                data?.active === '1'
-                  ? '#4caf50' // Active
-                  : data?.active === '2'
-                  ? '#f44336' // Inactive
-                  : data?.active === '3'
-                  ? '#2196f3' // Site Visit
-                  : data?.active === '4'
-                  ? '#ff9800' // Meeting Done
-                  : '#9c27b0', // Booking Done (or default)
-            },
-          ]}
-        >
-          <Text style={styles.activeText}>
-            {data?.active === '1'
-              ? 'Active'
-              : data?.active === '2'
-              ? 'Inactive'
-              : data?.active === '3'
-              ? 'Site Visit'
-              : data?.active === '4'
-              ? 'Meeting Done'
-              : 'Booking Done'}
-          </Text>
-        </View> */}
-              <View
+        <View
           style={[
             styles.activeBadge,
             {
@@ -378,8 +349,8 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
                 data?.active === '1'
                   ? '#4caf50'
                   : data?.active === '5'
-                  ? '#6b7785'
-                  : '#f44336',
+                    ? '#6b7785'
+                    : '#f44336',
             },
           ]}
         >
@@ -387,105 +358,122 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
             {data?.active === '1'
               ? 'Active'
               : data?.active === '5'
-              ? 'Booking Done'
-              : 'Inactive'}
+                ? 'Booking Done'
+                : 'Inactive'}
           </Text>
         </View>
       </View>
 
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          flexShrink: 0,
-        }}
-      >
-        {/* ✅ REMARKS BUTTON */}
-        {/* <TouchableOpacity
-          style={styles.remarksBtn}
-          onPress={() => {
-            setRemarksText(data?.propertyfeedbacks
-          ?.map(x => x?.remarks)
-          .join(', ') || 'No remarks available');
-            setShowRemarks(true);
-          }}
-        >
-          <Text style={styles.remarksText}>Remarks</Text>
-        </TouchableOpacity> */}
-        {/* 
-        <Icon
-          name="edit"
-          size={18}
-          color="#00e5ff"
-          style={{ marginLeft: 8 }}
-          onPress={() =>
-            navigation.navigate('MeetingsEdit', {
-              id: data?.id,
-            })
-          }
-        /> */}
-        <Icon
-          name="visibility"
-          size={18}
-          color="#00e5ff"
-          style={{ marginLeft: 8 }}
-          onPress={() =>
-            navigation.navigate('BookingDetailScreen', {
-              id: data.id,
-              data: data,
-            })
-          }
-        />
-      </View>
+      <Icon
+        name="visibility"
+        size={20}
+        color="#00e5ff"
+        onPress={() =>
+          navigation.navigate('BookingDetailScreen', {
+            id: data?.id,
+            data: data,
+          })
+        }
+      />
     </View>
 
-    {/* Info */}
+    {/* Project & Location */}
     <Text style={styles.location}>
-      {data?.propertyproject?.project_name} | {data?.propertylocation?.name}
+      {data?.propertyproject?.project_name || 'N/A'} |{' '}
+      {data?.propertylocation?.name || 'N/A'}
     </Text>
-    <View style={styles.rowBetween}>
-        <TouchableOpacity onPress={() => makeCall(data?.mobile)}>
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Text style={styles.label}>Phone:{' '}</Text>
-  
-            {/* <View style={styles.remarksBtn}> */}
-              <Text style={styles.phoneText}>
-                {data?.mobile || 'N/A'}
-              </Text>
-            {/* </View> */}
-          </View>
-        </TouchableOpacity>
-  
-      </View>
-      <View style={styles.rowBetween}>
-  
-        <TouchableOpacity
-  
-          onPress={() => sendMail(data?.email)}
-  
-        >
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Text style={styles.label}>Email:{' '}</Text>
-  
-  
-            <Text style={styles.emailText}>
-              {data?.email || 'N/A'}
-            </Text>
-  
-          </View>
-        </TouchableOpacity>
-      </View>
+
+    {/* Customer Name */}
     <View style={styles.rowBetween}>
       <Text style={styles.label}>
-        <Text style={styles.label}>
-          Site Visit Date:
-          <Text style={styles.value}>
-            {' '}
-            {data?.propertyfeedbacks?.map(x => x?.site_visit_date).join(', ')}
-          </Text>
+        Customer Name:{' '}
+        <Text style={styles.value}>
+          {data?.customer_name || data?.name || 'N/A'}
         </Text>
       </Text>
+    </View>
 
+    {/* Project */}
+    {/* <View style={styles.rowBetween}>
+      <Text style={styles.label}>
+        Project:{' '}
+        <Text style={styles.value}>
+          {data?.propertyproject?.project_name || 'N/A'}
+        </Text>
+      </Text>
+    </View> */}
+
+    {/* Booking Date */}
+    <View style={styles.rowBetween}>
+      <Text style={styles.label}>
+        Booking Date:{' '}
+        <Text style={styles.value}>
+          {data?.date_of_booking ||
+            'N/A'}
+        </Text>
+      </Text>
+    </View>
+
+    {/* Location */}
+    <View style={styles.rowBetween}>
+      <Text style={styles.label}>
+        Location:{' '}
+        <Text style={styles.value}>
+          {data?.propertylocation?.name || 'N/A'}
+        </Text>
+      </Text>
+    </View>
+
+    {/* Total Brokerage */}
+    <View style={styles.rowBetween}>
+      <Text style={styles.label}>
+        Total Brokerage:{' '}
+        <Text style={styles.value}>
+          ₹ {data?.base_brokerage ?? '0'}
+        </Text>
+      </Text>
+    </View>
+
+    {/* Phone */}
+    <View style={styles.rowBetween}>
+      <TouchableOpacity onPress={() => makeCall(data?.mobile)}>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <Text style={styles.label}>Phone: </Text>
+          <Text style={styles.phoneText}>
+            {data?.mobile || 'N/A'}
+          </Text>
+        </View>
+      </TouchableOpacity>
+    </View>
+
+    {/* Email */}
+    <View style={styles.rowBetween}>
+      <TouchableOpacity onPress={() => sendMail(data?.email)}>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <Text style={styles.label}>Email: </Text>
+          <Text style={styles.emailText}>
+            {data?.email || 'N/A'}
+          </Text>
+        </View>
+      </TouchableOpacity>
+    </View>
+
+    {/* Site Visit Date */}
+    {/* <View style={styles.rowBetween}>
+      <Text style={styles.label}>
+        Site Visit Date:{' '}
+        <Text style={styles.value}>
+          {data?.propertyfeedbacks?.length
+            ? data.propertyfeedbacks
+                .map(x => x?.site_visit_date)
+                .join(', ')
+            : 'N/A'}
+        </Text>
+      </Text>
+    </View> */}
+
+    {/* RM */}
+    <View style={styles.rowBetween}>
       <Text style={styles.label}>
         RM:{' '}
         <Text style={styles.value}>
@@ -496,30 +484,15 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
       </Text>
     </View>
 
-    <Text style={{ color: '#fb9e08', fontSize: 12, marginTop: 4 }}>
-      Lead Source:{' '}
-      <Text style={styles.value}>{data?.mrreference?.mrf_name}</Text>
-    </Text>
-
-    {/* Footer */}
-    {/* <View style={styles.cardFooter}>
-      <TouchableOpacity
-        style={styles.button}
-        onPress={() =>
-          navigation.navigate('AllInteractionsScreen', {
-            id: data?.id,
-          })
-        }
-      >
-        <Text style={styles.buttonText}>View Interaction</Text>
-      </TouchableOpacity>
-
-      <Text style={styles.completed}>
-        {data?.propertyfeedbacks
-          ?.map(x => x.propertycallstatus?.name)
-          .join(', ')||'N/A'}
+    {/* Source */}
+    <View style={styles.rowBetween}>
+      <Text style={styles.label}>
+        Source:{' '}
+        <Text style={styles.value}>
+          {data?.mrreference?.mrf_name || 'N/A'}
+        </Text>
       </Text>
-    </View> */}
+    </View>
   </View>
 );
 
@@ -528,53 +501,53 @@ const TotalBookingsAgreementsTillDateScreen = () => {
   const [showRemarks, setShowRemarks] = useState(false);
   const [remarksText, setRemarksText] = useState('');
   const [searchText, setSearchText] = useState('');
-   const [showFilterModal, setShowFilterModal] = useState(false);
-  
-    const [filters, setFilters] = useState({
-      company_id: null,
-      rm: null,
-      fromDate: null,
-      toDate: null,
-      project: null,
-      location: null,
-      booking_approval_status: null,
-      lead_status: null,
-      lead_sub_status: null,
-      lead_qualification: null,
-      call_status: null,
-      siteVisitFromDate: null,
-      siteVisitToDate: null,
-      lead_source: null,
-    });
-    const [appliedFilters, setAppliedFilters] = useState();
-    const [showFromPicker, setShowFromPicker] = useState(false);
-    const [showToPicker, setShowToPicker] = useState(false);
-    const [activePicker, setActivePicker] = useState(null);
+  const [showFilterModal, setShowFilterModal] = useState(false);
+
+  const [filters, setFilters] = useState({
+    company_id: null,
+    rm: null,
+    fromDate: null,
+    toDate: null,
+    project: null,
+    location: null,
+    booking_approval_status: null,
+    lead_status: null,
+    lead_sub_status: null,
+    lead_qualification: null,
+    call_status: null,
+    siteVisitFromDate: null,
+    siteVisitToDate: null,
+    lead_source: null,
+  });
+  const [appliedFilters, setAppliedFilters] = useState();
+  const [showFromPicker, setShowFromPicker] = useState(false);
+  const [showToPicker, setShowToPicker] = useState(false);
+  const [activePicker, setActivePicker] = useState(null);
   /* ================= API ================= */
   const { data: Lead, isLoading } = useQuery({
-    queryKey: ['totalBookingAndAgreementTillDate',appliedFilters],
+    queryKey: ['totalBookingAndAgreementTillDate', appliedFilters],
     queryFn: async ({ pageParam = 1 }) => {
       const res = await api.get('/api/pm/totalBookingAndAgreementTillDate', {
-          params: {
-            page: pageParam,
-            limit: 20,
-            company_id: filters.company_id || undefined,
-            rm: filters.rm || undefined,
-            fromDate: filters.fromDate || undefined,
-            toDate: filters.toDate || undefined,
-            project: filters.project || undefined,
-            location: filters.location || undefined,
-            // active: filters.active || undefined,
-            booking_approval_status: filters.booking_approval_status || undefined,
-            lead_status: filters.lead_status || undefined,
-            lead_sub_status: filters.lead_sub_status || undefined,
-            lead_qualification: filters.lead_qualification || undefined,
-            call_status: filters.call_status || undefined,
-            siteVisitFromDate: filters.siteVisitFromDate || undefined,
-            siteVisitToDate: filters.siteVisitToDate || undefined,
-            reference: filters.lead_source || undefined,
-          },
-        },);
+        params: {
+          page: pageParam,
+          limit: 20,
+          company_id: filters.company_id || undefined,
+          rm: filters.rm || undefined,
+          fromDate: filters.fromDate || undefined,
+          toDate: filters.toDate || undefined,
+          project: filters.project || undefined,
+          location: filters.location || undefined,
+          // active: filters.active || undefined,
+          booking_approval_status: filters.booking_approval_status || undefined,
+          lead_status: filters.lead_status || undefined,
+          lead_sub_status: filters.lead_sub_status || undefined,
+          lead_qualification: filters.lead_qualification || undefined,
+          call_status: filters.call_status || undefined,
+          siteVisitFromDate: filters.siteVisitFromDate || undefined,
+          siteVisitToDate: filters.siteVisitToDate || undefined,
+          reference: filters.lead_source || undefined,
+        },
+      },);
       return res?.data?.data?.Bookings;
     },
   });
@@ -590,7 +563,7 @@ const TotalBookingsAgreementsTillDateScreen = () => {
     );
   });
   // console.log('siteVisits1', Lead);
-   const { data: AllProperty } = useQuery({
+  const { data: AllProperty } = useQuery({
     queryKey: ['AllProperty'],
     queryFn: async () => {
       const res = await api.get('/api/pm/getAllPropertyLocation');
@@ -663,15 +636,22 @@ const TotalBookingsAgreementsTillDateScreen = () => {
   const scrollRef = useRef();
 
 
- const onDateChange = (event, selectedDate, key) => {
-  const isFrom = key === 'fromDate';
+  const onDateChange = (event, selectedDate, key) => {
+    if (key === 'fromDate') {
+      setShowFromPicker(false);
+    } else {
+      setShowToPicker(false);
+    }
 
-  if (isFrom) {
-    setShowFromPicker(false);
-  } else {
-    setActivePicker(false);
-  }
-}
+    if (event.type === 'dismissed' || !selectedDate) return;
+
+    const date = selectedDate.toISOString().split('T')[0];
+
+    setFilters(prev => ({
+      ...prev,
+      [key]: date,
+    }));
+  };
   const scrollToTop = () => {
     scrollRef.current?.scrollTo({ y: 0, animated: true });
   };
@@ -731,15 +711,15 @@ const TotalBookingsAgreementsTillDateScreen = () => {
             placeholderTextColor="#aaa"
             value={searchText}
             onChangeText={setSearchText}
-            style={{ marginLeft: 8, color: '#fff', flex: 1,height: '100%',   paddingVertical: Platform.OS === 'ios' ? 0 : 6, }}
+            style={{ marginLeft: 8, color: '#fff', flex: 1, height: '100%', paddingVertical: Platform.OS === 'ios' ? 0 : 6, }}
           />
         </View>
- <TouchableOpacity
+        <TouchableOpacity
           style={{
             alignSelf: 'flex-end',
             marginRight: 16,
-                marginTop: 8,
-            marginBottom:8
+            marginTop: 8,
+            marginBottom: 8
           }}
           onPress={() => setShowFilterModal(true)}
         >
@@ -766,7 +746,7 @@ const TotalBookingsAgreementsTillDateScreen = () => {
             No data found
           </Text>
         )}
-         <View style={{ height: 100 }} />
+        <View style={{ height: 100 }} />
       </ScrollView>
       {/* ✅ REMARKS MODAL */}
       {showRemarks && (
@@ -789,7 +769,7 @@ const TotalBookingsAgreementsTillDateScreen = () => {
           </View>
         </View>
       )}
-       <FilterModal
+      <FilterModal
         visible={showFilterModal}
         onClose={() => setShowFilterModal(false)}
         filters={filters}
@@ -806,7 +786,7 @@ const TotalBookingsAgreementsTillDateScreen = () => {
         setActivePicker={setActivePicker}
         activePicker={activePicker}
         setShowFromPicker={setShowFromPicker}
-setShowToPicker={setShowToPicker}
+        setShowToPicker={setShowToPicker}
       />
       {showTopBtn && (
         <TouchableOpacity style={styles.topButton} onPress={scrollToTop}>
@@ -857,7 +837,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     margin: 15,
-    marginBottom:0,
+    marginBottom: 0,
     borderWidth: 1,
     borderColor: '#444',
     borderRadius: 20,
@@ -875,7 +855,7 @@ const styles = StyleSheet.create({
     padding: 12,
     backgroundColor: '#ffffff20',
   },
- emailText: {
+  emailText: {
     color: '#00acc1',
     textDecorationLine: 'underline',
     fontWeight: '500',
@@ -908,13 +888,13 @@ const styles = StyleSheet.create({
     maxWidth: 80,
   },
   phoneText: {
-  color: '#00acc1',
-  backgroundColor: 'rgba(0, 172, 193, 0.15)',
-  paddingHorizontal: 4,
-  paddingVertical: 2,
-  borderRadius: 4,
-  fontWeight: '600',
-},
+    color: '#00acc1',
+    backgroundColor: 'rgba(0, 172, 193, 0.15)',
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    borderRadius: 4,
+    fontWeight: '600',
+  },
   remarksText: { color: '#fff', fontSize: 10 },
 
   location: {
@@ -987,18 +967,18 @@ const styles = StyleSheet.create({
   //   justifyContent: 'center',
   //   alignItems: 'center',
   // },
-modalOverlay: {
-  position: 'absolute',
-  top: 0,
-  left: 0,
-  right: 0,
-  bottom: 80, // BottomNav height
-  backgroundColor: 'rgba(0,0,0,0.6)',
-  justifyContent: 'center',
-  alignItems: 'center',
-  zIndex: 999,
-  elevation: 999,
-},
+  modalOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 80, // BottomNav height
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 999,
+    elevation: 999,
+  },
   modalCard: {
     width: '85%',
     backgroundColor: '#2f2f8f',
@@ -1056,7 +1036,7 @@ modalOverlay: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-   filterModalCard: {
+  filterModalCard: {
     width: '88%',
     maxHeight: SCREEN_HEIGHT * 0.72,
     backgroundColor: '#1a1f6b',
@@ -1139,8 +1119,7 @@ modalOverlay: {
     alignItems: 'center',
   },
   dropdownContainer: { backgroundColor: '#fff', borderRadius: 8 },
-  placeholderStyle: { color: '#7a8fc4', fontSize: 13 },
-  selectedTextStyle: { color: '#fff', fontSize: 13 },
+ 
 
   field: { marginBottom: 12, width: '100%' },
   filterInputContainer: {
