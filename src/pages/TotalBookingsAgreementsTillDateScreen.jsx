@@ -1120,7 +1120,7 @@ const styles = StyleSheet.create({
   },
   dropdownContainer: { backgroundColor: '#fff', borderRadius: 8 },
  
-
+  placeholderStyle: { color: '#7a8fc4', fontSize: 13 },
   field: { marginBottom: 12, width: '100%' },
   filterInputContainer: {
     flexDirection: 'row',

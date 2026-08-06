@@ -21,6 +21,7 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import Header from '../Layout/Header';
 import BottomNav from '../navigations/BottomNav';
 import { Dropdown } from 'react-native-element-dropdown';
+import DateTimePicker from '@react-native-community/datetimepicker';
 const STATUSBAR_HEIGHT =
   Platform.OS === 'android' ? StatusBar.currentHeight : 44;
 
@@ -129,6 +130,24 @@ const DropdownField = ({ label, data, placeholder, value, onChange }) => {
     </View>
   );
 };
+const InputField = ({ label, placeholder, icon, value, onChange, onPress }) => (
+  <View style={styles.field}>
+    <Text style={styles.filterLabel}>{label}</Text>
+    <TouchableOpacity activeOpacity={0.8} onPress={onPress}>
+      <View style={styles.filterInputContainer}>
+        <TextInput
+          placeholder={placeholder}
+          placeholderTextColor="#7a8fc4"
+          style={styles.filterInput}
+          value={value}
+          onChangeText={onChange}
+          editable={!onPress}
+        />
+        {icon && <Icon name={icon} size={18} color="#00bcd4" />}
+      </View>
+    </TouchableOpacity>
+  </View>
+);
 const RemarksText = ({ remarks }) => {
   const [expanded, setExpanded] = useState(false);
 
@@ -239,6 +258,15 @@ const LeadCard = ({ item, navigation, setShowRemarks, setRemarksText }) => {
              <Text style={styles.remarksBtn}>{data?.propertylead?.phone || 'N/A'}</Text>
            </Text>
          </TouchableOpacity> */}
+          <View style={styles.rowBetween}>
+               <Text style={styles.label}>
+                 Lead Assigned Date:{' '}
+                 <Text style={styles.value}>
+                   {item?.lead_assigned_date ||
+                     'N/A'}
+                 </Text>
+               </Text>
+             </View>
          <TouchableOpacity onPress={() => makeCall(item?.phone)}>
            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
              <Text style={styles.label}>Phone:{' '}</Text>
@@ -354,8 +382,11 @@ const MissedFollowup = () => {
     location: null,
     active: null,
     lead_source: null,
+ 
   });
   const [appliedFilters, setAppliedFilters] = useState();
+    const [showFromPicker, setShowFromPicker] = useState(false);
+    const [showToPicker, setShowToPicker] = useState(false);
   const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } =
     useInfiniteQuery({
       queryKey: ['MissedFollowups', appliedFilters],
@@ -465,7 +496,22 @@ const MissedFollowup = () => {
   const onChange = (key, value) => {
     setFilters(prev => ({ ...prev, [key]: value }));
   };
+  const onDateChange = (event, selectedDate, key) => {
+    if (key === 'fromDate') {
+      setShowFromPicker(false);
+    } else {
+      setShowToPicker(false);
+    }
 
+    if (event.type === 'dismissed' || !selectedDate) return;
+
+    const date = selectedDate.toISOString().split('T')[0];
+
+    setFilters(prev => ({
+      ...prev,
+      [key]: date,
+    }));
+  };
   const applyFilter = () => {
     setAppliedFilters(filters);
     setShowFilterModal(false);
@@ -681,6 +727,48 @@ const MissedFollowup = () => {
                 value={filters.status}
                 onChange={value => onChange('status', value)}
               />
+                 <View
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              width: '100%',
+            }}
+          >
+            <View style={{ width: '48%' }}>
+              <InputField
+                label="From Date"
+                placeholder="YYYY-MM-DD"
+                icon="calendar-today"
+                value={filters.fromDate}
+                onPress={() => setShowFromPicker(true)}
+              />
+            </View>
+            <View style={{ width: '48%' }}>
+              <InputField
+                label="To Date"
+                placeholder="YYYY-MM-DD"
+                icon="calendar-today"
+                value={filters.toDate}
+                onPress={() => setShowToPicker(true)}
+              />
+            </View>
+          </View>
+          {showFromPicker && (
+            <DateTimePicker
+              value={filters.fromDate ? new Date(filters.fromDate) : new Date()}
+              mode="date"
+              display="default"
+              onChange={(e, d) => onDateChange(e, d, 'fromDate')}
+            />
+          )}
+          {showToPicker && (
+            <DateTimePicker
+              value={filters.toDate ? new Date(filters.toDate) : new Date()}
+              mode="date"
+              display="default"
+              onChange={(e, d) => onDateChange(e, d, 'toDate')}
+            />
+          )}
             </ScrollView>
 
             <TouchableOpacity
@@ -949,4 +1037,22 @@ label: {
   dropdownContainer: { backgroundColor: '#fff', borderRadius: 8 },
   placeholderStyle: { color: '#aaa', fontSize: 13 },
   selectedTextStyle: { color: '#fff', fontSize: 13 },
+   field: { marginBottom: 12, width: '100%' },
+  filterInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffffff12',
+    borderWidth: 1,
+    borderColor: '#3d55cc',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    height: 40,
+  },
+     filterLabel: {
+    color: '#a0b4e8',
+    fontSize: 12,
+    marginBottom: 5,
+    fontWeight: '500',
+  },
+  filterInput: { flex: 1, color: '#fff', fontSize: 13, paddingVertical: 0 },
 });

@@ -263,6 +263,44 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
     <Text style={styles.location}>
       {data?.propertyproject?.project_name} | {data?.propertylocation?.name}
     </Text>
+      {/* Customer Name */}
+        <View style={styles.rowBetween}>
+          <Text style={styles.label}>
+            Customer Name:{' '}
+            <Text style={styles.value}>
+              {data?.customer_name || data?.name || 'N/A'}
+            </Text>
+          </Text>
+        </View>
+          {/* Booking Date */}
+            <View style={styles.rowBetween}>
+              <Text style={styles.label}>
+                Booking Date:{' '}
+                <Text style={styles.value}>
+                  {data?.date_of_booking ||
+                    'N/A'}
+                </Text>
+              </Text>
+            </View>
+             {/* Location */}
+                <View style={styles.rowBetween}>
+                  <Text style={styles.label}>
+                    Location:{' '}
+                    <Text style={styles.value}>
+                      {data?.propertylocation?.name || 'N/A'}
+                    </Text>
+                  </Text>
+                </View>
+            
+                {/* Total Brokerage */}
+                <View style={styles.rowBetween}>
+                  <Text style={styles.label}>
+                    Total Brokerage:{' '}
+                    <Text style={styles.value}>
+                      ₹ {data?.base_brokerage ?? '0'}
+                    </Text>
+                  </Text>
+                </View>
     <View style={styles.rowBetween}>
       <TouchableOpacity onPress={() => makeCall(data?.mobile)}>
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -284,7 +322,7 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
       </TouchableOpacity>
     </View>
     <View style={styles.rowBetween}>
-      <Text style={styles.label}>
+      {/* <Text style={styles.label}>
         <Text style={styles.label}>
           Site Visit Date:
           <Text style={styles.value}>
@@ -292,7 +330,7 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
             {data?.propertyfeedbacks?.map(x => x?.site_visit_date).join(', ')}
           </Text>
         </Text>
-      </Text>
+      </Text> */}
 
       <Text style={styles.label}>
         RM:{' '}
@@ -669,9 +707,17 @@ const onDateChange = (event, selectedDate, key) => {
   if (isFrom) {
     setShowFromPicker(false);
   } else {
-    setActivePicker(false);
+    setShowToPicker(false);
   }
-}
+
+  // Android-এ Cancel চাপলে event.type === 'dismissed' 
+  if (event.type === 'dismissed' || !selectedDate) {
+    return;
+  }
+
+  const formatted = selectedDate.toISOString().split('T')[0]; // YYYY-MM-DD
+  onChange(key, formatted);
+};
   const scrollToTop = () => {
     scrollRef.current?.scrollTo({ y: 0, animated: true });
   };
