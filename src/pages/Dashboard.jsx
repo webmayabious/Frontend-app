@@ -51,7 +51,7 @@ const CARDS = (d, nav) => [
   {
   icon: 'place',
   label: 'Site Visit',
-  period: 'Month / Till Date',
+  period: 'Monthly / Till Date',
   accent: '#f472b6',
   value: `${d?.monthly_site_visits ?? 0}  /  ${d?.site_visits_till_date ?? 0} `,
   route: 'SiteVisitsScreen',
@@ -82,7 +82,7 @@ const CARDS = (d, nav) => [
   },
   {
     icon: 'notifications-off',
-    label: 'Missed Follow Up',
+    label: 'Missed Followups',
     period: 'Till Date',
     accent: '#a78bfa',
     value: `${d?.total_missed_callback ?? 0}`,

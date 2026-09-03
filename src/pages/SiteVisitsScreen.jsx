@@ -348,7 +348,7 @@ const SiteVisitsScreen = () => {
     project: null,
     location: null,
     status: null,
-    lead_source: null,
+    reference: null,
     siteVisitFromDate:null,
     siteVisitToDate:null
   });
@@ -395,7 +395,7 @@ const SiteVisitsScreen = () => {
           project: filters.project || undefined,
           location: filters.location || undefined,
           status: filters.status || undefined,
-          lead_source: filters.lead_source || undefined,
+          reference: filters.lead_source || undefined,
           siteVisitFromDate:filters.siteVisitFromDate || undefined,
           siteVisitToDate:filters.siteVisitToDate || undefined,
           page: pageNum,
@@ -550,7 +550,7 @@ const endEntry = pagination
       project: null,
       location: null,
       status: null,
-      lead_source: null,
+      reference: null,
        siteVisitFromDate: null,
   siteVisitToDate: null,
     };

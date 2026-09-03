@@ -405,6 +405,14 @@ const FollowUpsScreen = () => {
   const followUps = data?.pages?.flatMap(page => page.todays_followUps) || [];
   const meetings = data?.pages?.flatMap(page => page.todays_meetings) || [];
 
+  // ✅ Total record count reported by the server (last page carries the latest total)
+  const lastPagePagination = data?.pages?.[data.pages.length - 1]?.pagination;
+  const totalFollowUpsCount =
+    lastPagePagination?.total ??
+    lastPagePagination?.totalRecords ??
+    lastPagePagination?.totalCount ??
+    null;
+
   const filteredfollowUps = followUps.filter(item => {
     const name = item?.propertylead?.name?.toLowerCase() || '';
     const phone = item?.propertylead?.phone || '';
@@ -571,7 +579,9 @@ const FollowUpsScreen = () => {
         <FlatList
           ref={scrollRef}
           data={filteredfollowUps}
-          keyExtractor={(visit, i) => String(visit.id || i)}
+          keyExtractor={(visit, i) =>
+            visit?.id != null ? `followup-${visit.id}` : `followup-idx-${i}`
+          }
           renderItem={({ item }) => (
             <FollowCard
               data={item}
@@ -582,16 +592,24 @@ const FollowUpsScreen = () => {
           )}
           showsVerticalScrollIndicator={false}
           ListHeaderComponent={
-            <View style={styles.searchBox}>
-              <Icon name="search" size={18} color="#aaa" />
-              <TextInput
-                placeholder="Search name / phone / email..."
-                placeholderTextColor="#aaa"
-                value={searchText}
-                onChangeText={setSearchText}
-                style={{ marginLeft: 8, color: '#fff', flex: 1 }}
-              />
-            </View>
+            <>
+              <View style={styles.searchBox}>
+                <Icon name="search" size={18} color="#aaa" />
+                <TextInput
+                  placeholder="Search name / phone / email..."
+                  placeholderTextColor="#aaa"
+                  value={searchText}
+                  onChangeText={setSearchText}
+                  style={{ marginLeft: 8, color: '#fff', flex: 1 }}
+                />
+              </View>
+
+              {/* COUNT */}
+              <Text style={styles.countText}>
+                Showing {filteredfollowUps?.length || 0}
+                {totalFollowUpsCount != null ? ` of ${totalFollowUpsCount}` : ''} Follow Ups
+              </Text>
+            </>
           }
           ListEmptyComponent={
             <Text
@@ -781,12 +799,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     margin: 15,
+    marginBottom: 0,
     borderWidth: 1,
     borderColor: '#444',
     borderRadius: 20,
     paddingHorizontal: 10,
     marginTop: 0,
     height: Platform.OS === 'ios' ? 45 : 45,
+  },
+
+  countText: {
+    color: '#a0b4e8',
+    fontSize: 12,
+    fontWeight: '600',
+    marginHorizontal: 15,
+    marginTop: 8,
+    marginBottom: 8,
   },
 
   card: {

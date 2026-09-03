@@ -588,7 +588,9 @@ const TotalBookingsAgreementsPerMonth = () => {
         {
           params: {
             page: pageParam,
-            limit: 20,
+            // ⚠️ 'all' চেষ্টা করো; backend সাপোর্ট না করলে একটা বড় সংখ্যা
+            // (যেমন 1000) বসাও, যাতে সব রেকর্ড একবারেই আসে।
+            limit: 'all',
             company_id: filters.company_id || undefined,
             rm: filters.rm || undefined,
             fromDate: filters.fromDate || undefined,
@@ -616,7 +618,7 @@ const TotalBookingsAgreementsPerMonth = () => {
     const name = item?.name?.toLowerCase() || '';
     const phone = item?.mobile || '';
     const email = item?.email?.toLowerCase() || '';
-    const office_location = item?.office_location.toLowerCase() || '';
+    const office_location = item?.office_location?.toLowerCase() || '';
 
     const search = searchText.toLowerCase();
 
@@ -786,17 +788,18 @@ const onDateChange = (event, selectedDate, key) => {
             }}
           />
         </View>
-        <TouchableOpacity
-          style={{
-            alignSelf: 'flex-end',
-            marginRight: 16,
-            marginTop: 8,
-            marginBottom:8
-          }}
-          onPress={() => setShowFilterModal(true)}
-        >
-          <Icon name="filter-alt" size={18} color="#00e5ff" />
-        </TouchableOpacity>
+
+        {/* COUNT + FILTER (same line) */}
+        <View style={styles.countFilterRow}>
+          <Text style={styles.countText}>
+            Showing {filteredfollowUps?.length || 0}
+            {Lead?.length != null ? ` of ${Lead.length}` : ''} Records
+          </Text>
+
+          <TouchableOpacity onPress={() => setShowFilterModal(true)}>
+            <Icon name="filter-alt" size={18} color="#00e5ff" />
+          </TouchableOpacity>
+        </View>
         {isLoading ? (
           <Text style={{ color: '#fff', textAlign: 'center', marginTop: 20 }}>
             Loading...
@@ -804,7 +807,7 @@ const onDateChange = (event, selectedDate, key) => {
         ) : filteredfollowUps?.length > 0 ? (
           filteredfollowUps?.map((visit, i) => (
             <SiteCard
-              key={visit.id || i}
+              key={visit?.id != null ? `booking-${visit.id}` : `booking-idx-${i}`}
               data={visit}
               setShowRemarks={setShowRemarks}
               setRemarksText={setRemarksText}
@@ -916,6 +919,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     marginTop: 0,
     height: Platform.OS === 'ios' ? 45 : 45,
+  },
+
+  countFilterRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginHorizontal: 15,
+    marginTop: 8,
+    marginBottom: 8,
+  },
+
+  countText: {
+    color: '#a0b4e8',
+    fontSize: 12,
+    fontWeight: '600',
   },
 
   card: {

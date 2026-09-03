@@ -530,7 +530,7 @@ const TotalBookingsAgreementsTillDateScreen = () => {
       const res = await api.get('/api/pm/totalBookingAndAgreementTillDate', {
         params: {
           page: pageParam,
-          limit: 20,
+          limit: 'all',
           company_id: filters.company_id || undefined,
           rm: filters.rm || undefined,
           fromDate: filters.fromDate || undefined,
@@ -714,17 +714,18 @@ const TotalBookingsAgreementsTillDateScreen = () => {
             style={{ marginLeft: 8, color: '#fff', flex: 1, height: '100%', paddingVertical: Platform.OS === 'ios' ? 0 : 6, }}
           />
         </View>
-        <TouchableOpacity
-          style={{
-            alignSelf: 'flex-end',
-            marginRight: 16,
-            marginTop: 8,
-            marginBottom: 8
-          }}
-          onPress={() => setShowFilterModal(true)}
-        >
-          <Icon name="filter-alt" size={18} color="#00e5ff" />
-        </TouchableOpacity>
+
+        {/* COUNT + FILTER (same line) */}
+        <View style={styles.countFilterRow}>
+          <Text style={styles.countText}>
+            Showing {filteredfollowUps?.length || 0}
+            {Lead?.length != null ? ` of ${Lead.length}` : ''} Records
+          </Text>
+
+          <TouchableOpacity onPress={() => setShowFilterModal(true)}>
+            <Icon name="filter-alt" size={18} color="#00e5ff" />
+          </TouchableOpacity>
+        </View>
         {isLoading ? (
           <Text style={{ color: '#fff', textAlign: 'center', marginTop: 20 }}>
             Loading...
@@ -732,7 +733,7 @@ const TotalBookingsAgreementsTillDateScreen = () => {
         ) : filteredfollowUps?.length > 0 ? (
           filteredfollowUps?.map((visit, i) => (
             <SiteCard
-              key={visit.id || i}
+              key={visit?.id != null ? `booking-${visit.id}` : `booking-idx-${i}`}
               data={visit}
               setShowRemarks={setShowRemarks}
               setRemarksText={setRemarksText}
@@ -844,6 +845,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     marginTop: 0,
     height: Platform.OS === 'ios' ? 45 : 45,
+  },
+
+  countFilterRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginHorizontal: 15,
+    marginTop: 8,
+    marginBottom: 8,
+  },
+
+  countText: {
+    color: '#a0b4e8',
+    fontSize: 12,
+    fontWeight: '600',
   },
 
   card: {
@@ -1132,5 +1148,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     height: 40,
   },
+   selectedTextStyle: { color: '#fff', fontSize: 13 },
   filterInput: { flex: 1, color: '#fff', fontSize: 13, paddingVertical: 0 },
 });

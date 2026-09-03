@@ -416,6 +416,26 @@ const MissedFollowup = () => {
 
   const leads = data?.pages?.flatMap(page => page.data) || [];
 
+  // ✅ Dedupe leads by id — prevents "same key" warnings & duplicate cards
+  // caused by overlapping pagination results.
+  const uniqueLeadsMap = new Map();
+  leads.forEach(item => {
+    if (item?.id != null) {
+      uniqueLeadsMap.set(item.id, item);
+    }
+  });
+  const uniqueLeads = Array.from(uniqueLeadsMap.values());
+
+  // ✅ Total count from server (last page carries the latest total/totalPages).
+  // Adjust the field name below (total / totalRecords / totalCount) to match
+  // whatever your API actually returns.
+  const lastPageData = data?.pages?.[data.pages.length - 1];
+  const totalCount =
+    lastPageData?.total ??
+    lastPageData?.totalRecords ??
+    lastPageData?.totalCount ??
+    null;
+
   // ✅ Infinite scroll handler — scroll position দেখে trigger করে
   const handleLoadMore = () => {
     if (hasNextPage && !isFetchingNextPage) {
@@ -423,7 +443,7 @@ const MissedFollowup = () => {
     }
   };
 
-  const filteredLeads = leads.filter(item => {
+  const filteredLeads = uniqueLeads.filter(item => {
     const search = searchText.toLowerCase();
     return (
       item?.name?.toLowerCase().includes(search) ||
@@ -625,6 +645,12 @@ const MissedFollowup = () => {
           />
         </View>
 
+        {/* COUNT */}
+        <Text style={styles.countText}>
+          Showing {filteredLeads.length}
+          {totalCount != null ? ` of ${totalCount}` : ''} entries
+        </Text>
+
         {/* CARDS */}
         {isLoading ? (
           <Text style={{ color: '#fff', textAlign: 'center', marginTop: 20 }}>
@@ -633,7 +659,7 @@ const MissedFollowup = () => {
         ) : filteredLeads.length > 0 ? (
           filteredLeads.map((item, i) => (
             <LeadCard
-              key={item.id || i}
+              key={item?.id != null ? `lead-${item.id}` : `lead-idx-${i}`}
               item={item}
               navigation={navigation}
               setShowRemarks={setShowRemarks}
@@ -853,12 +879,21 @@ readMore: {
     flexDirection: 'row',
     alignItems: 'center',
     margin: 15,
+    marginBottom:5,
     borderWidth: 1,
     borderColor: '#444',
     borderRadius: 20,
     paddingHorizontal: 10,
     marginTop: 0,
     height: Platform.OS === 'ios' ? 45 : 45,
+  },
+
+  countText: {
+    color: '#a0b4e8',
+    fontSize: 12,
+    fontWeight: '600',
+    marginLeft: 15,
+    marginBottom: 8,
   },
 
   card: {
