@@ -32,6 +32,28 @@ const SCREEN_HEIGHT = Dimensions.get('window').height;
 //     { text: 'Call', onPress: () => Linking.openURL(`tel:${phoneNumber}`) },
 //   ]);
 // };
+// ─── COLORS ──────────────────────────────────────────────────────────────────
+
+const COLORS = {
+  bg: '#080d5a',
+  cardBg: '#ffffff0e',
+  cardSelected: '#0d1a6e',
+  headerBg: '#0A0F2E',
+  accent: '#00cfff',
+  accentDim: '#00cfff18',
+  accentBorder: '#00cfff40',
+  white: '#FFFFFF',
+  mutedText: '#8A90B4',
+  labelText: '#FFB85D',
+  gold: '#f4c542',
+  goldDim: '#f4c54218',
+  goldBorder: '#f4c54235',
+  green: '#00C48C',
+  red: '#FF6B6B',
+  borderColor: '#ffffff20',
+  modalBg: '#0f1550',
+  sectionBg: 'rgba(255,255,255,0.13)',
+};
 const makeCall = phoneNumber => {
   if (!phoneNumber) return;
 
@@ -900,6 +922,10 @@ const endEntry = pagination
             >
               <Icon name="filter-alt" size={18} color="#00e5ff" />
             </TouchableOpacity>
+               {/* <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('Rmform')} activeOpacity={0.75}>
+                        <Icon name="add" size={13} color="#fff" />
+                        <Text style={styles.actionBtnText} numberOfLines={1} adjustsFontSizeToFit>Add New Lead</Text>
+                      </TouchableOpacity> */}
             <TouchableOpacity
               style={styles.addNewBtn}
               onPress={() =>
@@ -942,10 +968,11 @@ const endEntry = pagination
         }}
         scrollEventThrottle={400}
       >
+        <View style={styles.searchRow}>
         <View style={styles.searchBox}>
           <Icon name="search" size={18} color="#aaa" />
           <TextInput
-            placeholder="Search name / phone / email..."
+            placeholder="Search ...."
             placeholderTextColor="#aaa"
             value={searchText}
             onChangeText={setSearchText}
@@ -955,6 +982,11 @@ const endEntry = pagination
             clearButtonMode="while-editing"
           />
         </View>
+          <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('Rmform')} activeOpacity={0.75}>
+                        <Icon name="add" size={13} color="#fff" />
+                        <Text style={styles.actionBtnText} numberOfLines={1} adjustsFontSizeToFit>Add New Lead</Text>
+                      </TouchableOpacity>
+                      </View>
 {pagination && (
   <Text  style={{
                     alignSelf: 'flex-start',
@@ -1081,30 +1113,88 @@ const styles = StyleSheet.create({
   },
   backText: { color: '#fff', fontSize: 12 },
   backButton: { flexDirection: 'row', alignItems: 'center' },
+// searchRow: {
+//   flexDirection: 'row',
+//   alignItems: 'center',
+//   gap: 10,
+//   width: '100%',
+// },
+//   searchBox: {
+//     flex:1,
+//     flexDirection: 'row',
+//     alignItems: 'center',
+//     marginHorizontal:10,
+//     marginBottom: 5,
+//     borderWidth: 1,
+//     borderColor: '#444',
+//     borderRadius: 22,
+//     paddingHorizontal: 12,
+//     paddingVertical: Platform.OS === 'ios' ? 10 : 0,
+//     minHeight: Platform.OS === 'ios' ? 44 : 40,
+//     backgroundColor: '#ffffff08',
+//   },
+//   searchInput: {
+//     marginLeft: 8,
+//     color: '#fff',
+//     flex: 1,
+//     fontSize: 14,
+//     paddingVertical: 0,
+//     height: Platform.OS === 'ios' ? undefined : 40,
+//   },
+// actionBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, backgroundColor: 'rgba(58,63,122,0.85)', paddingVertical: 8, paddingHorizontal: 6, borderRadius: 20, borderWidth: 1, borderColor: COLORS.borderColor, minHeight: 36 },
+//   actionBtnText: { color: COLORS.white, fontSize: 11, fontWeight: '600', textAlign: 'center' },
+  searchRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  width: '100%',
+  paddingHorizontal: 10,
+  gap: 10,
+},
 
-  searchBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginHorizontal: 15,
-    marginBottom: 5,
-    borderWidth: 1,
-    borderColor: '#444',
-    borderRadius: 22,
-    paddingHorizontal: 12,
-    paddingVertical: Platform.OS === 'ios' ? 10 : 0,
-    minHeight: Platform.OS === 'ios' ? 44 : 40,
-    backgroundColor: '#ffffff08',
-  },
-  searchInput: {
-    marginLeft: 8,
-    color: '#fff',
-    flex: 1,
-    fontSize: 14,
-    paddingVertical: 0,
-    height: Platform.OS === 'ios' ? undefined : 40,
-  },
+searchBox: {
+  flex: 1,
+  flexDirection: 'row',
+  alignItems: 'center',
+  marginBottom: 5,
+  borderWidth: 1,
+  borderColor: '#444',
+  borderRadius: 22,
+  paddingHorizontal: 12,
+  paddingVertical: Platform.OS === 'ios' ? 10 : 0,
+  minHeight: Platform.OS === 'ios' ? 44 : 40,
+  backgroundColor: '#ffffff08',
+},
 
-  card: {
+searchInput: {
+  marginLeft: 8,
+  color: '#fff',
+  flex: 1,
+  fontSize: 14,
+  paddingVertical: 0,
+  height: Platform.OS === 'ios' ? undefined : 40,
+},
+
+actionBtn: {
+  width: 110,
+  height: 35,
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 4,
+  backgroundColor: 'rgba(58,63,122,0.85)',
+  borderRadius: 20,
+  borderWidth: 1,
+  borderColor: COLORS.borderColor,
+},
+
+actionBtnText: {
+  color: COLORS.white,
+  fontSize: 11,
+  fontWeight: '600',
+  textAlign: 'center',
+},
+
+card: {
     marginHorizontal: 15,
     marginBottom: 12,
     borderWidth: 1,
