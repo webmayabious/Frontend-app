@@ -1,24 +1,13 @@
 /**
  * NotificationScreen.js
  *
- * React Native CLI screen — recreated from the "mokhsh" app notification design,
- * now with a date-range + user "advanced filter" modal (opened via the filter icon).
+ * React Native CLI screen with a date-range + user "advanced filter" modal.
+ * Quick-filter dropdown now shows unread counts (Assign Leads / Follow Up Date /
+ * Site Visit Date) from Redux `unreadCounts`.
  *
- * Dependencies to install:
- *   npm install react-native-vector-icons @react-native-community/datetimepicker
- *   (iOS) cd ios && pod install
- *   For Android, make sure vector icons are linked in android/app/build.gradle:
- *     apply from: "../../node_modules/react-native-vector-icons/fonts.gradle"
- *
- * Auth:
- *   Requests go through the shared `api` instance (../../api/AxiosInstance),
- *   which attaches the `PM_TOKEN` bearer token from AsyncStorage on every
- *   request automatically — same as LeadsListScreen. Adjust the import path
- *   below if this file lives in a different folder.
- *
- * Usage:
- *   import NotificationScreen from './NotificationScreen';
- *   ...render <NotificationScreen /> inside your navigator or App.js
+ * Auth: requests go through the shared `api` instance (../../api/AxiosInstance).
+ * Badge/Counts: after read / unread / delete actions, `syncBadge()` refreshes
+ * the Redux counts (and the iOS app icon badge).
  */
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
@@ -42,10 +31,12 @@ import {
   KeyboardAvoidingView,
   Modal,
 } from 'react-native';
+import { useSelector } from 'react-redux';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import Icon from 'react-native-vector-icons/Ionicons';
 import MaterialIcon from 'react-native-vector-icons/MaterialIcons';
 import api from '../../api/AxiosInstance';
+import { syncBadge } from './syncBadge';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 
@@ -73,17 +64,23 @@ const API_PATH = '/api/pm/fetchNotification';
 const STATUS_API_PATH = '/api/pm/changeStatusOfNotification';
 const DELETE_API_PATH = '/api/pm/deleteNotification';
 const USERLIST_API_PATH = '/api/pm/getUserListOnly';
+const PAGE_LIMIT = 20;
 
 // label shown in dropdown -> query param value sent to the API
 // (value: null means "All" -> no `type` param, fetches everything)
 const FILTER_OPTIONS = [
   { label: 'All', value: null },
-  { label: 'Assign RM', value: 'ASGLEAD' },
-//  { label: 'Assigned', value: 'ASG' },
+  { label: 'Assign Leads', value: 'ASGLEAD' },
   { label: 'Follow Up Date', value: 'FLOWUPDT' },
   { label: 'Site Visit Date', value: 'VISITDT' },
-  // { label: 'Reminder', value: 'REMINDER' },
 ];
+
+// ✅ dropdown option value -> Redux unreadCounts key
+const COUNT_KEY = {
+  ASGLEAD: 'assigned_lead',
+  FLOWUPDT: 'follow_up_date',
+  VISITDT: 'site_visit_date',
+};
 
 // Strip basic HTML tags/entities from the API's `body` field.
 const stripHtml = html =>
@@ -99,14 +96,8 @@ const STATUS_OPTIONS = [
   { label: 'Read', value: '2' },
 ];
 
-// When the quick filter is "All" (no specific type picked), the list should
-// still only ever show these 4 categories — never anything outside them.
-// This now applies REGARDLESS of whether an advanced filter (user/date/status)
-// is active, so selecting a "User" still only shows that user's notifications
-// among the allowed types — same behavior as plain "All".
-// NOTE: assumes each notification item has a `type` field matching the same
-// codes used in FILTER_OPTIONS (ASG / FLOWUPDT / VISITDT / REMINDER). If the
-// API returns the type under a different key, change `n.type` below.
+// When the quick filter is "All", only show the allowed categories —
+// regardless of whether an advanced filter is active.
 const ALLOWED_TYPES = FILTER_OPTIONS.filter(o => o.value).map(o => o.value);
 
 const formatDate = date => {
@@ -118,7 +109,7 @@ const formatDate = date => {
   return `${year}-${month}-${day}`;
 };
 
-// ─── Searchable user picker (From/To date + user list w/ search) ──────────
+// ─── Searchable user picker ───────────────────────────────────────────────
 const UserPicker = ({ users, loading, value, onSelect }) => {
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
@@ -222,7 +213,7 @@ const UserPicker = ({ users, loading, value, onSelect }) => {
   );
 };
 
-// ─── Status dropdown (replaces the old chip-row selector) ─────────────────
+// ─── Status dropdown ──────────────────────────────────────────────────────
 const StatusPicker = ({ value, onSelect }) => {
   const [open, setOpen] = useState(false);
   const selected =
@@ -300,7 +291,7 @@ const InputField = ({ label, placeholder, icon, value, onPress }) => (
   </View>
 );
 
-// ─── Bottom-sheet advanced-filter modal (date range + user) ───────────────
+// ─── Bottom-sheet advanced-filter modal (date range + user + status) ──────
 const AdvancedFilterModal = ({
   visible,
   onClose,
@@ -486,6 +477,9 @@ const AdvancedFilterModal = ({
 };
 
 const NotificationScreen = ({ setHideBottomNav }) => {
+  // ✅ NEW: per-type unread counts from Redux
+  const unreadCounts = useSelector(state => state.unreadCounts);
+
   const [selectAll, setSelectAll] = useState(false);
   const [checkedIds, setCheckedIds] = useState([]);
   const [filter, setFilter] = useState(FILTER_OPTIONS[0]); // {label, value}
@@ -497,7 +491,12 @@ const NotificationScreen = ({ setHideBottomNav }) => {
   const [expandedIds, setExpandedIds] = useState([]);
   const [actionLoading, setActionLoading] = useState(false);
 
-  // ── Advanced filter (From Date / To Date / User) ──
+  // ── Pagination / infinite scroll ──
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const pageRef = useRef(1);
+
+  // ── Advanced filter (From Date / To Date / User / Status) ──
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [modalFromDate, setModalFromDate] = useState(null);
   const [modalToDate, setModalToDate] = useState(null);
@@ -519,14 +518,7 @@ const NotificationScreen = ({ setHideBottomNav }) => {
     !!advancedFilter.user ||
     !!advancedFilter.status;
 
-  // ✅ Restrict to the known/allowed notification types (ASG / FLOWUPDT /
-  // VISITDT / ...) whenever the quick filter is plain "All" — regardless of
-  // whether an advanced filter (user / date / status) is also active.
-  // Previously this only applied when NO advanced filter was active, which
-  // meant picking a "User" would leak notifications of unknown/unsupported
-  // types for that user. Now "Select User" behaves exactly like "All":
-  // it only ever shows the same 4 allowed categories, just scoped to that
-  // user.
+  // Restrict to known types whenever the quick filter is plain "All".
   const shouldRestrictToKnownTypes = filter.value === null;
 
   const toggleExpand = id => {
@@ -541,14 +533,12 @@ const NotificationScreen = ({ setHideBottomNav }) => {
       type: filter.value, // always include type
     };
 
-    // advanced filters only when active
     if (isAdvancedFilterActive) {
       if (advancedFilter.fromDate) params.fromDate = advancedFilter.fromDate;
       if (advancedFilter.toDate) params.toDate = advancedFilter.toDate;
       if (advancedFilter.user) params.user = advancedFilter.user;
     }
 
-    // ✅ ALWAYS include status if present
     if (advancedFilter.status) {
       params.status = advancedFilter.status;
     }
@@ -556,43 +546,69 @@ const NotificationScreen = ({ setHideBottomNav }) => {
     return params;
   }, [filter, advancedFilter, isAdvancedFilterActive]);
 
-  const fetchNotifications = useCallback(async (params, restrictToKnownTypes = false) => {
-    setLoading(true);
-    setError(null);
-    try {
-      // eslint-disable-next-line no-console
-      console.log('[Notifications] fetch params ->', params);
-      const res = await api.get(API_PATH, { params });
-      const json = res.data;
-      // eslint-disable-next-line no-console
-      console.log(
-        '[Notifications] response filters ->',
-        json?.filters,
-        'count ->',
-        json?.uarray?.length,
-      );
-
-      if (json?.status === false) {
-        throw new Error(json?.error || 'Failed to load notifications');
+  const fetchNotifications = useCallback(
+    async (params, restrictToKnownTypes = false, pageNum = 1) => {
+      const isFirstPage = pageNum === 1;
+      if (isFirstPage) {
+        setLoading(true);
+        setError(null);
+      } else {
+        setLoadingMore(true);
       }
+      try {
+        const res = await api.get(API_PATH, {
+          params: { ...params, page: pageNum, limit: PAGE_LIMIT },
+        });
+        const json = res.data;
 
-      let list = json?.uarray || [];
-      if (restrictToKnownTypes) {
-        list = list.filter(n => ALLOWED_TYPES.includes(n.type));
+        if (json?.status === false) {
+          throw new Error(json?.error || 'Failed to load notifications');
+        }
+
+        const rawList = json?.uarray || [];
+        // hasMore raw list diye check hobe (client-side filter er age)
+        setHasMore(rawList.length >= PAGE_LIMIT);
+        pageRef.current = pageNum;
+
+        let list = rawList;
+        if (restrictToKnownTypes) {
+          list = list.filter(n => ALLOWED_TYPES.includes(n.type));
+        }
+
+        if (isFirstPage) {
+          setNotifications(list);
+        } else {
+          setNotifications(prev => {
+            const seen = new Set(prev.map(n => n.id));
+            return [...prev, ...list.filter(n => !seen.has(n.id))];
+          });
+        }
+      } catch (e) {
+        if (isFirstPage) {
+          const message =
+            e?.response?.data?.error ||
+            e?.message ||
+            'Failed to load notifications';
+          setError(message);
+          setNotifications([]);
+          setHasMore(false);
+        }
+      } finally {
+        if (isFirstPage) setLoading(false);
+        else setLoadingMore(false);
       }
+    },
+    [],
+  );
 
-      setNotifications(list);
-    } catch (e) {
-      const message =
-        e?.response?.data?.error ||
-        e?.message ||
-        'Failed to load notifications';
-      setError(message);
-      setNotifications([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const loadMore = () => {
+    if (loading || loadingMore || !hasMore) return;
+    fetchNotifications(
+      buildQueryParams(),
+      shouldRestrictToKnownTypes,
+      pageRef.current + 1,
+    );
+  };
 
   useEffect(() => {
     fetchNotifications(buildQueryParams(), shouldRestrictToKnownTypes);
@@ -603,11 +619,21 @@ const NotificationScreen = ({ setHideBottomNav }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filter, advancedFilter, fetchNotifications, buildQueryParams]);
 
+  // ✅ Screen khulle count fresh kore nao
+  useEffect(() => {
+    syncBadge();
+  }, []);
+
   const selectFilter = option => {
     setFilter(option);
     setDropdownOpen(false);
-    // quick category filter overrides the advanced (date/user) filter
-    setAdvancedFilter({ fromDate: null, toDate: null, user: null });
+    // quick category filter overrides the advanced (date/user/status) filter
+    setAdvancedFilter({
+      fromDate: null,
+      toDate: null,
+      user: null,
+      status: '',
+    });
   };
 
   const fetchUserList = useCallback(async () => {
@@ -675,6 +701,7 @@ const NotificationScreen = ({ setHideBottomNav }) => {
       setCheckedIds([]);
       setSelectAll(false);
       await fetchNotifications(buildQueryParams(), shouldRestrictToKnownTypes);
+      syncBadge(); // ✅ refresh counts + iOS badge
     } catch (e) {
       Alert.alert(
         'Error',
@@ -687,20 +714,68 @@ const NotificationScreen = ({ setHideBottomNav }) => {
 
   const handleMarkRead = () => changeStatus(checkedIds, 2);
   const handleMarkUnread = () => changeStatus(checkedIds, 1);
-  const handleMarkAllRead = () =>
-    changeStatus(
-      notifications.map(n => n.id),
-      2,
-    );
+  // ✅ Shob page theke unread id gulo niye mark read kore (shudhu loaded 20 ta na)
+  const handleMarkAllRead = async () => {
+    setActionLoading(true);
+    try {
+      const BIG_LIMIT = 100;
+      const base = { ...buildQueryParams(), status: '1' };
+      const idSet = new Set();
+      let p = 1;
+      while (p <= 50) {
+        const res = await api.get(API_PATH, {
+          params: { ...base, page: p, limit: BIG_LIMIT },
+        });
+        const raw = res.data?.uarray || [];
+        const before = idSet.size;
+        raw.forEach(n => {
+          if (!shouldRestrictToKnownTypes || ALLOWED_TYPES.includes(n.type)) {
+            idSet.add(n.id);
+          }
+        });
+        // kono notun id na ele (backend limit ignore korle) ba last page hole thamo
+        if (raw.length < BIG_LIMIT || idSet.size === before) break;
+        p += 1;
+      }
 
-  // Silently mark a single notification as read (no alert, no full refetch —
-  // just update local state so the UI reflects it immediately).
+      const ids = Array.from(idSet);
+      if (!ids.length) {
+        Alert.alert('No unread notifications', 'Shob notification already read.');
+        return;
+      }
+
+      for (let i = 0; i < ids.length; i += 10) {
+        await Promise.all(
+          ids
+            .slice(i, i + 10)
+            .map(id =>
+              api.post(STATUS_API_PATH, { chanstat: String(id), val: 2 }),
+            ),
+        );
+      }
+
+      setCheckedIds([]);
+      setSelectAll(false);
+      await fetchNotifications(buildQueryParams(), shouldRestrictToKnownTypes, 1);
+      syncBadge();
+    } catch (e) {
+      Alert.alert(
+        'Error',
+        e?.response?.data?.message || 'Failed to mark all as read',
+      );
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Silently mark a single notification as read (local state update only).
   const markReadSilently = async id => {
     try {
       await api.post(STATUS_API_PATH, { chanstat: String(id), val: 2 });
       setNotifications(prev =>
         prev.map(n => (n.id === id ? { ...n, stat: 2 } : n)),
       );
+      syncBadge(); // ✅ refresh counts + iOS badge
     } catch (e) {
       // fail silently — the item just stays marked unread, user can retry
     }
@@ -740,7 +815,11 @@ const NotificationScreen = ({ setHideBottomNav }) => {
               );
               setCheckedIds([]);
               setSelectAll(false);
-              await fetchNotifications(buildQueryParams(), shouldRestrictToKnownTypes);
+              await fetchNotifications(
+                buildQueryParams(),
+                shouldRestrictToKnownTypes,
+              );
+              syncBadge(); // ✅ refresh counts + iOS badge
             } catch (e) {
               Alert.alert(
                 'Error',
@@ -825,7 +904,7 @@ const NotificationScreen = ({ setHideBottomNav }) => {
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="light-content" backgroundColor={COLORS.bg} />
 
-      {/* Section Title Row — styled like LeadsListScreen topBar */}
+      {/* Section Title Row */}
       <View style={styles.topBarContainer}>
         <View style={styles.topBar}>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -917,11 +996,15 @@ const NotificationScreen = ({ setHideBottomNav }) => {
               {FILTER_OPTIONS.map(option => {
                 const active =
                   option.label === filter.label && !isAdvancedFilterActive;
+                const count = option.value
+                  ? unreadCounts?.[COUNT_KEY[option.value]] || 0
+                  : 0;
                 return (
                   <TouchableOpacity
                     key={option.label}
                     style={[
                       styles.dropdownItem,
+                      styles.dropdownItemRow,
                       active && styles.dropdownItemActive,
                     ]}
                     onPress={() => selectFilter(option)}
@@ -934,6 +1017,13 @@ const NotificationScreen = ({ setHideBottomNav }) => {
                     >
                       {option.label}
                     </Text>
+                    {count > 0 && (
+                      <View style={styles.countBadge}>
+                        <Text style={styles.countBadgeText}>
+                          {count > 99 ? '99+' : count}
+                        </Text>
+                      </View>
+                    )}
                   </TouchableOpacity>
                 );
               })}
@@ -972,8 +1062,20 @@ const NotificationScreen = ({ setHideBottomNav }) => {
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
           refreshing={loading}
-          onRefresh={() =>
-            fetchNotifications(buildQueryParams(), shouldRestrictToKnownTypes)
+          onRefresh={() => {
+            fetchNotifications(buildQueryParams(), shouldRestrictToKnownTypes, 1);
+            syncBadge();
+          }}
+          onEndReached={loadMore}
+          onEndReachedThreshold={0.4}
+          ListFooterComponent={
+            loadingMore ? (
+              <ActivityIndicator
+                size="small"
+                color={COLORS.accent}
+                style={{ marginVertical: 16 }}
+              />
+            ) : null
           }
         />
       )}
@@ -1081,7 +1183,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 36,
     right: 0,
-    minWidth: 130,
+    minWidth: 160,
     backgroundColor: COLORS.card,
     borderRadius: 10,
     paddingVertical: 6,
@@ -1096,6 +1198,11 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
     paddingHorizontal: 14,
   },
+  dropdownItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   dropdownItemActive: {
     backgroundColor: COLORS.accent,
   },
@@ -1105,6 +1212,21 @@ const styles = StyleSheet.create({
   },
   dropdownItemTextActive: {
     color: COLORS.text,
+    fontWeight: '700',
+  },
+  countBadge: {
+    backgroundColor: '#FF5C5C',
+    borderRadius: 9,
+    minWidth: 18,
+    height: 18,
+    paddingHorizontal: 5,
+    marginLeft: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  countBadgeText: {
+    color: '#fff',
+    fontSize: 10,
     fontWeight: '700',
   },
   dropdownOverlay: {

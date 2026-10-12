@@ -19,6 +19,8 @@ import {
   Share,
   Modal,
   FlatList,
+  Keyboard,
+  DeviceEventEmitter,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -60,6 +62,148 @@ const COLORS = {
   borderColor: '#ffffff20',
   modalBg: '#0f1550',
   sectionBg: 'rgba(255,255,255,0.13)',
+};
+
+
+// ─── CUSTOM ALERT (Alert.alert er replacement, app theme er sathe match kore) ─
+
+let _alertHandler = null;
+
+// Alert.alert er moto-i signature: showAlert(title, message, buttons, options)
+const showAlert = (title, message, buttons, options) => {
+  if (_alertHandler) {
+    _alertHandler({ title, message, buttons, options });
+  } else {
+    Alert.alert(title, message, buttons, options); // fallback (host mount hoyni)
+  }
+};
+
+const ALERT_TYPES = {
+  success: { icon: 'check-circle', color: COLORS.green },
+  error: { icon: 'error', color: COLORS.red },
+  warning: { icon: 'warning', color: COLORS.gold },
+  danger: { icon: 'delete-forever', color: COLORS.red },
+  contact: { icon: 'contact-phone', color: COLORS.accent },
+  info: { icon: 'info', color: COLORS.accent },
+};
+
+// Title er shuru r emoji (✅ ❌ ⚠️) theke type bujhe, emoji ta soriye dey
+const parseAlert = (title = '', buttons = []) => {
+  const raw = String(title);
+  let type = 'info';
+  if (raw.startsWith('\u2705')) type = 'success';
+  else if (raw.startsWith('\u274C')) type = 'error';
+  else if (raw.startsWith('\u26A0')) type = 'warning';
+  else if (/^success$/i.test(raw)) type = 'success';
+  else if (/^(error|permission denied)$/i.test(raw)) type = 'error';
+  else if (/^contact$/i.test(raw)) type = 'contact';
+  else if (buttons.some(b => b.style === 'destructive')) type = 'danger';
+  const cleanTitle = raw.replace(/^[\u2705\u274C\u26A0]\uFE0F?\s*/, '');
+  return { type, cleanTitle };
+};
+
+const CustomAlertHost = () => {
+  const [config, setConfig] = useState(null);
+  const anim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    _alertHandler = cfg => {
+      setConfig(cfg);
+      anim.setValue(0);
+      Animated.spring(anim, {
+        toValue: 1,
+        useNativeDriver: true,
+        damping: 16,
+        stiffness: 190,
+      }).start();
+    };
+    return () => { _alertHandler = null; };
+  }, [anim]);
+
+  const close = cb => {
+    Animated.timing(anim, { toValue: 0, duration: 140, useNativeDriver: true }).start(() => {
+      setConfig(null);
+      cb && cb();
+    });
+  };
+
+  if (!config) return null;
+
+  const buttons = config.buttons?.length ? config.buttons : [{ text: 'OK' }];
+  const { type, cleanTitle } = parseAlert(config.title, buttons);
+  const t = ALERT_TYPES[type];
+  const cancelable = config.options?.cancelable !== false;
+  const stacked = buttons.length > 2;
+  const cancelBtns = buttons.filter(b => b.style === 'cancel');
+  const otherBtns = buttons.filter(b => b.style !== 'cancel');
+  const ordered = stacked ? [...otherBtns, ...cancelBtns] : [...cancelBtns, ...otherBtns];
+  const message = config.message ? String(config.message) : '';
+  const longMessage = message.includes('\n');
+
+  const dismiss = () => {
+    if (!cancelable) return;
+    close(() => config.options?.onDismiss && config.options.onDismiss());
+  };
+
+  const opacity = anim.interpolate({ inputRange: [0, 1], outputRange: [0, 1], extrapolate: 'clamp' });
+  const scale = anim.interpolate({ inputRange: [0, 1], outputRange: [0.88, 1] });
+
+  return (
+    <Modal transparent visible animationType="none" statusBarTranslucent onRequestClose={dismiss}>
+      <Animated.View style={[styles.alertOverlay, { opacity }]}>
+        <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={dismiss} />
+
+        <Animated.View style={[styles.alertBox, { opacity, transform: [{ scale }] }]}>
+          <View style={[styles.alertTopBar, { backgroundColor: t.color }]} />
+
+          <View style={[styles.alertIconWrap, { backgroundColor: t.color + '1f', borderColor: t.color + '55' }]}>
+            <Icon name={t.icon} size={26} color={t.color} />
+          </View>
+
+          <Text style={styles.alertTitle}>{cleanTitle}</Text>
+
+          {message ? (
+            <ScrollView
+              style={styles.alertMsgScroll}
+              showsVerticalScrollIndicator={false}
+              bounces={false}
+            >
+              <Text style={[styles.alertMessage, longMessage && { textAlign: 'left' }]}>{message}</Text>
+            </ScrollView>
+          ) : null}
+
+          <View style={[styles.alertBtnRow, stacked && { flexDirection: 'column' }]}>
+            {ordered.map((btn, i) => {
+              const isSolo = buttons.length === 1;
+              const isCancel = btn.style === 'cancel' && !isSolo;
+              const isDestructive = btn.style === 'destructive';
+              const bg = isCancel
+                ? 'rgba(255,255,255,0.08)'
+                : isDestructive || type === 'danger'
+                  ? COLORS.red
+                  : t.color;
+              const txtColor = isCancel ? COLORS.white : isDestructive || type === 'danger' ? '#fff' : '#06104a';
+              return (
+                <TouchableOpacity
+                  key={`${btn.text}-${i}`}
+                  activeOpacity={0.8}
+                  style={[
+                    styles.alertBtn,
+                    !stacked && { flex: 1 },
+                    { backgroundColor: bg },
+                    isCancel && { borderWidth: 1, borderColor: COLORS.borderColor },
+                  ]}
+                  onPress={() => close(() => btn.onPress && btn.onPress())}
+                >
+                  <Text style={[styles.alertBtnText, { color: txtColor }]}>{btn.text}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </Animated.View>
+      </Animated.View>
+    </Modal>
+  );
 };
 
 // ─── SEARCHABLE DROPDOWN ─────────────────────────────────────────────────────
@@ -206,45 +350,248 @@ const SearchableDropdown = ({ label, data = [], placeholder, value, onChange }) 
 
 // ─── DROPDOWN FIELD (upload modal এ ব্যবহার হচ্ছে — রাখা হয়েছে) ─────────────
 
-const DropdownField = ({ label, data, placeholder, value, onChange }) => {
-  const [isFocus, setIsFocus] = React.useState(false);
+// const DropdownField = ({ label, data, placeholder, value, onChange }) => {
+//   const [isFocus, setIsFocus] = React.useState(false);
+//   return (
+//     <View style={styles.inputWrapper}>
+//       {label ? <Text style={styles.dropLabel}>{label}</Text> : null}
+//       <Dropdown
+//         style={[
+//           styles.dropdown,
+//           isFocus && { borderColor: COLORS.accent, borderWidth: 1.5 },
+//         ]}
+//         containerStyle={styles.dropdownContainer}
+//         placeholderStyle={styles.placeholderStyle}
+//         selectedTextStyle={styles.selectedTextStyle}
+//         itemTextStyle={{ color: '#0b0b0b', fontWeight: '500' }}
+//         activeColor="#e6f7ff"
+//         data={data || []}
+//         labelField="label"
+//         valueField="value"
+//         placeholder={placeholder}
+//         value={value}
+//         itemContainerStyle={styles.itemContainer}
+//         onFocus={() => setIsFocus(true)}
+//         onBlur={() => setIsFocus(false)}
+//         onChange={item => {
+//           setIsFocus(false);
+//           onChange && onChange(item.value);
+//         }}
+//         renderRightIcon={() => (
+//           <Icon
+//             name={isFocus ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
+//             size={20}
+//             color={COLORS.accent}
+//           />
+//         )}
+//       />
+//     </View>
+//   );
+// };
+const LIST_HEIGHT = 220;
+const FIELD_TOP_OFFSET = Platform.OS === 'ios' ? 280 : 200;
+// Inline dropdown, same behaviour/look as EmployeeDropdown
+const DropdownField = ({
+  label,
+  data,
+  value,
+  onChange,
+  error,
+  scrollRef,
+  scrollYRef,
+  placeholder,
+}) => {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const dropAnim = useRef(new Animated.Value(0)).current;
+  const wrapRef = useRef(null);
+
+  const options = data || [];
+  const selected = options.find(o => o.value === value);
+  const initial = selected?.label?.[0]?.toUpperCase();
+
+  const filtered = options.filter(o =>
+    String(o.label ?? '').toLowerCase().includes(search.toLowerCase()),
+  );
+
+  const maxHeight = dropAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, LIST_HEIGHT],
+  });
+
+  // After the list has expanded, scroll up just enough to keep it above the BottomNav
+ // Animate the screen so this field moves up toward the top
+const scrollFieldUp = () => {
+  if (!wrapRef.current || !scrollRef?.current) return;
+  wrapRef.current.measureInWindow((x, y) => {
+    const delta = y - FIELD_TOP_OFFSET;
+    if (delta > 0) {
+      scrollRef.current.scrollTo({
+        y: (scrollYRef?.current || 0) + delta,
+        animated: true,
+      });
+    }
+  });
+};
+// const handleSearchFocus = () => {
+//     setTimeout(() => {
+//       if (!wrapRef.current || !scrollRef?.current) return;
+//       wrapRef.current.measureInWindow((x, y) => {
+//         const delta = y - SEARCH_TOP_OFFSET;
+//         if (delta > 0) {
+//           scrollRef.current.scrollTo({
+//             y: (scrollYRef?.current || 0) + delta,
+//             animated: true,
+//           });
+//         }
+//       });
+//     }, 350); // wait for the keyboard animation
+//   };
+const close = (duration = 180) => {
+  Keyboard.dismiss();
+  Animated.timing(dropAnim, {
+    toValue: 0,
+    duration,
+    useNativeDriver: false,
+  }).start(() => {
+    setOpen(false);
+    setSearch('');
+    DeviceEventEmitter.emit('toggleBottomNav', true);   // show the nav again
+  });
+};
+
+const toggle = () => {
+  if (open) {
+    close();
+  } else {
+    DeviceEventEmitter.emit('toggleBottomNav', false);  // hide the nav as soon as it opens
+    setOpen(true);
+    scrollFieldUp();
+    Animated.timing(dropAnim, {
+      toValue: 1,
+      duration: 200,
+      useNativeDriver: false,
+    }).start(scrollFieldUp);
+  }
+};
+
+useEffect(() => {
+  return () => DeviceEventEmitter.emit('toggleBottomNav', true);  // restore on leaving the screen
+}, []);
+
+  const handleSelect = item => {
+    onChange && onChange(item.value);
+    close(150);
+  };
+
   return (
-    <View style={styles.inputWrapper}>
-      {label ? <Text style={styles.dropLabel}>{label}</Text> : null}
-      <Dropdown
+    <View ref={wrapRef} collapsable={false} style={styles.field}>
+     {label ? <Text style={styles.dropLabel}>{label}</Text> : null}
+
+      {/* Trigger */}
+      <TouchableOpacity
         style={[
           styles.dropdown,
-          isFocus && { borderColor: COLORS.accent, borderWidth: 1.5 },
+          open && styles.dropdownOpen,
+          error && styles.inputError,
+          { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
         ]}
-        containerStyle={styles.dropdownContainer}
-        placeholderStyle={styles.placeholderStyle}
-        selectedTextStyle={styles.selectedTextStyle}
-        itemTextStyle={{ color: '#0b0b0b', fontWeight: '500' }}
-        activeColor="#e6f7ff"
-        data={data || []}
-        labelField="label"
-        valueField="value"
-        placeholder={placeholder}
-        value={value}
-        itemContainerStyle={styles.itemContainer}
-        onFocus={() => setIsFocus(true)}
-        onBlur={() => setIsFocus(false)}
-        onChange={item => {
-          setIsFocus(false);
-          onChange && onChange(item.value);
-        }}
-        renderRightIcon={() => (
-          <Icon
-            name={isFocus ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
-            size={20}
-            color={COLORS.accent}
-          />
-        )}
-      />
+        onPress={toggle}
+        activeOpacity={0.8}
+      >
+        <View style={styles.ddTriggerLeft}>
+          {/* {selected ? (
+            <View style={styles.ddAvatar}>
+              <Text style={styles.ddAvatarTxt}>{initial}</Text>
+            </View>
+          ) : null} */}
+          <Text
+            style={selected ? styles.selectedText : styles.placeholder}
+            numberOfLines={1}
+          >
+            {selected ? selected.label : placeholder || 'Select...'}
+          </Text>
+        </View>
+        <Icon
+          name={open ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
+          size={20}
+          color="#8a9daf"
+        />
+      </TouchableOpacity>
+
+      {/* Inline list */}
+      {open && (
+        <Animated.View
+          style={[styles.dropdownMenu, { maxHeight, opacity: dropAnim }]}
+        >
+          <View style={styles.ddSearchWrap}>
+            <Icon name="search" size={16} color="#000" style={{ marginRight: 6 }} />
+            <TextInput
+              style={styles.ddSearchInput}
+              placeholder="Search..."
+              placeholderTextColor="#000"
+              value={search}
+              onChangeText={setSearch}
+             
+              autoCorrect={false}
+              autoCapitalize="none"
+              returnKeyType="search"
+            />
+            {search.length > 0 && (
+              <TouchableOpacity
+                onPress={() => setSearch('')}
+                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+              >
+                <Icon name="close" size={14} color="#ccc" />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          <ScrollView
+            style={{ maxHeight: 155 }}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="always"
+            nestedScrollEnabled
+          >
+            {filtered.length === 0 ? (
+              <Text style={styles.ddNoResult}>No results found</Text>
+            ) : (
+              filtered.map(item => {
+                const isActive = item.value === value;
+                return (
+                  <TouchableOpacity
+                    key={String(item.value)}
+                    style={[styles.dropdownItem, isActive && styles.dropdownItemActive]}
+                    onPress={() => handleSelect(item)}
+                    activeOpacity={0.7}
+                  >
+                    {/* <View style={[styles.ddAvatar, isActive && styles.ddAvatarSelected]}>
+                      <Text style={[styles.ddAvatarTxt, isActive && { color: '#fff' }]}>
+                        {String(item.label ?? '')[0]?.toUpperCase()}
+                      </Text>
+                    </View> */}
+                    <Text
+                      style={[
+                        styles.dropdownItemText,
+                        isActive && styles.dropdownItemTextActive,
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {item.label}
+                    </Text>
+                    {isActive && <Icon name="check" size={16} color="#1482cc" />}
+                  </TouchableOpacity>
+                );
+              })
+            )}
+          </ScrollView>
+        </Animated.View>
+      )}
+
+      {error ? <Text style={styles.errorText}>{error}</Text> : null}
     </View>
   );
 };
-
 // ─── INPUT FIELD ──────────────────────────────────────────────────────────────
 
 const InputField = ({ label, placeholder, icon, value, onChange, onPress }) => (
@@ -271,7 +618,7 @@ const InputField = ({ label, placeholder, icon, value, onChange, onPress }) => (
 
 // const makeCall = phoneNumber => {
 //   if (!phoneNumber) return;
-//   Alert.alert('Call', `Do you want to call ${phoneNumber}?`, [
+//   showAlert('Call', `Do you want to call ${phoneNumber}?`, [
 //     { text: 'Cancel', style: 'cancel' },
 //     { text: 'Call', onPress: () => Linking.openURL(`tel:${phoneNumber}`) },
 //   ]);
@@ -281,7 +628,7 @@ const makeCall = phoneNumber => {
 
   const cleanNumber = phoneNumber.replace(/\D/g, '');
 
-  Alert.alert('Contact', `Choose an action for ${phoneNumber}`, [
+  showAlert('Contact', `Choose an action for ${phoneNumber}`, [
     {
       text: 'Cancel',
       style: 'cancel',
@@ -303,7 +650,7 @@ const makeCall = phoneNumber => {
             await Linking.openURL(webUrl);
           }
         } catch (error) {
-          Alert.alert('Error', 'Unable to open WhatsApp.');
+          showAlert('Error', 'Unable to open WhatsApp.');
         }
       },
     },
@@ -332,7 +679,7 @@ const sendMail = async (email) => {
       await Linking.openURL(`mailto:${email}`);
     }
   } catch (error) {
-    Alert.alert('Error', 'Unable to open email app.');
+    showAlert('Error', 'Unable to open email app.');
   }
 };
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
@@ -350,6 +697,8 @@ const AssignRM = ({ setHideBottomNav }) => {
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [searchText, setSearchText] = useState('');
+   const scrollRef = useRef(null);
+  const scrollYRef = useRef(0); 
   const [uploadProspect, setUploadProspect] = useState({
     reference: null,
     com_id: null,
@@ -520,11 +869,11 @@ const AssignRM = ({ setHideBottomNav }) => {
   // ── Assign RM ──
   const handleAssignRM = async () => {
     if (!selectedRM) {
-      Alert.alert('⚠️ No RM Selected', 'Please select a Relationship Manager before assigning.', [{ text: 'OK', style: 'default' }]);
+      showAlert('⚠️ No RM Selected', 'Please select a Relationship Manager before assigning.', [{ text: 'OK', style: 'default' }]);
       return;
     }
     if (selectedLeadIds.length === 0) {
-      Alert.alert('⚠️ No Leads Selected', 'Please select at least one lead to assign.', [{ text: 'OK', style: 'default' }]);
+      showAlert('⚠️ No Leads Selected', 'Please select at least one lead to assign.', [{ text: 'OK', style: 'default' }]);
       return;
     }
     setAssigning(true);
@@ -534,14 +883,14 @@ const AssignRM = ({ setHideBottomNav }) => {
         property_lead_id: selectedLeadIds,
       });
       if (res?.data?.status) {
-        Alert.alert('✅ Assigned Successfully', res?.data?.message || 'RM has been assigned to the selected leads.', [
+        showAlert('✅ Assigned Successfully', res?.data?.message || 'RM has been assigned to the selected leads.', [
           { text: 'OK', style: 'default', onPress: () => { setShowModal(false); setSelected([]); setSelectedRM(null); rmrefetch(); } },
         ], { cancelable: false });
       } else {
-        Alert.alert('❌ Assignment Failed', res?.data?.message || 'Failed to assign RM. Please try again.', [{ text: 'OK', style: 'cancel' }]);
+        showAlert('❌ Assignment Failed', res?.data?.message || 'Failed to assign RM. Please try again.', [{ text: 'OK', style: 'cancel' }]);
       }
     } catch (error) {
-      Alert.alert('❌ Error', 'Something went wrong. Please try again.', [{ text: 'OK', style: 'cancel' }]);
+      showAlert('❌ Error', 'Something went wrong. Please try again.', [{ text: 'OK', style: 'cancel' }]);
     } finally {
       setAssigning(false);
     }
@@ -561,7 +910,7 @@ const AssignRM = ({ setHideBottomNav }) => {
 
   // ── Delete ──
   const handleDeleteProspect = (id, status) => {
-    Alert.alert('Are you sure?', 'This lead will be deleted permanently.', [
+    showAlert('Are you sure?', 'This lead will be deleted permanently.', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Yes, Delete', style: 'destructive', onPress: () => deleteProspect({ id, status }) },
     ], { cancelable: true });
@@ -581,7 +930,7 @@ const AssignRM = ({ setHideBottomNav }) => {
         if (Platform.Version < 29) {
           const granted = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE);
           if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
-            Alert.alert('Permission Denied', 'Storage permission is required.');
+            showAlert('Permission Denied', 'Storage permission is required.');
             return;
           }
         }
@@ -590,12 +939,12 @@ const AssignRM = ({ setHideBottomNav }) => {
         await RNFS.writeFile(destPath, assetContent, 'base64');
         await notifee.createChannel({ id: 'download', name: 'Downloads', importance: AndroidImportance.HIGH });
         await notifee.displayNotification({ title: 'Download Complete ✅', body: `File saved: ${destPath}`, android: { channelId: 'download' } });
-        Alert.alert('Success', 'File saved to Downloads folder!');
+        showAlert('Success', 'File saved to Downloads folder!');
       } else {
         const destPath = `${RNFS.DocumentDirectoryPath}/${fileName}`;
         const sourcePath = `${RNFS.MainBundlePath}/${fileName}`;
         const sourceExists = await RNFS.exists(sourcePath);
-        if (!sourceExists) { Alert.alert('Error', 'Template file not found in bundle.'); return; }
+        if (!sourceExists) { showAlert('Error', 'Template file not found in bundle.'); return; }
         const destExists = await RNFS.exists(destPath);
         if (destExists) await RNFS.unlink(destPath);
         await RNFS.copyFile(sourcePath, destPath);
@@ -603,7 +952,7 @@ const AssignRM = ({ setHideBottomNav }) => {
       }
     } catch (err) {
       console.log('❌ Download Error:', err);
-      Alert.alert('Error', err.message || 'Could not download the file.');
+      showAlert('Error', err.message || 'Could not download the file.');
     }
   };
 
@@ -620,12 +969,12 @@ const AssignRM = ({ setHideBottomNav }) => {
   const handleUpload = async () => {
     if (isAdmin) {
       if (!uploadProspect.reference || !uploadProspect.com_id || !selectedFile) {
-        Alert.alert('⚠️ Missing Fields', 'Please select Reference, Company and File', [{ text: 'OK', style: 'default' }]);
+        showAlert('⚠️ Missing Fields', 'Please select Reference, Company and File', [{ text: 'OK', style: 'default' }]);
         return;
       }
     } else {
       if (!uploadProspect.reference || !uploadProspect.location || !selectedFile) {
-        Alert.alert('⚠️ Missing Fields', 'Please select Location, Reference and File', [{ text: 'OK', style: 'default' }]);
+        showAlert('⚠️ Missing Fields', 'Please select Location, Reference and File', [{ text: 'OK', style: 'default' }]);
         return;
       }
     }
@@ -643,28 +992,28 @@ const AssignRM = ({ setHideBottomNav }) => {
       const errorRows = resData?.errorRows ?? [];
       if (resData?.status === true && insertedCount === 0 && errorRows.length > 0) {
         const duplicateDetails = errorRows.map((e, i) => `${i + 1}. ${e.row?.name} (${e.row?.phone})\n    ↳ ${e.reason}`).join('\n');
-        Alert.alert('⚠️ Duplicate Entries Found', `All ${skippedCount} entries already exist.\n\n${duplicateDetails}`, [{ text: 'OK', style: 'default' }]);
+        showAlert('⚠️ Duplicate Entries Found', `All ${skippedCount} entries already exist.\n\n${duplicateDetails}`, [{ text: 'OK', style: 'default' }]);
         setSelectedFile(null);
       } else if (resData?.status === true && insertedCount > 0 && errorRows.length > 0) {
         const duplicateDetails = errorRows.map((e, i) => `${i + 1}. ${e.row?.name} (${e.row?.phone})\n    ↳ ${e.reason}`).join('\n');
-        Alert.alert('⚠️ Partial Upload', `✅ ${insertedCount} leads uploaded.\n⚠️ ${skippedCount} skipped:\n\n${duplicateDetails}`, [
+        showAlert('⚠️ Partial Upload', `✅ ${insertedCount} leads uploaded.\n⚠️ ${skippedCount} skipped:\n\n${duplicateDetails}`, [
           { text: 'OK', style: 'default', onPress: () => { setUploadProspect({ reference: null, com_id: null, location: null }); setSelectedFile(null); setShowUploadModal(false); rmrefetch(); } },
         ]);
       } else if (resData?.status === true && insertedCount > 0 && errorRows.length === 0) {
-        Alert.alert('✅ Upload Successful', `${insertedCount} leads uploaded successfully!`, [
+        showAlert('✅ Upload Successful', `${insertedCount} leads uploaded successfully!`, [
           { text: 'OK', style: 'default', onPress: () => { setUploadProspect({ reference: null, com_id: null, location: null }); setSelectedFile(null); setShowUploadModal(false); rmrefetch(); } },
         ]);
       } else {
-        Alert.alert('❌ Upload Failed', resData?.message || 'Upload failed.', [{ text: 'OK', style: 'cancel' }]);
+        showAlert('❌ Upload Failed', resData?.message || 'Upload failed.', [{ text: 'OK', style: 'cancel' }]);
       }
     } catch (err) {
       const errMsg = err?.response?.data?.message || '';
       const errStatus = err?.response?.status;
       if (errStatus === 409 || errMsg.toLowerCase().includes('duplicate') || errMsg.toLowerCase().includes('already exist') || errMsg.toLowerCase().includes('phone') || errMsg.toLowerCase().includes('exist')) {
-        Alert.alert('⚠️ Duplicate Entries Found', `${errMsg || 'Some entries already exist.'}\n\nPlease remove duplicate entries and try again.`, [{ text: 'OK', style: 'default' }]);
+        showAlert('⚠️ Duplicate Entries Found', `${errMsg || 'Some entries already exist.'}\n\nPlease remove duplicate entries and try again.`, [{ text: 'OK', style: 'default' }]);
         setSelectedFile(null);
       } else {
-        Alert.alert('❌ Something Went Wrong', errMsg || 'An unexpected error occurred.', [{ text: 'OK', style: 'cancel' }]);
+        showAlert('❌ Something Went Wrong', errMsg || 'An unexpected error occurred.', [{ text: 'OK', style: 'cancel' }]);
       }
     } finally {
       setUploading(false);
@@ -730,31 +1079,26 @@ const AssignRM = ({ setHideBottomNav }) => {
         <Text style={styles.sectionLabel}>Contact Details:</Text>
 
         <View style={styles.contactRow}>
-          <View style={styles.contactItem}>
+          {/* Phone */}
+          <View style={styles.contactPhone}>
             <Icon name="call" size={12} color={COLORS.accent} />
-            {/* <Text style={styles.infoText} onPress={() => makeCall(item?.phone)}>
-              {item?.phone || 'N/A'}
-            </Text> */}
-             <TouchableOpacity onPress={() => makeCall(item?.phone)}>
-                                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                               
-                        
-                                  {/* <View style={styles.remarksBtn}> */}
-                                    <Text style={styles.phoneText}>
-                                      {item?.phone || 'N/A'}
-                                    </Text>
-                                  {/* </View> */}
-                                </View>
-                              </TouchableOpacity>
+            <TouchableOpacity onPress={() => makeCall(item?.phone)} activeOpacity={0.7}>
+              <Text style={styles.phoneText}>{item?.phone || 'N/A'}</Text>
+            </TouchableOpacity>
           </View>
-          <View style={styles.contactItem}>
+
+          {/* Email */}
+          <View style={styles.contactEmail}>
             <Icon name="email" size={12} color={COLORS.accent} />
-            {/* <Text style={styles.infoText} numberOfLines={1}>{item?.email || 'N/A'}</Text> */}
-             <TouchableOpacity onPress={() => sendMail(item?.email)}>
-                        <Text style={styles.emailText} numberOfLines={2}>
-                          {item?.email || 'N/A'}
-                        </Text>
-                      </TouchableOpacity>
+            <TouchableOpacity
+              style={{ flexShrink: 1 }}
+              onPress={() => sendMail(item?.email)}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.emailText} numberOfLines={1} ellipsizeMode="tail">
+                {item?.email || 'N/A'}
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -807,7 +1151,7 @@ const AssignRM = ({ setHideBottomNav }) => {
             style={styles.actionBtn}
             onPress={() => {
               if (selected.length === 0) {
-                Alert.alert('⚠️ No Leads Selected', 'Please select at least one lead to assign an RM.', [{ text: 'OK', style: 'default' }]);
+                showAlert('⚠️ No Leads Selected', 'Please select at least one lead to assign an RM.', [{ text: 'OK', style: 'default' }]);
                 return;
               }
               setShowModal(true);
@@ -992,7 +1336,13 @@ const AssignRM = ({ setHideBottomNav }) => {
                 </Text>
               </View>
 
-              <ScrollView style={{ width: '100%' }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+              <ScrollView style={{ width: '100%' }}   
+              ref={scrollRef}
+          onScroll={e => {
+            scrollYRef.current = e.nativeEvent.contentOffset.y;
+          }}
+          scrollEventThrottle={16}
+          showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                 <View style={styles.formBox}>
                   <DropdownField
                     label="Location of Property *"
@@ -1000,6 +1350,8 @@ const AssignRM = ({ setHideBottomNav }) => {
                     placeholder="Select Location"
                     value={uploadProspect.location}
                     onChange={value => onChange('location', value)}
+                       scrollRef={scrollRef}
+              scrollYRef={scrollYRef}
                   />
                   <DropdownField
                     label="Reference *"
@@ -1007,6 +1359,8 @@ const AssignRM = ({ setHideBottomNav }) => {
                     placeholder="Select Reference"
                     value={uploadProspect.reference}
                     onChange={value => onChange('reference', value)}
+                       scrollRef={scrollRef}
+              scrollYRef={scrollYRef}
                   />
                   {isAdmin && (
                     <DropdownField
@@ -1015,6 +1369,8 @@ const AssignRM = ({ setHideBottomNav }) => {
                       placeholder="Select Company"
                       value={uploadProspect.com_id}
                       onChange={value => onChange('com_id', value)}
+                         scrollRef={scrollRef}
+              scrollYRef={scrollYRef}
                     />
                   )}
 
@@ -1181,6 +1537,9 @@ const AssignRM = ({ setHideBottomNav }) => {
         )}
 
       </KeyboardAvoidingView>
+
+      {/* ── Custom Alert ── */}
+      <CustomAlertHost />
     </View>
   );
 };
@@ -1238,8 +1597,12 @@ const styles = StyleSheet.create({
   iconRow: { flexDirection: 'row', gap: 12 },
   divider: { height: 0.5, backgroundColor: 'rgba(255,255,255,0.12)', marginBottom: 8 },
   sectionLabel: { color: COLORS.gold, fontSize: 11, fontWeight: '700', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.4 },
-  contactRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5, gap: 8 },
-  contactItem: { flexDirection: 'row', alignItems: 'center', gap: 5, flex: 1 },
+
+  // ── Contact row (iOS-safe: phone fixed width, email takes remaining space) ──
+  contactRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 6, gap: 10 },
+  contactPhone: { flexDirection: 'row', alignItems: 'center', gap: 5, flexShrink: 0 },
+  contactEmail: { flexDirection: 'row', alignItems: 'center', gap: 5, flex: 1, minWidth: 0 },
+
   infoRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 4 },
   infoText: { color: COLORS.mutedText, fontSize: 11, flexShrink: 1 },
   refRow: { flexDirection: 'row', alignItems: 'center', marginTop: 2 },
@@ -1254,6 +1617,68 @@ const styles = StyleSheet.create({
   infoBox: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: COLORS.goldDim, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7, marginBottom: 12, borderWidth: 1, borderColor: COLORS.goldBorder },
   infoBoxText: { color: COLORS.gold, fontSize: 12, fontWeight: '500' },
   rmLabel: { color: COLORS.white, marginBottom: 6, fontSize: 13, fontWeight: '500' },
+   dropdown: {
+    height: 40,
+  backgroundColor: '#2b2f66',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#39415a',
+  },
+  dropdownOpen: { borderColor: '#4aa3df', 
+    // backgroundColor: '#28304a' 
+  },
+  dropdownMenu: {
+    marginTop: 4,
+   backgroundColor: '#ffffff',
+    borderRadius: 12,
+    // borderWidth: 1,
+    // borderColor: '#39415a',
+    overflow: Platform.OS === 'ios' ? 'visible' : 'hidden',
+   
+  },
+  dropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    // borderBottomWidth: 1,
+    // borderBottomColor: '#323a52',
+  },
+  dropdownItemActive: { backgroundColor: 'rgba(74,163,223,0.15)' },
+  dropdownItemText: { flex: 1, fontSize: 13, color: '#000', fontWeight: '500' },
+  dropdownItemTextActive: { color: '#7cc4f2', fontWeight: '700' },
+  placeholder: { color: '#8a9daf', fontSize: 13 },
+  selectedText: { color: '#e6ebf2', fontSize: 13, fontWeight: '600' },
+  ddTriggerLeft: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 },
+  ddAvatar: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: 'rgba(20,130,204,0.14)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ddAvatarSelected: { backgroundColor: '#1482cc' },
+  ddAvatarTxt: { fontSize: 11, fontWeight: '700', color: '#1482cc' },
+  ddSearchWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#babdc5',
+    backgroundColor: '#b1b5c0',
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
+  },
+  ddSearchInput: { flex: 1, fontSize: 13, color: '#000', padding: 0 },
+  ddNoResult: { textAlign: 'center', color: '#6b7690', fontSize: 12, paddingVertical: 16 },
+  placeholderStyle: { color: COLORS.mutedText, fontSize: 13 },
+  selectedTextStyle: { color: COLORS.white, fontSize: 13 },
+  itemContainer: { paddingVertical: 0 },
   dropdownList: { maxHeight: 200, borderWidth: 1, borderColor: COLORS.borderColor, borderRadius: 10, marginBottom: 12, marginTop: 4 },
   dropdownItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingVertical: 11, borderBottomWidth: 0.5, borderBottomColor: 'rgba(255,255,255,0.08)' },
   dropdownItemSelected: { backgroundColor: COLORS.accentDim },
@@ -1272,21 +1697,22 @@ const styles = StyleSheet.create({
   assignBtn: { backgroundColor: COLORS.accent, paddingHorizontal: 18, paddingVertical: 9, borderRadius: 20, minWidth: 80, alignItems: 'center' },
   assignBtnDisabled: { backgroundColor: 'rgba(0,207,255,0.3)' },
   assignBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
-phoneText: {
-  color: '#00acc1',
-  backgroundColor: 'rgba(0, 172, 193, 0.15)',
-  paddingHorizontal: 4,
-  paddingVertical: 2,
-  borderRadius: 4,
-  fontWeight: '600',
-},
+  phoneText: {
+    color: '#00acc1',
+    backgroundColor: 'rgba(0, 172, 193, 0.15)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    fontSize: 11,
+    fontWeight: '600',
+    overflow: 'hidden', // iOS e borderRadius clip korar jonno
+  },
   emailText: {
     color: '#00acc1',
     textDecorationLine: 'underline',
     fontWeight: '500',
     fontSize: 11,
-
-
+    flexShrink: 1, // iOS fix
   },
   uploadModalContainer: { width: '92%', backgroundColor: COLORS.modalBg, borderRadius: 16, padding: 18, borderWidth: 1, borderColor: COLORS.borderColor, maxHeight: '88%' },
   roleBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4, marginBottom: 12, borderWidth: 1, borderColor: COLORS.borderColor },
@@ -1355,4 +1781,21 @@ phoneText: {
   sdItemTextSelected: { color: COLORS.accent, fontWeight: '600' },
   sdEmpty: { alignItems: 'center', paddingVertical: 32, gap: 8 },
   sdEmptyText: { color: COLORS.mutedText, fontSize: 13 },
+
+  // ── Custom Alert ──
+  alertOverlay: { flex: 1, backgroundColor: 'rgba(3,6,40,0.78)', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24 },
+  alertBox: {
+    width: '100%', maxWidth: 340, backgroundColor: COLORS.modalBg, borderRadius: 22,
+    paddingHorizontal: 20, paddingTop: 28, paddingBottom: 20, alignItems: 'center',
+    borderWidth: 1, borderColor: COLORS.borderColor, overflow: 'hidden',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.45, shadowRadius: 20, elevation: 14,
+  },
+  alertTopBar: { position: 'absolute', top: 0, left: 0, right: 0, height: 3 },
+  alertIconWrap: { width: 54, height: 54, borderRadius: 27, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  alertTitle: { color: COLORS.white, fontSize: 16, fontWeight: '700', textAlign: 'center', marginTop: 14 },
+  alertMsgScroll: { alignSelf: 'stretch', maxHeight: screenHeight * 0.32, marginTop: 8 },
+  alertMessage: { color: COLORS.mutedText, fontSize: 13, lineHeight: 19, textAlign: 'center' },
+  alertBtnRow: { alignSelf: 'stretch', flexDirection: 'row', gap: 10, marginTop: 20 },
+  alertBtn: { paddingVertical: 11, paddingHorizontal: 14, borderRadius: 14, alignItems: 'center', justifyContent: 'center', minHeight: 42 },
+  alertBtnText: { fontSize: 13, fontWeight: '700' },
 });

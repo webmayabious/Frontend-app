@@ -1,24 +1,24 @@
-import { Platform, PermissionsAndroid, AppState } from 'react-native';
+import { Platform, AppState } from 'react-native';
 import React, { useEffect, useRef } from 'react';
 import StackNavigations from './src/navigations/StackNavigations';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Provider, useSelector } from 'react-redux';
 import store from './src/redux/store';
 import messaging from '@react-native-firebase/messaging';
-import notifee, { AndroidImportance } from '@notifee/react-native';
-import api from './src/api/AxiosInstance';
-import socket from './src/socket';
+import notifee, { AndroidImportance, EventType } from '@notifee/react-native';
 import { openFile } from './src/pages/utils/openFile';
-import  { EventType } from '@notifee/react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { syncBadge } from './src/pages/Notification/syncBadge';
+
 const queryClient = new QueryClient();
 
 // ✅ MAIN APP (ALL LOGIC HERE)
 function MainApp() {
   const stateRef = useRef(store.getState());
-  const lastMessageId = useRef(null);
+  const wasLoggedIn = useRef(false);
   const isLoggedIn = useSelector(state => state.isLoggedIn);
 
+  // ✅ Foreground notification press (file open)
   useEffect(() => {
     const unsubscribe = notifee.onForegroundEvent(async ({ type, detail }) => {
       console.log('NOTIFICATION DETAIL:', detail);
@@ -27,7 +27,6 @@ function MainApp() {
 
         if (filePath) {
           await openFile(filePath);
-
           await notifee.cancelNotification(detail.notification.id);
         }
       }
@@ -45,8 +44,6 @@ function MainApp() {
 
     requestPermission();
   }, []);
-
-
 
   // ✅ Store state sync
   useEffect(() => {
@@ -69,65 +66,6 @@ function MainApp() {
       await requestUserPermission();
     }
   }
-
-  // ✅ Android 13+ Permission
-  async function requestAndroidPermission() {
-    if (Platform.OS === 'android' && Platform.Version >= 33) {
-      const granted = await PermissionsAndroid.request(
-        PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS
-      );
-      console.log('🔔 Android Permission:', granted);
-    }
-  }
-
-  
-  // useEffect(() => {
-  //   if (!isLoggedIn) return;
-
-  //   let unsubscribeTokenRefresh;
-
-  //   async function initNotifications() {
-  //     console.log('✅ Login → Init Notification');
-  //     requestAndroidPermission();
-
-  //     const granted = await requestUserPermission();
-
-  //     if (granted) {
-  //       await getFCMToken();
-  //       unsubscribeTokenRefresh = messaging().onTokenRefresh(newToken => {
-  //         console.log('🔄 Token Refresh:', newToken);
-  //       });
-  //     }
-  //   }
-
-  //   initNotifications();
-
-  //   return () => {
-  //     if (unsubscribeTokenRefresh) unsubscribeTokenRefresh();
-  //   };
-  // }, [isLoggedIn]);
-
-  // ✅ Login এ Badge Sync
-  // useEffect(() => {
-  //   if (!isLoggedIn) return;
-
-  //   async function syncBadgeOnLogin() {
-  //     try {
-  //       const res = await api.get('/api/pm/fetchUnreadChatCount');
-  //       console.log('📦 API RESPONSE:', res.data);
-  //       const count = Number(res.data?.totalUnreadChat || 0);
-
-  //       if (Platform.OS === 'ios') {
-  //         await notifee.cancelAllNotifications();
-  //         await notifee.setBadgeCount(count);
-  //       }
-  //     } catch (err) {
-  //       console.log(err);
-  //     }
-  //   }
-
-  //   syncBadgeOnLogin();
-  // }, [isLoggedIn]);
 
   // ✅ iOS Permission
   async function requestUserPermission() {
@@ -152,17 +90,6 @@ function MainApp() {
     return enabled;
   }
 
-  // ✅ FCM Token
-  async function getFCMToken() {
-    try {
-      const token = await messaging().getToken();
-      console.log('📱 FCM TOKEN:', token);
-      return token;
-    } catch (error) {
-      console.log('❌ Token Error:', error);
-    }
-  }
-
   // ✅ Notification Channel (Android)
   async function createNotificationChannel() {
     await notifee.createChannel({
@@ -173,22 +100,13 @@ function MainApp() {
     });
   }
 
-  // ✅ App Active হলে Tray Clear + Badge Sync
+  // ✅ App Active hole: Tray Clear + Count Sync (only when logged in)
   useEffect(() => {
     const sub = AppState.addEventListener('change', async state => {
-      if (state === 'active') {
+      if (state === 'active' && stateRef.current.isLoggedIn) {
         try {
-          console.log('📱 App Open → Clear Tray + Sync Badge');
-
           await notifee.cancelAllNotifications();
-
-          const res = await api.get('/api/pm/fetchUnreadChatCount');
-          console.log('unread count--', res.data);
-          const count = Number(res.data?.totalUnreadChat || 0);
-
-          if (Platform.OS === 'ios') {
-            await notifee.setBadgeCount(count);
-          }
+          await syncBadge();
         } catch (err) {
           console.log('❌ Error:', err);
         }
@@ -198,30 +116,32 @@ function MainApp() {
     return () => sub.remove();
   }, []);
 
-  // ✅ Socket থেকে Badge Update
-  // useEffect(() => {
-  //   const handleUnreadCount = async data => {
-  //     console.log('🔥 SOCKET HIT:', data);
-  //     const count = Number(data?.total_unread || 0);
+  // ✅ Login hole Count Sync, Logout hole iOS Badge 0
+  useEffect(() => {
+    if (isLoggedIn) {
+      wasLoggedIn.current = true;
+      syncBadge();
+    } else if (wasLoggedIn.current) {
+      wasLoggedIn.current = false;
+      if (Platform.OS === 'ios') {
+        notifee.setBadgeCount(0).catch(err =>
+          console.log('❌ Badge reset error:', err),
+        );
+      }
+    }
+  }, [isLoggedIn]);
 
-  //     try {
-  //       if (Platform.OS === 'ios') {
-  //         await notifee.setBadgeCount(count);
-  //       }
-  //       console.log('🎯 Badge Updated:', count);
-  //     } catch (err) {
-  //       console.log('❌ Badge update error:', err);
-  //     }
-  //   };
+  // ✅ NEW: Foreground e notun push ashle count auto update
+  useEffect(() => {
+    const unsubscribe = messaging().onMessage(async () => {
+      if (stateRef.current.isLoggedIn) {
+        await syncBadge();
+      }
+    });
+    return unsubscribe;
+  }, []);
 
-  //   socket.on('global_chat_unread_count_sk', handleUnreadCount);
-
-  //   return () => {
-  //     socket.off('global_chat_unread_count_sk', handleUnreadCount);
-  //   };
-  // }, []);
-
-  // ✅ Background Notification Click
+  // ✅ Background / Quit Notification Click
   useEffect(() => {
     const unsubscribe = messaging().onNotificationOpenedApp(remoteMessage => {
       console.log('📲 Background tap:', remoteMessage);

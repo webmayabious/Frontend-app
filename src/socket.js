@@ -8,9 +8,9 @@ import { io } from "socket.io-client";
 
 // console.log("Connected?", socket.connected);
 
-// https://api.prolificdesigns.mokhsh.com
-// https://api.mokhsh.com
-// https://api.prolificdesigns.mokhsh.com
+// https://api.prolificdesigns.mokhsh.info
+// https://api.mokhsh.info
+// https://api.prolificdesigns.mokhsh.info
 
 const socket = io("https://api.mokhsh.info", {
   path: "/api/socket.io/", 

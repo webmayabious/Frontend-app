@@ -1,4 +1,4 @@
-// FollowUpsScreen.js (Fixed - useNavigation inside component)
+// TotalBookingsAgreementsTillDateScreen.js
 import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
@@ -14,26 +14,40 @@ import {
   Image,
   Dimensions,
   Animated,
+  Keyboard,
+  DeviceEventEmitter,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import Header from '../Layout/Header';
-import BottomNav from '../navigations/BottomNav';
 import { useNavigation } from '@react-navigation/native';
 import { useQuery } from '@tanstack/react-query';
 import api from '../api/AxiosInstance';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { Dropdown } from 'react-native-element-dropdown';
+
+const COLORS = {
+  bg: '#080d5a',
+  cardBg: '#ffffff0e',
+  cardSelected: '#0d1a6e',
+  headerBg: '#0A0F2E',
+  accent: '#00cfff',
+  accentDim: '#00cfff18',
+  accentBorder: '#00cfff40',
+  white: '#FFFFFF',
+  mutedText: '#8A90B4',
+  labelText: '#FFB85D',
+  gold: '#f4c542',
+  goldDim: '#f4c54218',
+  goldBorder: '#f4c54235',
+  green: '#00C48C',
+  red: '#FF6B6B',
+  borderColor: '#ffffff20',
+  modalBg: '#0f1550',
+  sectionBg: 'rgba(255,255,255,0.13)',
+};
 const STATUSBAR_HEIGHT =
   Platform.OS === 'android' ? StatusBar.currentHeight : 44;
 const SCREEN_HEIGHT = Dimensions.get('window').height;
+
 /* ================= CALL ================= */
-// const makeCall = phoneNumber => {
-//   if (!phoneNumber) return;
-//   Alert.alert('Call', `Do you want to call ${phoneNumber}?`, [
-//     { text: 'Cancel', style: 'cancel' },
-//     { text: 'Call', onPress: () => Linking.openURL(`tel:${phoneNumber}`) },
-//   ]);
-// };
 const makeCall = phoneNumber => {
   if (!phoneNumber) return;
 
@@ -57,7 +71,6 @@ const makeCall = phoneNumber => {
           if (supported) {
             await Linking.openURL(appUrl);
           } else {
-            // Opens WhatsApp Web or the app if installed
             await Linking.openURL(webUrl);
           }
         } catch (error) {
@@ -71,7 +84,8 @@ const makeCall = phoneNumber => {
     },
   ]);
 };
-const sendMail = async (email) => {
+
+const sendMail = async email => {
   if (!email) return;
 
   try {
@@ -82,51 +96,208 @@ const sendMail = async (email) => {
       if (supported) {
         await Linking.openURL(gmailUrl);
       } else {
-        // Fallback to mailto
         await Linking.openURL(`mailto:${email}`);
       }
     } else {
-      // iOS
       await Linking.openURL(`mailto:${email}`);
     }
   } catch (error) {
     Alert.alert('Error', 'Unable to open email app.');
   }
 };
-const DropdownField = ({ label, data, placeholder, value, onChange }) => {
-  const [isFocus, setIsFocus] = useState(false);
+
+/* ================= INLINE DROPDOWN ================= */
+const LIST_HEIGHT = 220;
+const FIELD_TOP_OFFSET = Platform.OS === 'ios' ? 280 : 200;
+
+const DropdownField = ({
+  label,
+  data,
+  value,
+  onChange,
+  error,
+  scrollRef,
+  scrollYRef,
+  placeholder,
+}) => {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const dropAnim = useRef(new Animated.Value(0)).current;
+  const wrapRef = useRef(null);
+
+  const options = data || [];
+  const selected = options.find(o => o.value === value);
+
+  const filtered = options.filter(o =>
+    String(o.label ?? '')
+      .toLowerCase()
+      .includes(search.toLowerCase()),
+  );
+
+  const maxHeight = dropAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, LIST_HEIGHT],
+  });
+
+  // Scroll the modal so this field moves up toward the top
+  const scrollFieldUp = () => {
+    if (!wrapRef.current || !scrollRef?.current) return;
+    wrapRef.current.measureInWindow((x, y) => {
+      const delta = y - FIELD_TOP_OFFSET;
+      if (delta > 0) {
+        scrollRef.current.scrollTo({
+          y: (scrollYRef?.current || 0) + delta,
+          animated: true,
+        });
+      }
+    });
+  };
+
+  const close = (duration = 180) => {
+    Keyboard.dismiss();
+    Animated.timing(dropAnim, {
+      toValue: 0,
+      duration,
+      useNativeDriver: false,
+    }).start(() => {
+      setOpen(false);
+      setSearch('');
+      DeviceEventEmitter.emit('toggleBottomNav', true);
+    });
+  };
+
+  const toggle = () => {
+    if (open) {
+      close();
+    } else {
+      DeviceEventEmitter.emit('toggleBottomNav', false);
+      setOpen(true);
+      scrollFieldUp();
+      Animated.timing(dropAnim, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: false,
+      }).start(scrollFieldUp);
+    }
+  };
+
+  useEffect(() => {
+    return () => DeviceEventEmitter.emit('toggleBottomNav', true);
+  }, []);
+
+  const handleSelect = item => {
+    onChange && onChange(item.value);
+    close(150);
+  };
+
   return (
-    <View style={styles.filterInputWrapper}>
-      <Text style={styles.filterLabel}>{label}</Text>
-      <Dropdown
+    <View ref={wrapRef} collapsable={false} style={styles.field}>
+      {label ? <Text style={styles.dropLabel}>{label}</Text> : null}
+
+      {/* Trigger */}
+      <TouchableOpacity
         style={[
-          styles.filterDropdown,
-          isFocus && { borderColor: '#00e5ff', borderWidth: 1.5 },
+          styles.dropdown,
+          open && styles.dropdownOpen,
+          error && styles.inputError,
+          {
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          },
         ]}
-        containerStyle={styles.dropdownContainer}
-        placeholderStyle={styles.placeholderStyle}
-        selectedTextStyle={styles.selectedTextStyle}
-        itemTextStyle={{ color: '#0b0b0b', fontWeight: '500' }}
-        activeColor="#e6f7ff"
-        data={data || []}
-        labelField="label"
-        valueField="value"
-        placeholder={placeholder}
-        value={value}
-        onFocus={() => setIsFocus(true)}
-        onBlur={() => setIsFocus(false)}
-        onChange={item => {
-          setIsFocus(false);
-          onChange && onChange(item.value);
-        }}
-        renderRightIcon={() => (
-          <Icon
-            name={isFocus ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
-            size={20}
-            color="#00e5ff"
-          />
-        )}
-      />
+        onPress={toggle}
+        activeOpacity={0.8}
+      >
+        <View style={styles.ddTriggerLeft}>
+          <Text
+            style={selected ? styles.selectedText : styles.placeholder}
+            numberOfLines={1}
+          >
+            {selected ? selected.label : placeholder || 'Select...'}
+          </Text>
+        </View>
+        <Icon
+          name={open ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
+          size={20}
+          color="#8a9daf"
+        />
+      </TouchableOpacity>
+
+      {/* Inline list */}
+      {open && (
+        <Animated.View
+          style={[styles.dropdownMenu, { maxHeight, opacity: dropAnim }]}
+        >
+          <View style={styles.ddSearchWrap}>
+            <Icon
+              name="search"
+              size={16}
+              color="#000"
+              style={{ marginRight: 6 }}
+            />
+            <TextInput
+              style={styles.ddSearchInput}
+              placeholder="Search..."
+              placeholderTextColor="#000"
+              value={search}
+              onChangeText={setSearch}
+              autoCorrect={false}
+              autoCapitalize="none"
+              returnKeyType="search"
+            />
+            {search.length > 0 && (
+              <TouchableOpacity
+                onPress={() => setSearch('')}
+                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+              >
+                <Icon name="close" size={14} color="#ccc" />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          <ScrollView
+            style={{ maxHeight: 155 }}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="always"
+            nestedScrollEnabled
+          >
+            {filtered.length === 0 ? (
+              <Text style={styles.ddNoResult}>No results found</Text>
+            ) : (
+              filtered.map(item => {
+                const isActive = item.value === value;
+                return (
+                  <TouchableOpacity
+                    key={String(item.value)}
+                    style={[
+                      styles.dropdownItem,
+                      isActive && styles.dropdownItemActive,
+                    ]}
+                    onPress={() => handleSelect(item)}
+                    activeOpacity={0.7}
+                  >
+                    <Text
+                      style={[
+                        styles.dropdownItemText,
+                        isActive && styles.dropdownItemTextActive,
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {item.label}
+                    </Text>
+                    {isActive && (
+                      <Icon name="check" size={16} color="#1482cc" />
+                    )}
+                  </TouchableOpacity>
+                );
+              })
+            )}
+          </ScrollView>
+        </Animated.View>
+      )}
+
+      {error ? <Text style={styles.errorText}>{error}</Text> : null}
     </View>
   );
 };
@@ -149,7 +320,8 @@ const InputField = ({ label, placeholder, icon, value, onChange, onPress }) => (
     </TouchableOpacity>
   </View>
 );
-/* ================= FILTER MODAL (same as LeadsListScreen) ================= */
+
+/* ================= FILTER MODAL ================= */
 const FilterModal = ({
   visible,
   onClose,
@@ -158,11 +330,6 @@ const FilterModal = ({
   onApply,
   onReset,
   Property,
-  callStatusListfetch,
-  leadQualificationOptions,
-  leadStatusOptions,
-  leadSubStatusOptions,
-  leadSourceOptions,
   Rm,
   projectOptions,
   LeadStatus,
@@ -171,12 +338,14 @@ const FilterModal = ({
   setShowFromPicker,
   setShowToPicker,
   onDateChange,
-  setActivePicker,
-  activePicker,
 }) => {
   const scaleAnim = useRef(new Animated.Value(0.85)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
   const [mounted, setMounted] = useState(false);
+
+  // refs for inline dropdown auto-scroll
+  const scrollRef1 = useRef(null);
+  const scrollYRef = useRef(0);
 
   useEffect(() => {
     if (visible) {
@@ -233,6 +402,11 @@ const FilterModal = ({
         <View style={styles.modalDivider} />
 
         <ScrollView
+          ref={scrollRef1}
+          onScroll={e => {
+            scrollYRef.current = e.nativeEvent.contentOffset.y;
+          }}
+          scrollEventThrottle={16}
           style={styles.filterScrollView}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
@@ -244,6 +418,8 @@ const FilterModal = ({
             placeholder="Select Location"
             value={filters.location}
             onChange={value => onChange('location', value)}
+            scrollRef={scrollRef1}
+            scrollYRef={scrollYRef}
           />
           <DropdownField
             label="Relationship Manager"
@@ -251,6 +427,8 @@ const FilterModal = ({
             placeholder="Select RM"
             value={filters.rm}
             onChange={value => onChange('rm', value)}
+            scrollRef={scrollRef1}
+            scrollYRef={scrollYRef}
           />
           <DropdownField
             label="Project"
@@ -258,6 +436,8 @@ const FilterModal = ({
             placeholder="Select Project"
             value={filters.project}
             onChange={value => onChange('project', value)}
+            scrollRef={scrollRef1}
+            scrollYRef={scrollYRef}
           />
           <DropdownField
             label="Approval Status"
@@ -265,6 +445,8 @@ const FilterModal = ({
             placeholder="Select Status"
             value={filters.booking_approval_status}
             onChange={value => onChange('booking_approval_status', value)}
+            scrollRef={scrollRef1}
+            scrollYRef={scrollYRef}
           />
           <View
             style={{
@@ -308,7 +490,8 @@ const FilterModal = ({
               onChange={(e, d) => onDateChange(e, d, 'toDate')}
             />
           )}
-          <View style={{ height: 8 }} />
+          {/* extra space so the last dropdown can scroll fully into view */}
+          <View style={{ height: 120 }} />
         </ScrollView>
 
         <View style={styles.modalDivider} />
@@ -333,7 +516,8 @@ const FilterModal = ({
     </Animated.View>
   );
 };
-//  navigation prop টা বাইরে থেকে pass করা হচ্ছে
+
+/* ================= CARD ================= */
 const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
   <View style={styles.card}>
     {/* Header */}
@@ -393,24 +577,11 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
       </Text>
     </View>
 
-    {/* Project */}
-    {/* <View style={styles.rowBetween}>
-      <Text style={styles.label}>
-        Project:{' '}
-        <Text style={styles.value}>
-          {data?.propertyproject?.project_name || 'N/A'}
-        </Text>
-      </Text>
-    </View> */}
-
     {/* Booking Date */}
     <View style={styles.rowBetween}>
       <Text style={styles.label}>
         Booking Date:{' '}
-        <Text style={styles.value}>
-          {data?.date_of_booking ||
-            'N/A'}
-        </Text>
+        <Text style={styles.value}>{data?.date_of_booking || 'N/A'}</Text>
       </Text>
     </View>
 
@@ -428,9 +599,7 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
     <View style={styles.rowBetween}>
       <Text style={styles.label}>
         Total Brokerage:{' '}
-        <Text style={styles.value}>
-          ₹ {data?.base_brokerage ?? '0'}
-        </Text>
+        <Text style={styles.value}>₹ {data?.base_brokerage ?? '0'}</Text>
       </Text>
     </View>
 
@@ -439,9 +608,7 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
       <TouchableOpacity onPress={() => makeCall(data?.mobile)}>
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
           <Text style={styles.label}>Phone: </Text>
-          <Text style={styles.phoneText}>
-            {data?.mobile || 'N/A'}
-          </Text>
+          <Text style={styles.phoneText}>{data?.mobile || 'N/A'}</Text>
         </View>
       </TouchableOpacity>
     </View>
@@ -451,26 +618,10 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
       <TouchableOpacity onPress={() => sendMail(data?.email)}>
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
           <Text style={styles.label}>Email: </Text>
-          <Text style={styles.emailText}>
-            {data?.email || 'N/A'}
-          </Text>
+          <Text style={styles.emailText}>{data?.email || 'N/A'}</Text>
         </View>
       </TouchableOpacity>
     </View>
-
-    {/* Site Visit Date */}
-    {/* <View style={styles.rowBetween}>
-      <Text style={styles.label}>
-        Site Visit Date:{' '}
-        <Text style={styles.value}>
-          {data?.propertyfeedbacks?.length
-            ? data.propertyfeedbacks
-                .map(x => x?.site_visit_date)
-                .join(', ')
-            : 'N/A'}
-        </Text>
-      </Text>
-    </View> */}
 
     {/* RM */}
     <View style={styles.rowBetween}>
@@ -488,14 +639,13 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
     <View style={styles.rowBetween}>
       <Text style={styles.label}>
         Source:{' '}
-        <Text style={styles.value}>
-          {data?.mrreference?.mrf_name || 'N/A'}
-        </Text>
+        <Text style={styles.value}>{data?.mrreference?.mrf_name || 'N/A'}</Text>
       </Text>
     </View>
   </View>
 );
 
+/* ================= MAIN ================= */
 const TotalBookingsAgreementsTillDateScreen = () => {
   const navigation = useNavigation();
   const [showRemarks, setShowRemarks] = useState(false);
@@ -522,7 +672,7 @@ const TotalBookingsAgreementsTillDateScreen = () => {
   const [appliedFilters, setAppliedFilters] = useState();
   const [showFromPicker, setShowFromPicker] = useState(false);
   const [showToPicker, setShowToPicker] = useState(false);
-  const [activePicker, setActivePicker] = useState(null);
+
   /* ================= API ================= */
   const { data: Lead, isLoading } = useQuery({
     queryKey: ['totalBookingAndAgreementTillDate', appliedFilters],
@@ -537,7 +687,6 @@ const TotalBookingsAgreementsTillDateScreen = () => {
           toDate: filters.toDate || undefined,
           project: filters.project || undefined,
           location: filters.location || undefined,
-          // active: filters.active || undefined,
           booking_approval_status: filters.booking_approval_status || undefined,
           lead_status: filters.lead_status || undefined,
           lead_sub_status: filters.lead_sub_status || undefined,
@@ -547,10 +696,11 @@ const TotalBookingsAgreementsTillDateScreen = () => {
           siteVisitToDate: filters.siteVisitToDate || undefined,
           reference: filters.lead_source || undefined,
         },
-      },);
+      });
       return res?.data?.data?.Bookings;
     },
   });
+
   const filteredfollowUps = (Lead || [])?.filter(item => {
     const name = item?.name?.toLowerCase() || '';
     const phone = item?.mobile || '';
@@ -562,7 +712,7 @@ const TotalBookingsAgreementsTillDateScreen = () => {
       name.includes(search) || phone.includes(search) || email.includes(search)
     );
   });
-  // console.log('siteVisits1', Lead);
+
   const { data: AllProperty } = useQuery({
     queryKey: ['AllProperty'],
     queryFn: async () => {
@@ -586,6 +736,7 @@ const TotalBookingsAgreementsTillDateScreen = () => {
       return res.data.data || [];
     },
   });
+
   const Property = AllProperty?.map(item => ({
     label: item.name,
     value: item.id,
@@ -600,6 +751,7 @@ const TotalBookingsAgreementsTillDateScreen = () => {
     { label: 'PENDING', value: '1' },
     { label: 'APPROVED BY CITY HEAD / BUSINESS HEAD / ADMIN', value: '2' },
   ];
+
   /* ================= HANDLERS ================= */
   const onChange = (key, value) => {
     setFilters(prev => ({ ...prev, [key]: value }));
@@ -635,7 +787,6 @@ const TotalBookingsAgreementsTillDateScreen = () => {
   const [showTopBtn, setShowTopBtn] = useState(false);
   const scrollRef = useRef();
 
-
   const onDateChange = (event, selectedDate, key) => {
     if (key === 'fromDate') {
       setShowFromPicker(false);
@@ -652,6 +803,7 @@ const TotalBookingsAgreementsTillDateScreen = () => {
       [key]: date,
     }));
   };
+
   const scrollToTop = () => {
     scrollRef.current?.scrollTo({ y: 0, animated: true });
   };
@@ -664,9 +816,6 @@ const TotalBookingsAgreementsTillDateScreen = () => {
         barStyle="light-content"
       />
 
-      {/* Header */}
-      {/* <Header /> */}
-
       {/* Title Row */}
       <View style={styles.topBarContainer}>
         <View style={styles.topBar}>
@@ -678,7 +827,6 @@ const TotalBookingsAgreementsTillDateScreen = () => {
           </View>
 
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            {/* <Icon name="filter-alt" size={18} color="#00e5ff" /> */}
             <TouchableOpacity
               style={styles.backBtn}
               onPress={() => navigation.goBack()}
@@ -705,13 +853,13 @@ const TotalBookingsAgreementsTillDateScreen = () => {
         scrollEventThrottle={16}
       >
         <View style={styles.searchBox}>
-          <Icon name="search" size={18} color="#aaa" />
+          <Icon name="search" size={16} color={COLORS.mutedText} />
           <TextInput
             placeholder="Search name / phone / email..."
-            placeholderTextColor="#aaa"
+            placeholderTextColor={COLORS.mutedText}
             value={searchText}
             onChangeText={setSearchText}
-            style={{ marginLeft: 8, color: '#fff', flex: 1, height: '100%', paddingVertical: Platform.OS === 'ios' ? 0 : 6, }}
+            style={styles.searchInput}
           />
         </View>
 
@@ -726,6 +874,7 @@ const TotalBookingsAgreementsTillDateScreen = () => {
             <Icon name="filter-alt" size={18} color="#00e5ff" />
           </TouchableOpacity>
         </View>
+
         {isLoading ? (
           <Text style={{ color: '#fff', textAlign: 'center', marginTop: 20 }}>
             Loading...
@@ -749,7 +898,8 @@ const TotalBookingsAgreementsTillDateScreen = () => {
         )}
         <View style={{ height: 100 }} />
       </ScrollView>
-      {/* ✅ REMARKS MODAL */}
+
+      {/* REMARKS MODAL */}
       {showRemarks && (
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
@@ -770,6 +920,7 @@ const TotalBookingsAgreementsTillDateScreen = () => {
           </View>
         </View>
       )}
+
       <FilterModal
         visible={showFilterModal}
         onClose={() => setShowFilterModal(false)}
@@ -784,25 +935,22 @@ const TotalBookingsAgreementsTillDateScreen = () => {
         showFromPicker={showFromPicker}
         showToPicker={showToPicker}
         onDateChange={onDateChange}
-        setActivePicker={setActivePicker}
-        activePicker={activePicker}
         setShowFromPicker={setShowFromPicker}
         setShowToPicker={setShowToPicker}
       />
+
       {showTopBtn && (
         <TouchableOpacity style={styles.topButton} onPress={scrollToTop}>
           <Icon name="keyboard-arrow-up" size={26} color="#fff" />
         </TouchableOpacity>
       )}
-
-      {/* Bottom Nav */}
-      {/* <BottomNav /> */}
     </View>
   );
 };
 
 export default TotalBookingsAgreementsTillDateScreen;
 
+/* ================= STYLES ================= */
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#070c4d' },
 
@@ -832,19 +980,32 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
   },
 
+  backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+
   backText: { color: '#fff', fontSize: 12 },
 
   searchBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    margin: 15,
-    marginBottom: 0,
+    margin: 12,
+    marginBottom: 8,
     borderWidth: 1,
-    borderColor: '#444',
+    borderColor: COLORS.borderColor,
     borderRadius: 20,
-    paddingHorizontal: 10,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    paddingHorizontal: 12,
     marginTop: 0,
-    height: Platform.OS === 'ios' ? 45 : 45,
+    height: 40,
+  },
+  searchInput: {
+    color: COLORS.white,
+    marginLeft: 8,
+    fontSize: 13,
+    flex: 1,
+    paddingVertical: 0,
   },
 
   countFilterRow: {
@@ -876,8 +1037,6 @@ const styles = StyleSheet.create({
     textDecorationLine: 'underline',
     fontWeight: '500',
     fontSize: 12,
-
-
   },
   cardHeader: {
     flexDirection: 'row',
@@ -885,7 +1044,18 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
 
-  name: { color: '#fff', fontWeight: 'bold' },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    flexWrap: 'wrap',
+  },
+
+  name: {
+    color: '#fff',
+    fontWeight: 'bold',
+    flexShrink: 1,
+  },
 
   activeBadge: {
     backgroundColor: '#4caf50',
@@ -896,13 +1066,6 @@ const styles = StyleSheet.create({
 
   activeText: { color: '#fff', fontSize: 10 },
 
-  remarksBtn: {
-    backgroundColor: '#00acc1',
-    borderRadius: 10,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    maxWidth: 80,
-  },
   phoneText: {
     color: '#00acc1',
     backgroundColor: 'rgba(0, 172, 193, 0.15)',
@@ -911,7 +1074,6 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     fontWeight: '600',
   },
-  remarksText: { color: '#fff', fontSize: 10 },
 
   location: {
     color: '#00e5ff',
@@ -930,37 +1092,11 @@ const styles = StyleSheet.create({
   label: {
     color: '#FFB85D',
     fontSize: 12,
-    // flex: 1,
-    // flexWrap: 'wrap',
     paddingTop: 2,
   },
   value: {
     color: '#fff',
     flexShrink: 1,
-  },
-
-  cardFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 10,
-    gap: 6,
-  },
-
-  button: {
-    backgroundColor: '#00acc1',
-    borderRadius: 20,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    flexShrink: 1,
-  },
-
-  buttonText: { color: '#fff', fontSize: 12 },
-  completed: {
-    color: '#aaa',
-    fontSize: 12,
-    flexShrink: 1,
-    textAlign: 'right',
   },
 
   topButton: {
@@ -975,14 +1111,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 
-  // modalOverlay: {
-  //   position: 'absolute',
-  //   width: '100%',
-  //   height: '100%',
-  //   backgroundColor: 'rgba(0,0,0,0.6)',
-  //   justifyContent: 'center',
-  //   alignItems: 'center',
-  // },
   modalOverlay: {
     position: 'absolute',
     top: 0,
@@ -1013,45 +1141,6 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
 
-  modalTitle: {
-    color: '#00e5ff',
-    fontSize: 18,
-    marginBottom: 10,
-  },
-
-  modalText: {
-    color: '#fff',
-    textAlign: 'center',
-    marginBottom: 15,
-  },
-
-  modalCloseBtn: {
-    backgroundColor: '#00acc1',
-    paddingHorizontal: 20,
-    paddingVertical: 6,
-    borderRadius: 20,
-  },
-
-  modalCloseText: {
-    color: '#fff',
-    fontWeight: '600',
-  },
-  nameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    flexWrap: 'wrap',
-  },
-
-  name: {
-    color: '#fff',
-    fontWeight: 'bold',
-    flexShrink: 1,
-  },
-  backButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
   filterModalCard: {
     width: '88%',
     maxHeight: SCREEN_HEIGHT * 0.72,
@@ -1065,7 +1154,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 
-  /* ScrollView inside modal */
   filterScrollView: {
     width: '100%',
     flexGrow: 0,
@@ -1107,22 +1195,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
 
-  filterInputWrapper: { width: '100%', marginBottom: 12 },
-  filterLabel: {
-    color: '#a0b4e8',
-    fontSize: 12,
-    marginBottom: 5,
-    fontWeight: '500',
-  },
-  filterDropdown: {
-    height: 40,
-    backgroundColor: '#ffffff12',
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    borderWidth: 1,
-    borderColor: '#3d55cc',
-  },
-
   dragHandle: {
     width: 36,
     height: 4,
@@ -1130,14 +1202,16 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     marginBottom: 14,
   },
-  backButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  dropdownContainer: { backgroundColor: '#fff', borderRadius: 8 },
- 
-  placeholderStyle: { color: '#7a8fc4', fontSize: 13 },
+
+  /* ---- filter fields ---- */
   field: { marginBottom: 12, width: '100%' },
+
+  filterLabel: {
+    color: '#a0b4e8',
+    fontSize: 12,
+    marginBottom: 5,
+    fontWeight: '500',
+  },
   filterInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1148,6 +1222,69 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     height: 40,
   },
-   selectedTextStyle: { color: '#fff', fontSize: 13 },
   filterInput: { flex: 1, color: '#fff', fontSize: 13, paddingVertical: 0 },
+
+  /* ---- inline dropdown ---- */
+  dropLabel: {
+    color: '#00cfff',
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
+    marginBottom: 5,
+  },
+  dropdown: {
+    height: 40,
+    backgroundColor: '#2b2f66',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#39415a',
+  },
+  dropdownOpen: { borderColor: '#4aa3df' },
+  inputError: { borderColor: '#FF6B6B' },
+  errorText: { color: '#FF6B6B', fontSize: 11, marginTop: 4 },
+  dropdownMenu: {
+    marginTop: 4,
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    overflow: Platform.OS === 'ios' ? 'visible' : 'hidden',
+  },
+  dropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  dropdownItemActive: { backgroundColor: 'rgba(74,163,223,0.15)' },
+  dropdownItemText: { flex: 1, fontSize: 13, color: '#000', fontWeight: '500' },
+  dropdownItemTextActive: { color: '#7cc4f2', fontWeight: '700' },
+  placeholder: { color: '#8a9daf', fontSize: 13 },
+  selectedText: { color: '#e6ebf2', fontSize: 13, fontWeight: '600' },
+  ddTriggerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+  },
+  ddSearchWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#babdc5',
+    backgroundColor: '#b1b5c0',
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
+  },
+  ddSearchInput: { flex: 1, fontSize: 13, color: '#000', padding: 0 },
+  ddNoResult: {
+    textAlign: 'center',
+    color: '#6b7690',
+    fontSize: 12,
+    paddingVertical: 16,
+  },
 });

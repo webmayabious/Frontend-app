@@ -688,7 +688,7 @@ const LeadsListScreen = () => {
   const [showToPicker, setShowToPicker] = useState(false);
   const [activePicker, setActivePicker] = useState(null);
   const [appliedFilters, setAppliedFilters] = useState();
- const [pagination, setPagination] = useState(null);
+  const [pagination, setPagination] = useState(null);
   const formatDate = date => {
     if (!date) return '';
     const d = new Date(date);
@@ -745,12 +745,12 @@ const LeadsListScreen = () => {
         },
       });
       console.log('lead data:', JSON.stringify(res?.data?.data?.[0], null, 2));
-          setPagination({
-    total_records: res.data.totalRecords,
-    total_pages: res.data.totalPages,
-    current_page: res.data.currentPage,
-    per_page: res.data.limit,
-  });
+      setPagination({
+        total_records: res.data.totalRecords,
+        total_pages: res.data.totalPages,
+        current_page: res.data.currentPage,
+        per_page: res.data.limit,
+      });
       return res.data;
     },
     getNextPageParam: lastPage => {
@@ -881,15 +881,15 @@ const LeadsListScreen = () => {
     setShowFilterModal(false);
   };
   const startEntry = pagination
-  ? (pagination.current_page - 1) * pagination.per_page + 1
-  : 0;
+    ? (pagination.current_page - 1) * pagination.per_page + 1
+    : 0;
 
-const endEntry = pagination
-  ? Math.min(
+  const endEntry = pagination
+    ? Math.min(
       pagination.current_page * pagination.per_page,
       pagination.total_records
     )
-  : 0;
+    : 0;
   const scrollToTop = () => {
     isScrollingToTop.current = true;
     scrollRef.current?.scrollTo({ y: 0, animated: true });
@@ -922,7 +922,7 @@ const endEntry = pagination
             >
               <Icon name="filter-alt" size={18} color="#00e5ff" />
             </TouchableOpacity>
-               {/* <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('Rmform')} activeOpacity={0.75}>
+            {/* <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('Rmform')} activeOpacity={0.75}>
                         <Icon name="add" size={13} color="#fff" />
                         <Text style={styles.actionBtnText} numberOfLines={1} adjustsFontSizeToFit>Add New Lead</Text>
                       </TouchableOpacity> */}
@@ -969,37 +969,37 @@ const endEntry = pagination
         scrollEventThrottle={400}
       >
         <View style={styles.searchRow}>
-        <View style={styles.searchBox}>
-          <Icon name="search" size={18} color="#aaa" />
-          <TextInput
-            placeholder="Search ...."
-            placeholderTextColor="#aaa"
-            value={searchText}
-            onChangeText={setSearchText}
-            style={styles.searchInput}
-            autoCapitalize="none"
-            autoCorrect={false}
-            clearButtonMode="while-editing"
-          />
-        </View>
+          <View style={styles.searchBox}>
+         <Icon name="search" size={16} color={COLORS.mutedText} />
+            <TextInput
+              placeholder="Search name / phone..."
+                 placeholderTextColor={COLORS.mutedText}
+              value={searchText}
+              onChangeText={setSearchText}
+              style={styles.searchInput}
+              autoCapitalize="none"
+              autoCorrect={false}
+              clearButtonMode="while-editing"
+            />
+          </View>
           <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('Rmform')} activeOpacity={0.75}>
-                        <Icon name="add" size={13} color="#fff" />
-                        <Text style={styles.actionBtnText} numberOfLines={1} adjustsFontSizeToFit>Add New Lead</Text>
-                      </TouchableOpacity>
-                      </View>
-{pagination && (
-  <Text  style={{
-                    alignSelf: 'flex-start',
-                    marginLeft: 15,
-                    // marginTop: 2,
-                    marginBottom: 8,
-                    color:'#a0b4e8',
-                    fontSize:12,
-                    fontWeight:'600'
-                  }}>
-    Showing {startEntry} to {endEntry} of {pagination.total_records} entries
-  </Text>
-)}
+            <Icon name="add" size={16} color="#fff" />
+            <Text style={styles.actionBtnText} numberOfLines={1} adjustsFontSizeToFit>Add New Lead</Text>
+          </TouchableOpacity>
+        </View>
+        {pagination && (
+          <Text style={{
+            alignSelf: 'flex-start',
+            marginLeft: 15,
+            // marginTop: 2,
+            marginBottom: 8,
+            color: '#a0b4e8',
+            fontSize: 12,
+            fontWeight: '600'
+          }}>
+            Showing {startEntry} to {endEntry} of {pagination.total_records} entries
+          </Text>
+        )}
         {isLoading ? (
           <Text style={{ color: '#fff', textAlign: 'center', marginTop: 20 }}>
             Loading...
@@ -1113,70 +1113,69 @@ const styles = StyleSheet.create({
   },
   backText: { color: '#fff', fontSize: 12 },
   backButton: { flexDirection: 'row', alignItems: 'center' },
-// searchRow: {
-//   flexDirection: 'row',
-//   alignItems: 'center',
-//   gap: 10,
-//   width: '100%',
-// },
-//   searchBox: {
-//     flex:1,
-//     flexDirection: 'row',
-//     alignItems: 'center',
-//     marginHorizontal:10,
-//     marginBottom: 5,
-//     borderWidth: 1,
-//     borderColor: '#444',
-//     borderRadius: 22,
-//     paddingHorizontal: 12,
-//     paddingVertical: Platform.OS === 'ios' ? 10 : 0,
-//     minHeight: Platform.OS === 'ios' ? 44 : 40,
-//     backgroundColor: '#ffffff08',
-//   },
-//   searchInput: {
-//     marginLeft: 8,
-//     color: '#fff',
-//     flex: 1,
-//     fontSize: 14,
-//     paddingVertical: 0,
-//     height: Platform.OS === 'ios' ? undefined : 40,
-//   },
-// actionBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, backgroundColor: 'rgba(58,63,122,0.85)', paddingVertical: 8, paddingHorizontal: 6, borderRadius: 20, borderWidth: 1, borderColor: COLORS.borderColor, minHeight: 36 },
-//   actionBtnText: { color: COLORS.white, fontSize: 11, fontWeight: '600', textAlign: 'center' },
-  searchRow: {
+  // searchRow: {
+  //   flexDirection: 'row',
+  //   alignItems: 'center',
+  //   gap: 10,
+  //   width: '100%',
+  // },
+  //   searchBox: {
+  //     flex:1,
+  //     flexDirection: 'row',
+  //     alignItems: 'center',
+  //     marginHorizontal:10,
+  //     marginBottom: 5,
+  //     borderWidth: 1,
+  //     borderColor: '#444',
+  //     borderRadius: 22,
+  //     paddingHorizontal: 12,
+  //     paddingVertical: Platform.OS === 'ios' ? 10 : 0,
+  //     minHeight: Platform.OS === 'ios' ? 44 : 40,
+  //     backgroundColor: '#ffffff08',
+  //   },
+  //   searchInput: {
+  //     marginLeft: 8,
+  //     color: '#fff',
+  //     flex: 1,
+  //     fontSize: 14,
+  //     paddingVertical: 0,
+  //     height: Platform.OS === 'ios' ? undefined : 40,
+  //   },
+  // actionBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, backgroundColor: 'rgba(58,63,122,0.85)', paddingVertical: 8, paddingHorizontal: 6, borderRadius: 20, borderWidth: 1, borderColor: COLORS.borderColor, minHeight: 36 },
+  //   actionBtnText: { color: COLORS.white, fontSize: 11, fontWeight: '600', textAlign: 'center' },
+searchRow: {
   flexDirection: 'row',
   alignItems: 'center',
   width: '100%',
   paddingHorizontal: 10,
   gap: 10,
+  marginBottom: 8,
 },
 
 searchBox: {
   flex: 1,
+  height: 40,
   flexDirection: 'row',
   alignItems: 'center',
-  marginBottom: 5,
   borderWidth: 1,
-  borderColor: '#444',
-  borderRadius: 22,
+  borderColor: COLORS.borderColor,
+  borderRadius: 20,
+  backgroundColor: 'rgba(255,255,255,0.06)',
   paddingHorizontal: 12,
-  paddingVertical: Platform.OS === 'ios' ? 10 : 0,
-  minHeight: Platform.OS === 'ios' ? 44 : 40,
-  backgroundColor: '#ffffff08',
 },
 
 searchInput: {
-  marginLeft: 8,
-  color: '#fff',
   flex: 1,
-  fontSize: 14,
+  color: COLORS.white,
+  fontSize: 13,
+  marginLeft: 8,
   paddingVertical: 0,
-  height: Platform.OS === 'ios' ? undefined : 40,
+  height: 40,
 },
 
 actionBtn: {
-  width: 110,
-  height: 35,
+  width: 120,            // 110 theke barano, 13 size e text jate fit hoy
+  height: 40,
   flexDirection: 'row',
   alignItems: 'center',
   justifyContent: 'center',
@@ -1189,12 +1188,12 @@ actionBtn: {
 
 actionBtnText: {
   color: COLORS.white,
-  fontSize: 11,
+  fontSize: 12,
   fontWeight: '600',
   textAlign: 'center',
 },
 
-card: {
+  card: {
     marginHorizontal: 15,
     marginBottom: 12,
     borderWidth: 1,

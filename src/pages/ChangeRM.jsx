@@ -55,6 +55,148 @@ const COLORS = {
   sectionBg: 'rgba(255,255,255,0.13)',
 };
 
+// ─── CUSTOM ALERT (Alert.alert er replacement, app theme er sathe match kore) ─
+
+let _alertHandler = null;
+
+// Alert.alert er moto-i signature: showAlert(title, message, buttons, options)
+const showAlert = (title, message, buttons, options) => {
+  if (_alertHandler) {
+    _alertHandler({ title, message, buttons, options });
+  } else {
+    Alert.alert(title, message, buttons, options); // fallback (host mount hoyni)
+  }
+};
+
+const ALERT_TYPES = {
+  success: { icon: 'check-circle', color: COLORS.green },
+  error: { icon: 'error', color: COLORS.red },
+  warning: { icon: 'warning', color: COLORS.gold },
+  danger: { icon: 'delete-forever', color: COLORS.red },
+  contact: { icon: 'contact-phone', color: COLORS.accent },
+  info: { icon: 'info', color: COLORS.accent },
+};
+
+// Title er shuru r emoji (✅ ❌ ⚠️) theke type bujhe, emoji ta soriye dey
+const parseAlert = (title = '', buttons = []) => {
+  const raw = String(title);
+  let type = 'info';
+  if (raw.startsWith('\u2705') || raw.startsWith('\uD83C\uDF89')) type = 'success';
+  else if (raw.startsWith('\u274C')) type = 'error';
+  else if (raw.startsWith('\u26A0')) type = 'warning';
+  else if (/^success$/i.test(raw)) type = 'success';
+  else if (/^(error|permission denied)$/i.test(raw)) type = 'error';
+  else if (/^contact$/i.test(raw)) type = 'contact';
+  else if (buttons.some(b => b.style === 'destructive')) type = 'danger';
+  const cleanTitle = raw.replace(/^(?:[\u2705\u274C\u26A0]\uFE0F?|\uD83C\uDF89)\s*/, '');
+  return { type, cleanTitle };
+};
+
+const CustomAlertHost = () => {
+  const [config, setConfig] = useState(null);
+  const anim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    _alertHandler = cfg => {
+      setConfig(cfg);
+      anim.setValue(0);
+      Animated.spring(anim, {
+        toValue: 1,
+        useNativeDriver: true,
+        damping: 16,
+        stiffness: 190,
+      }).start();
+    };
+    return () => { _alertHandler = null; };
+  }, [anim]);
+
+  const close = cb => {
+    Animated.timing(anim, { toValue: 0, duration: 140, useNativeDriver: true }).start(() => {
+      setConfig(null);
+      cb && cb();
+    });
+  };
+
+  if (!config) return null;
+
+  const buttons = config.buttons?.length ? config.buttons : [{ text: 'OK' }];
+  const { type, cleanTitle } = parseAlert(config.title, buttons);
+  const t = ALERT_TYPES[type];
+  const cancelable = config.options?.cancelable !== false;
+  const stacked = buttons.length > 2;
+  const cancelBtns = buttons.filter(b => b.style === 'cancel');
+  const otherBtns = buttons.filter(b => b.style !== 'cancel');
+  const ordered = stacked ? [...otherBtns, ...cancelBtns] : [...cancelBtns, ...otherBtns];
+  const message = config.message ? String(config.message) : '';
+  const longMessage = message.includes('\n');
+
+  const dismiss = () => {
+    if (!cancelable) return;
+    close(() => config.options?.onDismiss && config.options.onDismiss());
+  };
+
+  const opacity = anim.interpolate({ inputRange: [0, 1], outputRange: [0, 1], extrapolate: 'clamp' });
+  const scale = anim.interpolate({ inputRange: [0, 1], outputRange: [0.88, 1] });
+
+  return (
+    <Modal transparent visible animationType="none" statusBarTranslucent onRequestClose={dismiss}>
+      <Animated.View style={[styles.alertOverlay, { opacity }]}>
+        <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={dismiss} />
+
+        <Animated.View style={[styles.alertBox, { opacity, transform: [{ scale }] }]}>
+          <View style={[styles.alertTopBar, { backgroundColor: t.color }]} />
+
+          <View style={[styles.alertIconWrap, { backgroundColor: t.color + '1f', borderColor: t.color + '55' }]}>
+            <Icon name={t.icon} size={26} color={t.color} />
+          </View>
+
+          <Text style={styles.alertTitle}>{cleanTitle}</Text>
+
+          {message ? (
+            <ScrollView
+              style={styles.alertMsgScroll}
+              showsVerticalScrollIndicator={false}
+              bounces={false}
+            >
+              <Text style={[styles.alertMessage, longMessage && { textAlign: 'left' }]}>{message}</Text>
+            </ScrollView>
+          ) : null}
+
+          <View style={[styles.alertBtnRow, stacked && { flexDirection: 'column' }]}>
+            {ordered.map((btn, i) => {
+              const isSolo = buttons.length === 1;
+              const isCancel = btn.style === 'cancel' && !isSolo;
+              const isDestructive = btn.style === 'destructive';
+              const bg = isCancel
+                ? 'rgba(255,255,255,0.08)'
+                : isDestructive || type === 'danger'
+                  ? COLORS.red
+                  : t.color;
+              const txtColor = isCancel ? COLORS.white : isDestructive || type === 'danger' ? '#fff' : '#06104a';
+              return (
+                <TouchableOpacity
+                  key={`${btn.text}-${i}`}
+                  activeOpacity={0.8}
+                  style={[
+                    styles.alertBtn,
+                    !stacked && { flex: 1 },
+                    { backgroundColor: bg },
+                    isCancel && { borderWidth: 1, borderColor: COLORS.borderColor },
+                  ]}
+                  onPress={() => close(() => btn.onPress && btn.onPress())}
+                >
+                  <Text style={[styles.alertBtnText, { color: txtColor }]}>{btn.text}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </Animated.View>
+      </Animated.View>
+    </Modal>
+  );
+};
+
+
 // ─── SEARCHABLE DROPDOWN ──────────────────────────────────────────────────────
 
 const SearchableDropdown = ({ label, data = [], placeholder, value, onChange }) => {
@@ -248,7 +390,7 @@ const makeCall = phoneNumber => {
 
   const cleanNumber = phoneNumber.replace(/\D/g, '');
 
-  Alert.alert('Contact', `Choose an action for ${phoneNumber}`, [
+  showAlert('Contact', `Choose an action for ${phoneNumber}`, [
     {
       text: 'Cancel',
       style: 'cancel',
@@ -270,7 +412,7 @@ const makeCall = phoneNumber => {
             await Linking.openURL(webUrl);
           }
         } catch (error) {
-          Alert.alert('Error', 'Unable to open WhatsApp.');
+          showAlert('Error', 'Unable to open WhatsApp.');
         }
       },
     },
@@ -299,7 +441,7 @@ const sendMail = async (email) => {
       await Linking.openURL(`mailto:${email}`);
     }
   } catch (error) {
-    Alert.alert('Error', 'Unable to open email app.');
+    showAlert('Error', 'Unable to open email app.');
   }
 };
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
@@ -496,7 +638,7 @@ const ChangeRM = ({ setHideBottomNav }) => {
       });
     },
     onSuccess: () => {
-      Alert.alert('🎉 Success', 'RM has been changed successfully.', [
+      showAlert('🎉 Success', 'RM has been changed successfully.', [
         { text: 'OK', onPress: () => console.log('Done') },
       ]);
       setSelected([]);
@@ -505,7 +647,7 @@ const ChangeRM = ({ setHideBottomNav }) => {
       fetchLeads(1, true);
     },
     onError: error => {
-      Alert.alert('Error', error?.message || 'Something went wrong');
+      showAlert('Error', error?.message || 'Something went wrong');
     },
   });
 
@@ -546,7 +688,7 @@ const ChangeRM = ({ setHideBottomNav }) => {
               >
                 {isChecked && <Icon name="check" size={11} color="#fff" />}
               </TouchableOpacity>
-              <Text style={styles.cardName}>
+              <Text style={styles.cardName} numberOfLines={2}>
                 {item?.name || 'N/A'} |{' '}
                 <Text style={styles.section}>
                   {item?.propertyproject?.project_name}
@@ -579,46 +721,44 @@ const ChangeRM = ({ setHideBottomNav }) => {
             <View style={styles.leftCol}>
               <View style={styles.infoRow}>
                 <Icon name="call" size={12} color={COLORS.accent} />
-                {/* <Text
-                  style={[styles.infoText, { color: COLORS.accent }]}
+                <TouchableOpacity
+                  style={styles.infoTouch}
                   onPress={() => makeCall(item?.phone)}
                 >
-                  {item?.phone || 'N/A'}
-                </Text> */}
-                   <TouchableOpacity onPress={() => makeCall(item?.phone)}>
-                                                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                               
-                                        
-                                                  {/* <View style={styles.remarksBtn}> */}
-                                                    <Text style={styles.phoneText}>
-                                                      {item?.phone || 'N/A'}
-                                                    </Text>
-                                                  {/* </View> */}
-                                                </View>
-                                              </TouchableOpacity>
+                  <Text style={styles.phoneText} numberOfLines={1}>
+                    {item?.phone || 'N/A'}
+                  </Text>
+                </TouchableOpacity>
               </View>
+
               <View style={styles.infoRow}>
                 <MaterialCommunityIcons
                   name="file-document-outline"
                   size={12}
                   color={COLORS.accent}
                 />
-                <Text style={styles.infoText}>{item?.company?.com_name || 'N/A'}</Text>
+                <Text style={styles.infoText} numberOfLines={1}>
+                  {item?.company?.com_name || 'N/A'}
+                </Text>
               </View>
+
               <View style={styles.infoRow}>
                 <Icon name="email" size={12} color={COLORS.accent} />
-                <TouchableOpacity onPress={() => sendMail(item?.email)}>
-                                       <Text style={styles.emailText} >
-                                         {item?.email || 'N/A'}
-                                       </Text>
-                                     </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.infoTouch}
+                  onPress={() => sendMail(item?.email)}
+                >
+                  <Text style={styles.emailText} numberOfLines={1}>
+                    {item?.email || 'N/A'}
+                  </Text>
+                </TouchableOpacity>
               </View>
             </View>
 
             <View style={styles.rightCol}>
               <View style={styles.infoRow}>
                 <Text style={styles.rmLabelCard}>RM: </Text>
-                <Text style={styles.rmValue}>
+                <Text style={styles.rmValue} numberOfLines={1}>
                   {item?.relationshipManager
                     ? `${item.relationshipManager.usr_fname} ${item.relationshipManager.usr_lname}`
                     : 'N/A'}
@@ -626,11 +766,15 @@ const ChangeRM = ({ setHideBottomNav }) => {
               </View>
               <View style={styles.infoRow}>
                 <Icon name="location-on" size={12} color={COLORS.gold} />
-                <Text style={styles.infoText}>{item?.propertylocation?.name || 'N/A'}</Text>
+                <Text style={styles.infoText} numberOfLines={1}>
+                  {item?.propertylocation?.name || 'N/A'}
+                </Text>
               </View>
               <View style={styles.infoRow}>
                 <Text style={styles.refLabel}>Reference: </Text>
-                <Text style={styles.refValue}>{item?.mrreference?.mrf_name || 'N/A'}</Text>
+                <Text style={styles.refValue} numberOfLines={1}>
+                  {item?.mrreference?.mrf_name || 'N/A'}
+                </Text>
               </View>
             </View>
           </View>
@@ -673,7 +817,7 @@ const ChangeRM = ({ setHideBottomNav }) => {
             style={styles.changeBtn}
             onPress={() => {
               if (selected.length === 0) {
-                Alert.alert(
+                showAlert(
                   '⚠️ Warning',
                   'Please select at least one lead',
                   [
@@ -966,6 +1110,9 @@ const ChangeRM = ({ setHideBottomNav }) => {
           </Animated.View>
         </KeyboardAvoidingView>
       )}
+
+      {/* ── Custom Alert ── */}
+      <CustomAlertHost />
     </View>
   );
 };
@@ -1051,14 +1198,15 @@ const styles = StyleSheet.create({
   cardSelected: { borderColor: 'rgba(0,207,255,0.45)', backgroundColor: COLORS.cardSelected },
   cardTop: { marginBottom: 8 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  cardName: { color: COLORS.white, fontWeight: '800', fontSize: 13, flex: 1 },
-  statusBadge: { borderRadius: 20, paddingHorizontal: 8, paddingVertical: 2, borderWidth: 0.8 },
+  cardName: { color: COLORS.white, fontWeight: '800', fontSize: 13, flex: 1, minWidth: 0 },
+  statusBadge: { borderRadius: 20, paddingHorizontal: 8, paddingVertical: 2, borderWidth: 0.8, flexShrink: 0 },
   statusText: { fontSize: 10, fontWeight: '700' },
   divider: { height: 0.5, backgroundColor: 'rgba(255,255,255,0.12)', marginBottom: 8 },
   cardBody: { flexDirection: 'row', gap: 8 },
-  leftCol: { flex: 1, gap: 5 },
-  rightCol: { flex: 1, gap: 5 },
-  infoRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  leftCol: { flex: 1, gap: 5, minWidth: 0 },
+  rightCol: { flex: 1, gap: 5, minWidth: 0 },
+  infoRow: { flexDirection: 'row', alignItems: 'center', gap: 5, minWidth: 0 },
+  infoTouch: { flexShrink: 1 },          // 👈 notun add koro
   infoText: { color: COLORS.mutedText, fontSize: 11, flexShrink: 1 },
   rmLabelCard: { color: COLORS.gold, fontSize: 11, fontWeight: '600' },
   rmValue: { color: COLORS.gold, fontSize: 11, fontWeight: '600', flexShrink: 1 },
@@ -1092,20 +1240,21 @@ const styles = StyleSheet.create({
     borderRadius: 10, marginBottom: 12, marginTop: 4,
   },
   phoneText: {
-  color: '#00acc1',
-  backgroundColor: 'rgba(0, 172, 193, 0.15)',
-  paddingHorizontal: 4,
-  paddingVertical: 2,
-  borderRadius: 4,
-  fontWeight: '600',
-},
- emailText: {
+    color: '#00acc1',
+    backgroundColor: 'rgba(0, 172, 193, 0.15)',
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    borderRadius: 4,
+    fontWeight: '600',
+    fontSize: 11,
+    flexShrink: 1,
+  },
+  emailText: {
     color: '#00acc1',
     textDecorationLine: 'underline',
     fontWeight: '500',
-    fontSize: 12,
-
-
+    fontSize: 11,
+    flexShrink: 1,
   },
   dropdownItem: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
@@ -1239,4 +1388,21 @@ const styles = StyleSheet.create({
   sdItemTextSelected: { color: COLORS.accent, fontWeight: '600' },
   sdEmpty: { alignItems: 'center', paddingVertical: 32, gap: 8 },
   sdEmptyText: { color: COLORS.mutedText, fontSize: 13 },
+
+  // ── Custom Alert ──
+  alertOverlay: { flex: 1, backgroundColor: 'rgba(3,6,40,0.78)', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24 },
+  alertBox: {
+    width: '100%', maxWidth: 340, backgroundColor: COLORS.modalBg, borderRadius: 22,
+    paddingHorizontal: 20, paddingTop: 28, paddingBottom: 20, alignItems: 'center',
+    borderWidth: 1, borderColor: COLORS.borderColor, overflow: 'hidden',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.45, shadowRadius: 20, elevation: 14,
+  },
+  alertTopBar: { position: 'absolute', top: 0, left: 0, right: 0, height: 3 },
+  alertIconWrap: { width: 54, height: 54, borderRadius: 27, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  alertTitle: { color: COLORS.white, fontSize: 16, fontWeight: '700', textAlign: 'center', marginTop: 14 },
+  alertMsgScroll: { alignSelf: 'stretch', maxHeight: screenHeight * 0.32, marginTop: 8 },
+  alertMessage: { color: COLORS.mutedText, fontSize: 13, lineHeight: 19, textAlign: 'center' },
+  alertBtnRow: { alignSelf: 'stretch', flexDirection: 'row', gap: 10, marginTop: 20 },
+  alertBtn: { paddingVertical: 11, paddingHorizontal: 14, borderRadius: 14, alignItems: 'center', justifyContent: 'center', minHeight: 42 },
+  alertBtnText: { fontSize: 13, fontWeight: '700' },
 });

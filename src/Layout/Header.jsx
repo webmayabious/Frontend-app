@@ -10,94 +10,73 @@ import {
   Alert,
   Text,
 } from "react-native";
-import Icon from "react-native-vector-icons/MaterialIcons";
 import { useSelector, useDispatch } from "react-redux";
 import Entypo from 'react-native-vector-icons/Entypo';
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import messaging from '@react-native-firebase/messaging'; 
-import socket from '../socket';                            
-import api from '../api/AxiosInstance';       
-import { useSafeAreaInsets } from "react-native-safe-area-context";      
-
-// const STATUSBAR_HEIGHT = Platform.OS === "android" ? StatusBar.currentHeight : 44;
+import messaging from '@react-native-firebase/messaging';
+import notifee from '@notifee/react-native';
+import api from '../api/AxiosInstance';
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const Header = ({ routeName }) => {
-   const insets = useSafeAreaInsets();
-const statusBarHeight = Platform.OS === "android"
-  ? (StatusBar.currentHeight || insets.top || 24)
-  : insets.top;
+  const insets = useSafeAreaInsets();
+  const statusBarHeight = Platform.OS === "android"
+    ? (StatusBar.currentHeight || insets.top || 24)
+    : insets.top;
 
   const userInfo = useSelector(state => state.userInfo);
   const [profileModalVisible, setProfileModalVisible] = useState(false);
   const [avatarLayout, setAvatarLayout] = useState(null);
   const navigation = useNavigation();
-  const dispatch = useDispatch();  
+  const dispatch = useDispatch();
 
-  // const handleLogout = async () => {
-  //   try {
-      
-  //     const fcmToken = await messaging().getToken();
-  //     await api.post('/api/pm/auth/logout', { fcm_token: fcmToken });
-  //     await messaging().deleteToken();
-
-  //     // ✅ Socket Disconnect
-  //     // if (socket.connected) {
-  //     //   socket.disconnect();
-  //     // }
-
-  //     // ✅ AsyncStorage Clear
-  //     await AsyncStorage.removeItem('PM_TOKEN');
-  //     await AsyncStorage.removeItem('PM_USER');
-  //     await AsyncStorage.removeItem('PM_ROLES');
-
-  //     // ✅ Redux Clear
-  //     dispatch({ type: 'LOGOUT' });
-  //     setProfileModalVisible(false);
-  //     navigation.replace('Login');
-
-  //   } catch (error) {
-  //     console.log('❌ LOGOUT ERROR:', error);
-  //     Alert.alert('Error', 'Logout failed');
-  //   }
-  // };
   const handleLogout = async () => {
-  try {
-    const fcmToken = await messaging().getToken();
+    try {
+      const fcmToken = await messaging().getToken();
 
-    // 1. ALWAYS clear app state first
-    await AsyncStorage.removeItem('PM_TOKEN');
-    await AsyncStorage.removeItem('PM_USER');
-    await AsyncStorage.removeItem('PM_ROLES');
+      // 1. ALWAYS clear app state first
+      await AsyncStorage.removeItem('PM_TOKEN');
+      await AsyncStorage.removeItem('PM_USER');
+      await AsyncStorage.removeItem('PM_ROLES');
 
-    dispatch({ type: 'LOGOUT' });
+      dispatch({ type: 'LOGOUT' });
 
-    // 2. navigate immediately
-    navigation.reset({
-      index: 0,
-      routes: [{ name: 'Login' }],
-    });
+      // Badge reset + tray clear
+      try {
+        await notifee.cancelAllNotifications();
+        if (Platform.OS === 'ios') {
+          await notifee.setBadgeCount(0);
+        }
+      } catch (e) {
+        console.log('Badge reset error:', e);
+      }
 
-    // 3. then call API in background (non-blocking)
-    api.post('/api/pm/auth/logout', { fcm_token: fcmToken })
-      .catch(err => console.log('logout API failed (ignored)', err));
+      // 2. navigate immediately
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'Login' }],
+      });
 
-    await messaging().deleteToken();
+      // 3. then call API in background (non-blocking)
+      api.post('/api/pm/auth/logout', { fcm_token: fcmToken })
+        .catch(err => console.log('logout API failed (ignored)', err));
 
-    setProfileModalVisible(false);
+      await messaging().deleteToken();
 
-  } catch (error) {
-    console.log('Logout error:', error);
-    Alert.alert('Error', 'Logout failed');
-  }
-};
+      setProfileModalVisible(false);
+    } catch (error) {
+      console.log('Logout error:', error);
+      Alert.alert('Error', 'Logout failed');
+    }
+  };
+
   return (
     <View style={[styles.header, { paddingTop: statusBarHeight + 10 }]}>
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
       {/* Left Section */}
       <View style={styles.leftSection}>
-        {/* <Icon name="menu" size={24} color="#fff" /> */}
         <Image
           source={require("../asset/image/logo/mokhsLogo.png")}
           style={styles.logoImage}
@@ -177,8 +156,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 15,
     paddingBottom: 20,
-    
-    // paddingTop: insets.top,
     backgroundColor: "#2B2E81",
     borderBottomLeftRadius: 20,
     borderBottomRightRadius: 20,

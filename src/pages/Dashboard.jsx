@@ -153,7 +153,7 @@ const Dashboard = () => {
     setRefreshing(false);
   };
 
-  const paddingTop = Platform.OS === 'ios' ? insets.top + 14: 14;
+const paddingTop = Platform.OS === 'ios' ? 14 : 14;
   const bottomNavHeight = 60 + insets.bottom;
 
   return (
@@ -161,7 +161,9 @@ const Dashboard = () => {
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
       <ScrollView
-        showsVerticalScrollIndicator={false}
+      contentInsetAdjustmentBehavior="never"
+  automaticallyAdjustContentInsets={false}
+  showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           styles.scroll,
           {
@@ -214,7 +216,7 @@ const Dashboard = () => {
             onPress={() => navigation.navigate(card.route)}
           />
         ))}
-        <View style={{paddingBottom:60}}/>
+        <View style={{paddingBottom:10}}/>
       </ScrollView>
 
       {/* ✅ BottomNav fixed at bottom — no glitch */}

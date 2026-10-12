@@ -22,7 +22,15 @@ const initialState = {
     paymentStatus: 0,
   },
   disacussionDetailsAccordion: "1",
-    replyMessage: null,
+  replyMessage: null,
+
+  // ✅ NEW
+  isLoggedIn: false,
+  unreadCounts: {
+    assigned_lead: 0,
+    follow_up_date: 0,
+    site_visit_date: 0,
+  },
 };
 
 const changeState = (state = initialState, { type, payload }) => {
@@ -62,11 +70,20 @@ const changeState = (state = initialState, { type, payload }) => {
 
     case "setDiscussionDetailsAccordion":
       return { ...state, disacussionDetailsAccordion: payload };
-      
+
     case "setReplyMessage":
       return { ...state, replyMessage: payload };
+
     case "clearReplyMessage":
       return { ...state, replyMessage: null };
+
+    // ✅ NEW
+    case "SET_UNREAD_COUNTS":
+      return { ...state, unreadCounts: payload };
+
+    case "LOGOUT":
+      return { ...initialState };
+
     default:
       return state;
   }

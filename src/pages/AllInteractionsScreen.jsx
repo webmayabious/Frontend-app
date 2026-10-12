@@ -103,7 +103,12 @@ const InteractionCard = ({ item, setShowRemarks, setRemarksText }) => {
         <Text style={styles.remarksBtnText}>Remarks</Text>
       </TouchableOpacity> */}
     </View>
-
+ <Text style={styles.leadQualification}>
+      project:{' '}
+      <Text style={styles.leadQualificationValue}>
+        {item?.project_id?.name}
+      </Text>
+    </Text>
     {/* Lead Qualification */}
     <Text style={styles.leadQualification}>
       Lead Qualification:{' '}
@@ -431,12 +436,12 @@ readMore: {
     fontWeight: '600',
   },
   leadQualification: {
-    color: COLORS.accent,
+     color: COLORS.labelText,
     fontSize: 11.5,
     marginBottom: 5,
   },
   leadQualificationValue: {
-    color: COLORS.accentLight,
+     color: COLORS.white,
     fontWeight: '700',
   },
   statusRow: {
