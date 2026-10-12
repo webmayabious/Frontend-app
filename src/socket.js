@@ -8,15 +8,20 @@ import { io } from "socket.io-client";
 
 // console.log("Connected?", socket.connected);
 
-// https://api.prolificdesigns.mokhsh.info
-// https://api.mokhsh.info
-// https://api.prolificdesigns.mokhsh.info
+// https://api.prolificdesigns.mokhsh.com
+// https://api.mokhsh.com
+// https://api.prolificdesigns.mokhsh.com
 
-const socket = io("https://api.mokhsh.info", {
+const socket = io("https://api.mokhsh.com", {
   path: "/api/socket.io/", 
-   //transports: ["websocket"],
-  transports: ["polling", "websocket"],
-  autoConnect: true,
+   transports: ["websocket"],
+  // transports: ["polling", "websocket"],
+  autoConnect: false,
+  reconnection:true,
+  reconnectionAttempts:Infinity,
+  reconnectionDelay:1000,
+  reconnectionDelayMax:5000,
+  timeout:20000
 });
 
 socket.on("connect", async() => {

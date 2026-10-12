@@ -1,4 +1,3 @@
-// LeadsListScreen.js — Centered filter modal with scale+fade animation
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import {
   View,
@@ -15,6 +14,9 @@ import {
   Image,
   Animated,
   Dimensions,
+  Modal,
+  DeviceEventEmitter,
+  Keyboard,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import Icon from 'react-native-vector-icons/MaterialIcons';
@@ -22,6 +24,7 @@ import { Dropdown } from 'react-native-element-dropdown';
 import { useNavigation } from '@react-navigation/native';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import api from '../api/AxiosInstance';
+import { useSelector } from 'react-redux';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 
@@ -54,6 +57,37 @@ const COLORS = {
   modalBg: '#0f1550',
   sectionBg: 'rgba(255,255,255,0.13)',
 };
+
+const USER_IMG_BASE_URL = 'https://pm2-files.s3.ap-south-1.amazonaws.com/user_images';
+
+const getUserImageUrl = img => {
+  if (!img) return null;
+  // Already a full URL? use as-is
+  if (/^https?:\/\//i.test(img)) return img;
+  // Remove any leading slash to avoid double slashes
+  return `${USER_IMG_BASE_URL}/${String(img).replace(/^\/+/, '')}`;
+};
+
+const getChangeMeta = item => {
+  const type = String(item?.change_type ?? '');
+  const hasChangedBy =
+    item?.changed_by !== null && item?.changed_by !== undefined;
+
+  // type "1" + changed_by has a value  => Manual
+  // type "2" + changed_by is null      => Automatic
+  const isManual = type === '1' && hasChangedBy;
+  const isAutomatic = type === '2' && !hasChangedBy;
+
+  // If the data is unexpected, decide using changed_by
+  const manual = isManual || (!isAutomatic && hasChangedBy);
+
+  return {
+    isAutomatic: !manual,
+    label: manual ? 'Manual' : 'Automatic',
+    color: manual ? '#f59e0b' : '#1a73e8',
+  };
+};
+
 const makeCall = phoneNumber => {
   if (!phoneNumber) return;
 
@@ -135,14 +169,71 @@ const RemarksText = ({ remarks }) => {
     </Text>
   );
 };
-const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => {
+
+const pad = n => String(n).padStart(2, '0');
+
+const getTodayString = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+};
+
+// true if ANY feedback has a call back date equal to today
+const isCallbackToday = feedbacks => {
+  if (!Array.isArray(feedbacks)) return false;
+  const today = getTodayString();
+
+  return feedbacks.some(x => {
+    if (!x?.call_back_date) return false;
+    const raw = String(x.call_back_date).trim();
+
+    // Format "YYYY-MM-DD" (or starts with it)
+    if (/^\d{4}-\d{2}-\d{2}/.test(raw)) {
+      return raw.substring(0, 10) === today;
+    }
+
+    // Any other format: try parsing
+    const d = new Date(raw);
+    if (isNaN(d.getTime())) return false;
+    return (
+      `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` === today
+    );
+  });
+};
+
+const Avatar = ({ uri, style, iconSize = 20 }) => {
+  const [failed, setFailed] = useState(false);
+
+  if (!uri || failed) {
+    return (
+      <View style={[style, styles.rmAvatarPlaceholder]}>
+        <Icon name="person" size={iconSize} color="#8A90B4" />
+      </View>
+    );
+  }
+
+  return (
+    <Image source={{ uri }} style={style} onError={() => setFailed(true)} />
+  );
+};
+
+const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText ,onInfoPress,canViewAssignment,}) => {
   const remarks =
     data?.propertyfeedbacks
       ?.map(x => x?.remarks)
       ?.filter(Boolean)
       ?.join(', ') || 'No Remarks Available';
+
+const hasMultipleAssignments = canViewAssignment && Number(data?.assignment_count) === 2;
+const isTodayCard = isCallbackToday(data?.propertyfeedbacks);
+// Priority: assignment_count border > today's border > no border
+const cardBorderColor = hasMultipleAssignments
+  ? '#dc35469c'
+  : isTodayCard
+    ? '#30bb7896'
+    : '#ffffff6e';
+
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, , { borderColor: cardBorderColor }]}>
       <View style={styles.cardHeader}>
         <View style={styles.nameRow}>
           <Text style={styles.name}>{data?.name || []}</Text>
@@ -170,8 +261,19 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => {
         </View>
 
         <View
-          style={{ flexDirection: 'row', alignItems: 'center', flexShrink: 0 }}
+          style={{ flexDirection: 'row', alignItems: 'center', flexShrink: 0, gap:5 }}
         >
+          {hasMultipleAssignments && (  
+          <Icon
+            name="info-outline"
+            size={25}
+            color="#00e5ff"
+            style={{ marginLeft: 8 }}
+            onPress={() =>
+              onInfoPress && onInfoPress(data?.id, data?.name)
+            }
+          />
+        )}
           {/* <TouchableOpacity
           style={styles.remarksBtn}
           onPress={() => {
@@ -213,6 +315,39 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => {
         Email: <Text style={styles.value}>{data?.email || 'N/A'}</Text>
       </Text>
     </View> */}
+       <View
+  style={{
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 5,
+    width: '100%',
+  }}
+>
+  <Text
+    style={{
+      color: '#fb9e08',
+      fontSize: 12,
+      fontWeight: '600',
+      flexShrink: 0,
+    }}
+  >
+    Project Form Name:
+  </Text>
+
+  <Text
+    style={[
+      styles.value,
+      {
+        flex: 1,
+        marginLeft: 5,
+      },
+    ]}
+    numberOfLines={1}
+    ellipsizeMode="tail"
+  >
+    {data?.project_form_name || 'N/A'}
+  </Text>
+</View>
       <View style={styles.rowBetween}>
         {/* <TouchableOpacity onPress={() => makeCall(data?.propertylead?.phone)}>
         <Text style={styles.label}>
@@ -220,6 +355,8 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => {
           <Text style={styles.remarksBtn}>{data?.propertylead?.phone || 'N/A'}</Text>
         </Text>
       </TouchableOpacity> */}
+   
+     
         <TouchableOpacity onPress={() => makeCall(data?.phone)}>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <Text style={styles.label1}>Phone: </Text>
@@ -298,6 +435,7 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => {
           <RemarksText remarks={remarks} />
         </View>
       </View>
+        
       <View style={styles.cardFooter}>
         <TouchableOpacity
           style={styles.button}
@@ -317,40 +455,207 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => {
   )
 };
 
-const DropdownField = ({ label, data, placeholder, value, onChange }) => {
-  const [isFocus, setIsFocus] = useState(false);
+const LIST_HEIGHT = 220;
+const FIELD_TOP_OFFSET = Platform.OS === 'ios' ? 280 : 250;
+// Inline dropdown, same behaviour/look as EmployeeDropdown
+const DropdownField = ({
+  label,
+  data,
+  value,
+  onChange,
+  error,
+  scrollRef,
+  scrollYRef,
+  placeholder,
+}) => {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const dropAnim = useRef(new Animated.Value(0)).current;
+  const wrapRef = useRef(null);
+
+  const options = data || [];
+  const selected = options.find(o => o.value === value);
+  const initial = selected?.label?.[0]?.toUpperCase();
+
+  const filtered = options.filter(o =>
+    String(o.label ?? '').toLowerCase().includes(search.toLowerCase()),
+  );
+
+  const maxHeight = dropAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, LIST_HEIGHT],
+  });
+
+  // After the list has expanded, scroll up just enough to keep it above the BottomNav
+ // Animate the screen so this field moves up toward the top
+const scrollFieldUp = () => {
+  if (!wrapRef.current || !scrollRef?.current) return;
+  wrapRef.current.measureInWindow((x, y) => {
+    const delta = y - FIELD_TOP_OFFSET;
+    if (delta > 0) {
+      scrollRef.current.scrollTo({
+        y: (scrollYRef?.current || 0) + delta,
+        animated: true,
+      });
+    }
+  });
+};
+// const handleSearchFocus = () => {
+//     setTimeout(() => {
+//       if (!wrapRef.current || !scrollRef?.current) return;
+//       wrapRef.current.measureInWindow((x, y) => {
+//         const delta = y - SEARCH_TOP_OFFSET;
+//         if (delta > 0) {
+//           scrollRef.current.scrollTo({
+//             y: (scrollYRef?.current || 0) + delta,
+//             animated: true,
+//           });
+//         }
+//       });
+//     }, 350); // wait for the keyboard animation
+//   };
+const close = (duration = 180) => {
+  Keyboard.dismiss();
+  Animated.timing(dropAnim, {
+    toValue: 0,
+    duration,
+    useNativeDriver: false,
+  }).start(() => {
+    setOpen(false);
+    setSearch('');
+    DeviceEventEmitter.emit('toggleBottomNav', true);   // show the nav again
+  });
+};
+
+const toggle = () => {
+  if (open) {
+    close();
+  } else {
+    DeviceEventEmitter.emit('toggleBottomNav', false);  // hide the nav as soon as it opens
+    setOpen(true);
+    scrollFieldUp();
+    Animated.timing(dropAnim, {
+      toValue: 1,
+      duration: 200,
+      useNativeDriver: false,
+    }).start(scrollFieldUp);
+  }
+};
+
+useEffect(() => {
+  return () => DeviceEventEmitter.emit('toggleBottomNav', true);  // restore on leaving the screen
+}, []);
+
+  const handleSelect = item => {
+    onChange && onChange(item.value);
+    close(150);
+  };
+
   return (
-    <View style={styles.filterInputWrapper}>
-      <Text style={styles.filterLabel}>{label}</Text>
-      <Dropdown
+    <View ref={wrapRef} collapsable={false} style={styles.field}>
+     {label ? <Text style={styles.dropLabel}>{label}</Text> : null}
+
+      {/* Trigger */}
+      <TouchableOpacity
         style={[
-          styles.filterDropdown,
-          isFocus && { borderColor: '#00e5ff', borderWidth: 1.5 },
+          styles.dropdown,
+          open && styles.dropdownOpen,
+          error && styles.inputError,
+          { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
         ]}
-        containerStyle={styles.dropdownContainer}
-        placeholderStyle={styles.placeholderStyle}
-        selectedTextStyle={styles.selectedTextStyle}
-        itemTextStyle={{ color: '#0b0b0b', fontWeight: '500' }}
-        activeColor="#e6f7ff"
-        data={data || []}
-        labelField="label"
-        valueField="value"
-        placeholder={placeholder}
-        value={value}
-        onFocus={() => setIsFocus(true)}
-        onBlur={() => setIsFocus(false)}
-        onChange={item => {
-          setIsFocus(false);
-          onChange && onChange(item.value);
-        }}
-        renderRightIcon={() => (
-          <Icon
-            name={isFocus ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
-            size={20}
-            color="#00e5ff"
-          />
-        )}
-      />
+        onPress={toggle}
+        activeOpacity={0.8}
+      >
+        <View style={styles.ddTriggerLeft}>
+          {/* {selected ? (
+            <View style={styles.ddAvatar}>
+              <Text style={styles.ddAvatarTxt}>{initial}</Text>
+            </View>
+          ) : null} */}
+          <Text
+            style={selected ? styles.selectedText : styles.placeholder}
+            numberOfLines={1}
+          >
+            {selected ? selected.label : placeholder || 'Select...'}
+          </Text>
+        </View>
+        <Icon
+          name={open ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
+          size={20}
+          color="#8a9daf"
+        />
+      </TouchableOpacity>
+
+      {/* Inline list */}
+      {open && (
+        <Animated.View
+          style={[styles.dropdownMenu, { maxHeight, opacity: dropAnim }]}
+        >
+          <View style={styles.ddSearchWrap}>
+            <Icon name="search" size={16} color="#000" style={{ marginRight: 6 }} />
+            <TextInput
+              style={styles.ddSearchInput}
+              placeholder="Search..."
+              placeholderTextColor="#000"
+              value={search}
+              onChangeText={setSearch}
+             
+              autoCorrect={false}
+              autoCapitalize="none"
+              returnKeyType="search"
+            />
+            {search.length > 0 && (
+              <TouchableOpacity
+                onPress={() => setSearch('')}
+                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+              >
+                <Icon name="close" size={14} color="#ccc" />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          <ScrollView
+            style={{ maxHeight: 155 }}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="always"
+            nestedScrollEnabled
+          >
+            {filtered.length === 0 ? (
+              <Text style={styles.ddNoResult}>No results found</Text>
+            ) : (
+              filtered.map(item => {
+                const isActive = item.value === value;
+                return (
+                  <TouchableOpacity
+                    key={String(item.value)}
+                    style={[styles.dropdownItem, isActive && styles.dropdownItemActive]}
+                    onPress={() => handleSelect(item)}
+                    activeOpacity={0.7}
+                  >
+                    {/* <View style={[styles.ddAvatar, isActive && styles.ddAvatarSelected]}>
+                      <Text style={[styles.ddAvatarTxt, isActive && { color: '#fff' }]}>
+                        {String(item.label ?? '')[0]?.toUpperCase()}
+                      </Text>
+                    </View> */}
+                    <Text
+                      style={[
+                        styles.dropdownItemText,
+                        isActive && styles.dropdownItemTextActive,
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {item.label}
+                    </Text>
+                    {isActive && <Icon name="check" size={16} color="#1482cc" />}
+                  </TouchableOpacity>
+                );
+              })
+            )}
+          </ScrollView>
+        </Animated.View>
+      )}
+
+      {error ? <Text style={styles.errorText}>{error}</Text> : null}
     </View>
   );
 };
@@ -401,7 +706,8 @@ const FilterModal = ({
   const scaleAnim = useRef(new Animated.Value(0.85)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
   const [mounted, setMounted] = useState(false);
-
+ const scrollRef1 = useRef(null);
+      const scrollYRef = useRef(0); 
   useEffect(() => {
     if (visible) {
       setMounted(true);
@@ -458,6 +764,11 @@ const FilterModal = ({
 
         <ScrollView
           style={styles.filterScrollView}
+                 ref={scrollRef1}
+          onScroll={e => {
+            scrollYRef.current = e.nativeEvent.contentOffset.y;
+          }}
+          scrollEventThrottle={16}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
           nestedScrollEnabled={true}
@@ -468,6 +779,8 @@ const FilterModal = ({
             placeholder="Select Location"
             value={filters.location}
             onChange={value => onChange('location', value)}
+                   scrollRef={scrollRef1}
+              scrollYRef={scrollYRef}
           />
           <DropdownField
             label="Relationship Manager"
@@ -475,6 +788,8 @@ const FilterModal = ({
             placeholder="Select RM"
             value={filters.rm_id}
             onChange={value => onChange('rm_id', value)}
+                   scrollRef={scrollRef1}
+              scrollYRef={scrollYRef}
           />
 
           <View
@@ -510,6 +825,8 @@ const FilterModal = ({
             placeholder="Select Project"
             value={filters.project}
             onChange={value => onChange('project', value)}
+                   scrollRef={scrollRef1}
+              scrollYRef={scrollYRef}
           />
           <DropdownField
             label="Lead Status"
@@ -517,6 +834,8 @@ const FilterModal = ({
             placeholder="Select Status"
             value={filters.active}
             onChange={value => onChange('active', value)}
+                   scrollRef={scrollRef1}
+              scrollYRef={scrollYRef}
           />
           <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 12, marginBottom: 10 }}>
             <Text
@@ -544,6 +863,8 @@ const FilterModal = ({
             placeholder="Select Status"
             value={filters.call_status}
             onChange={value => onChange('call_status', value)}
+                   scrollRef={scrollRef1}
+              scrollYRef={scrollYRef}
           />
           <DropdownField
             label="Lead Qualification"
@@ -551,6 +872,8 @@ const FilterModal = ({
             placeholder="Select Qualification"
             value={filters.lead_qualification}
             onChange={value => onChange('lead_qualification', value)}
+                   scrollRef={scrollRef1}
+              scrollYRef={scrollYRef}
           />
           <DropdownField
             label="Lead Status"
@@ -558,6 +881,8 @@ const FilterModal = ({
             placeholder="Select Status"
             value={filters.lead_status}
             onChange={value => onChange('lead_status', value)}
+                   scrollRef={scrollRef1}
+              scrollYRef={scrollYRef}
           />
           <DropdownField
             label="Lead Sub Status"
@@ -565,6 +890,8 @@ const FilterModal = ({
             placeholder="Select Sub Status"
             value={filters.lead_sub_status}
             onChange={value => onChange('lead_sub_status', value)}
+                   scrollRef={scrollRef1}
+              scrollYRef={scrollYRef}
           />
           <View
             style={{
@@ -668,6 +995,66 @@ const LeadsListScreen = () => {
   const [searchText, setSearchText] = useState('');
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [showTopBtn, setShowTopBtn] = useState(false);
+const [isTotalLeadsLoading, setIsTotalLeadsLoading] = useState(false);
+  const userRole = useSelector(state => state.userRole);
+const isAdmin = userRole?.includes('ADMIN');
+const isCityHead = userRole?.includes('CITY HEAD');
+const canViewAssignment = !!(isAdmin || isCityHead);
+
+const [showRMHistory, setShowRMHistory] = useState(false);
+const [selectedLeadId, setSelectedLeadId] = useState(null);
+const [selectedLeadName, setSelectedLeadName] = useState('');
+const rmHistoryAnim = useRef(new Animated.Value(0)).current;
+
+  const showRMHistoryModal = () => {
+  setShowRMHistory(true);
+  Animated.timing(rmHistoryAnim, {
+    toValue: 1,
+    duration: 250,
+    useNativeDriver: true,
+  }).start();
+};
+
+const hideRMHistoryModal = () => {
+  Animated.timing(rmHistoryAnim, {
+    toValue: 0,
+    duration: 200,
+    useNativeDriver: true,
+  }).start(() => {
+    setShowRMHistory(false);
+    setSelectedLeadId(null);
+  });
+};
+
+  const {
+  data: rmHistoryData = [],
+  isLoading: rmHistoryLoading,
+  isError: rmHistoryError,
+} = useQuery({
+  queryKey: ['rmChangeHistory', selectedLeadId],
+  queryFn: async () => {
+    const res = await api.get(`/api/pm/getRMChangeHistory/${selectedLeadId}`);
+    const body = res?.data?.data !== undefined ? res.data : res;
+    const data = body?.data ?? body ?? [];
+    return Array.isArray(data) ? data : [];
+  },
+  enabled: !!selectedLeadId,
+  retry: 1,
+});
+
+useEffect(() => {
+  if (rmHistoryError) {
+    Alert.alert('Error', 'Unable to load RM change history.');
+    hideRMHistoryModal();
+  }
+}, [rmHistoryError]);
+
+const fetchRMChangeHistory = (leadId, leadName) => {
+  if (!leadId) return;
+  setSelectedLeadName(leadName || '');
+  setSelectedLeadId(leadId);
+  showRMHistoryModal();
+};
 
   const [filters, setFilters] = useState({
     company_id: null,
@@ -890,6 +1277,7 @@ const LeadsListScreen = () => {
       pagination.total_records
     )
     : 0;
+   
   const scrollToTop = () => {
     isScrollingToTop.current = true;
     scrollRef.current?.scrollTo({ y: 0, animated: true });
@@ -897,7 +1285,19 @@ const LeadsListScreen = () => {
       isScrollingToTop.current = false;
     }, 600);
   };
+const handleTotalLeads = () => {
+  if (isTotalLeadsLoading) return;
 
+  setIsTotalLeadsLoading(true);
+  navigation.navigate('Totalleadscreen1');
+};
+useEffect(() => {
+  const unsubscribe = navigation.addListener('focus', () => {
+    setIsTotalLeadsLoading(false);
+  });
+
+  return unsubscribe;
+}, [navigation]);
   return (
     <View style={styles.container}>
       <StatusBar
@@ -926,7 +1326,7 @@ const LeadsListScreen = () => {
                         <Icon name="add" size={13} color="#fff" />
                         <Text style={styles.actionBtnText} numberOfLines={1} adjustsFontSizeToFit>Add New Lead</Text>
                       </TouchableOpacity> */}
-            <TouchableOpacity
+            {/* <TouchableOpacity
               style={styles.addNewBtn}
               onPress={() =>
                 navigation.navigate('Totalleadscreen1')
@@ -936,10 +1336,25 @@ const LeadsListScreen = () => {
               activeOpacity={0.75}
             >
               <Text style={styles.addNewText}>Total Leads</Text>
-            </TouchableOpacity>
+            </TouchableOpacity> */}
+            <TouchableOpacity
+  style={[
+    styles.addNewBtn,
+    isTotalLeadsLoading && { opacity: 0.6 },
+  ]}
+  onPress={handleTotalLeads}
+  activeOpacity={0.75}
+  disabled={isTotalLeadsLoading}
+>
+  {isTotalLeadsLoading ? (
+    <ActivityIndicator size="small" color="#FFFFFF" />
+  ) : (
+    <Text style={styles.addNewText}>Total Leads</Text>
+  )}
+</TouchableOpacity>
             <TouchableOpacity
               style={styles.backBtn}
-              onPress={() => navigation.goBack()}
+               onPress={() => navigation.navigate('Dashboard')}
             >
               <View style={styles.backButton}>
                 <Image
@@ -1016,6 +1431,8 @@ const LeadsListScreen = () => {
               setShowRemarks={setShowRemarks}
               setRemarksText={setRemarksText}
               navigation={navigation}
+              onInfoPress={fetchRMChangeHistory}
+              canViewAssignment={canViewAssignment}
             />
           ))
         ) : (
@@ -1035,7 +1452,7 @@ const LeadsListScreen = () => {
       </ScrollView>
 
       {/* REMARKS MODAL */}
-      {showRemarks && (
+      {/* {showRemarks && (
         <View style={styles.modalOverlay}>
           <View style={styles.remarksModalCard}>
             <View style={styles.checkIcon}>
@@ -1051,7 +1468,225 @@ const LeadsListScreen = () => {
             </TouchableOpacity>
           </View>
         </View>
-      )}
+      )} */}
+
+       {/* RM CHANGE HISTORY — bottom sheet style */}
+      <Modal
+        visible={showRMHistory}
+        transparent
+        animationType="none"
+        onRequestClose={hideRMHistoryModal}
+      >
+        <View style={styles.rmHistoryOverlay}>
+          <TouchableOpacity
+            style={StyleSheet.absoluteFill}
+            activeOpacity={1}
+            onPress={hideRMHistoryModal}
+          />
+
+          <Animated.View
+            style={[
+              styles.rmHistorySheet,
+              {
+                transform: [
+                  {
+                    translateY: rmHistoryAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [500, 0],
+                    }),
+                  },
+                ],
+                opacity: rmHistoryAnim,
+              },
+            ]}
+          >
+            <View style={styles.rmHistoryHandle} />
+            <Text style={styles.rmHistoryTitle}>RM Change History</Text>
+
+            {rmHistoryLoading ? (
+              <ActivityIndicator
+                size="small"
+                color="#00e5ff"
+                style={{ marginVertical: 40 }}
+              />
+            ) : rmHistoryData.length === 0 ? (
+              <Text style={styles.rmHistoryEmpty}>No history found</Text>
+            ) : (
+              <>
+                {/* Summary card */}
+{(() => {
+  const first = rmHistoryData[0];
+
+  const leadName =
+    selectedLeadName || first?.propertylead?.name || 'N/A';
+
+  const projectName =
+    first?.propertylead?.propertyproject?.project_name || 'N/A';
+
+  return (
+    <View style={styles.rmSummaryCard}>
+      <View style={styles.rmSummaryAccent} />
+
+      <View style={styles.rmSummaryContent}>
+
+        {/* PROJECT */}
+        <View style={styles.rmSummaryItem}>
+          <Text style={styles.rmSummaryLabel}>
+            PROJECT:
+          </Text>
+
+          <Text
+            style={styles.rmSummaryValue}
+            numberOfLines={1}
+          >
+            {projectName}
+          </Text>
+        </View>
+
+        {/* LEAD */}
+        <View style={styles.rmSummaryItem}>
+          <Text style={styles.rmSummaryLabel}>
+            LEAD:
+          </Text>
+
+          <Text
+            style={styles.rmSummaryValue}
+            numberOfLines={1}
+          >
+            {leadName}
+          </Text>
+        </View>
+
+        {/* TOTAL CHANGES */}
+        <View style={styles.rmSummaryItem}>
+          <Text style={styles.rmSummaryLabel}>
+            TOTAL CHANGES:
+          </Text>
+
+          <Text style={styles.rmSummaryCount}>
+            {rmHistoryData.length}
+          </Text>
+        </View>
+
+      </View>
+    </View>
+  );
+})()}
+
+                {/* Timeline list */}
+                <ScrollView
+                  style={styles.rmHistoryScroll}
+                  contentContainerStyle={{ paddingBottom: 12 }}
+                  showsVerticalScrollIndicator={false}
+                  nestedScrollEnabled
+                >
+                  {rmHistoryData.map((item, index) => {
+                    const prevName = item?.previousRM
+                      ? `${item.previousRM.usr_fname || ''} ${item.previousRM.usr_lname || ''}`.trim()
+                      : 'N/A';
+                    const newName = item?.newRM
+                      ? `${item.newRM.usr_fname || ''} ${item.newRM.usr_lname || ''}`.trim()
+                      : 'N/A';
+                    const changedBySource =
+                      item?.changedBy ||
+                      (item?.changed_by && item.changed_by === item.previous_rm
+                        ? item.previousRM
+                        : null);
+                      
+                    const changedByName = changedBySource
+                      ? `${changedBySource.usr_fname || ''} ${changedBySource.usr_lname || ''}`.trim()
+                      : null;
+
+                    const prevImg = getUserImageUrl(item?.previousRM?.usr_img);
+                    const newImg = getUserImageUrl(item?.newRM?.usr_img);
+                    const changedByImg = getUserImageUrl(changedBySource?.usr_img);
+
+                    // const isAutomatic =
+                    //   !item?.change_type ||
+                    //   String(item.change_type).toLowerCase() === 'automatic';
+                    // const badgeLabel = isAutomatic ? 'Automatic' : 'Manual';
+                    // const badgeBg = isAutomatic ? '#1a73e8' : '#1a73e8';
+                    const { isAutomatic, label: badgeLabel, color: badgeBg } = getChangeMeta(item);
+
+                    const dateStr = item?.created_at
+                      ? new Date(item.created_at).toLocaleString('en-IN', {
+                          day: '2-digit',
+                          month: 'short',
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          hour12: true,
+                        })
+                      : '';
+
+                    const isLast = index === rmHistoryData.length - 1;
+
+                    return (
+                      <View key={item?.id ?? index} style={styles.rmTimelineItem}>
+                        <View style={styles.rmTimelineLeft}>
+                          <View style={styles.rmTimelineDot} />
+                          {!isLast && <View style={styles.rmTimelineLine} />}
+                        </View>
+
+                        <View style={styles.rmTimelineCard}>
+                          <View style={styles.rmCardHeader}>
+                            <View style={[styles.rmBadge, { backgroundColor: badgeBg }]}>
+                              <Text style={styles.rmBadgeText}>{badgeLabel}</Text>
+                            </View>
+                            <Text style={styles.rmCardDate}>{dateStr}</Text>
+                          </View>
+
+                          <View style={styles.rmTransferRow}>
+                            <View style={styles.rmPersonCol}>
+                              <Avatar uri={prevImg} style={styles.rmAvatar} />
+                              <Text style={styles.rmPersonRole}>PREVIOUS RM</Text>
+                              <Text style={styles.rmPersonName} numberOfLines={2}>
+                                {prevName}
+                              </Text>
+                            </View>
+
+                            <View style={styles.rmArrowWrap}>
+                              <Icon name="arrow-forward" size={20} color="#fff" />
+                            </View>
+
+                            <View style={styles.rmPersonCol}>
+                              <Avatar uri={newImg} style={styles.rmAvatar} />
+                              <Text style={styles.rmPersonRole}>NEW RM</Text>
+                              <Text
+                                style={[styles.rmPersonName, { color: '#00e5ff' }]}
+                                numberOfLines={2}
+                              >
+                                {newName}
+                              </Text>
+                            </View>
+                          </View>
+
+                          {!isAutomatic && changedByName ? (
+                            <View style={styles.rmChangedByRow}>
+                              <Text style={styles.rmChangedByLabel}>CHANGED BY</Text>
+                              <Avatar uri={changedByImg} style={styles.rmChangedByAvatar} iconSize={12} />
+                              <Text style={styles.rmChangedByName}>{changedByName}</Text>
+                            </View>
+                          ) : null}
+                        </View>
+                      </View>
+                    );
+                  })}
+                </ScrollView>
+              </>
+            )}
+
+            <TouchableOpacity
+              style={styles.rmHistoryCancelBtn}
+              onPress={hideRMHistoryModal}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.rmHistoryCancelText}>Close</Text>
+            </TouchableOpacity>
+          </Animated.View>
+        </View>
+      </Modal>
+
 
       {/* ✅ FILTER — Centered modal with scale+fade animation */}
       <FilterModal
@@ -1418,6 +2053,66 @@ actionBtnText: {
     borderColor: '#3d55cc',
   },
   dropdownContainer: { backgroundColor: '#fff', borderRadius: 8 },
+  dropLabel: { color: '#00cfff', fontSize: 10, fontWeight: '700', letterSpacing: 0.4, textTransform: 'uppercase', marginBottom: 5 },
+ dropdown: {
+    height: 40,
+ backgroundColor: '#ffffff12',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    justifyContent: 'center',
+    borderWidth: 1,
+      borderColor: '#3d55cc',
+  },
+  dropdownOpen: { borderColor: '#4aa3df', 
+    // backgroundColor: '#28304a' 
+  },
+  dropdownMenu: {
+    marginTop: 4,
+   backgroundColor: '#ffffff',
+    borderRadius: 12,
+    // borderWidth: 1,
+    // borderColor: '#39415a',
+    overflow: Platform.OS === 'ios' ? 'visible' : 'hidden',
+   
+  },
+  dropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    // borderBottomWidth: 1,
+    // borderBottomColor: '#323a52',
+  },
+  dropdownItemActive: { backgroundColor: 'rgba(74,163,223,0.15)' },
+  dropdownItemText: { flex: 1, fontSize: 13, color: '#000', fontWeight: '500' },
+  dropdownItemTextActive: { color: '#7cc4f2', fontWeight: '700' },
+  placeholder: { color: '#8a9daf', fontSize: 13 },
+  selectedText: { color: '#e6ebf2', fontSize: 13, fontWeight: '600' },
+  ddTriggerLeft: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 },
+  ddAvatar: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: 'rgba(20,130,204,0.14)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ddAvatarSelected: { backgroundColor: '#1482cc' },
+  ddAvatarTxt: { fontSize: 11, fontWeight: '700', color: '#1482cc' },
+  ddSearchWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#babdc5',
+    backgroundColor: '#b1b5c0',
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
+  },
+  ddSearchInput: { flex: 1, fontSize: 13, color: '#000', padding: 0 },
+  ddNoResult: { textAlign: 'center', color: '#6b7690', fontSize: 12, paddingVertical: 16 },
   placeholderStyle: { color: '#7a8fc4', fontSize: 13 },
   selectedTextStyle: { color: '#fff', fontSize: 13 },
 
@@ -1433,4 +2128,271 @@ actionBtnText: {
     height: 40,
   },
   filterInput: { flex: 1, color: '#fff', fontSize: 13, paddingVertical: 0 },
+  /* RM History bottom sheet */
+  rmHistoryOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    justifyContent: 'flex-end',
+  },
+  rmHistorySheet: {
+    backgroundColor: '#0d1240',
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: Platform.OS === 'ios' ? 34 : 20,
+    maxHeight: SCREEN_HEIGHT * 0.82,
+    width:'100%',
+  },
+  rmHistoryHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#3d55cc',
+    alignSelf: 'center',
+    marginBottom: 12,
+  },
+  rmHistoryTitle: {
+    color: '#00cfff',
+    fontSize: 18,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: 14,
+  },
+  rmHistorySubtitle: {
+    color: '#a0b4e8',
+    fontSize: 13,
+    textAlign: 'center',
+    marginBottom: 14,
+  },
+  rmHistoryEmpty: {
+    color: '#fff',
+    textAlign: 'center',
+    marginVertical: 32,
+    fontSize: 13,
+  },
+
+  /* Summary card */
+  rmSummaryCard: {
+    // backgroundColor: '#151b4a',
+    backgroundColor: COLORS.modalBg, 
+    borderRadius: 12,
+    marginBottom: 16,
+    overflow: 'hidden',
+    flexDirection: 'row',
+    borderWidth: 1,
+    borderColor: '#ffffff12',
+  },
+  rmSummaryAccent: {
+    width: 4,
+    backgroundColor: '#00cfff',
+  },
+ rmSummaryContent: {
+  flex: 1,
+  paddingVertical: 12,
+  paddingHorizontal: 14,
+},
+
+rmSummaryItem: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  minHeight: 24,
+},
+
+rmSummaryLabel: {
+  color: '#8A90B4',
+  fontSize: 10,
+  fontWeight: '700',
+  letterSpacing: 0.4,
+  width: 105,
+},
+
+rmSummaryValue: {
+  flex: 1,
+  color: '#fff',
+  fontSize: 12,
+  fontWeight: '600',
+},
+
+rmSummaryCount: {
+  color: '#00cfff',
+  fontSize: 16,
+  fontWeight: '700',
+},
+
+  /* Timeline */
+  rmTimelineItem: {
+    flexDirection: 'row',
+    marginBottom: 4,
+  },
+  rmTimelineLeft: {
+    width: 16,
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  rmTimelineDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#00cfff',
+    marginTop: 18,
+    borderWidth: 2,
+    borderColor: '#0d1240',
+  },
+  rmTimelineLine: {
+    flex: 1,
+    width: 2,
+    backgroundColor: '#2a3370',
+    marginTop: 4,
+  },
+  rmTimelineCard: {
+    flex: 1,
+    backgroundColor: '#151b4a',
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#ffffff10',
+  },
+  rmCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  rmBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  rmBadgeText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  rmCardDate: {
+    color: '#8A90B4',
+    fontSize: 11,
+  },
+
+  /* Transfer row */
+  rmTransferRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  rmPersonCol: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  rmAvatar: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    marginBottom: 6,
+    backgroundColor: '#1e255a',
+  },
+  rmAvatarPlaceholder: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  rmPersonRole: {
+    color: '#8A90B4',
+    fontSize: 9,
+    fontWeight: '600',
+    letterSpacing: 0.4,
+    marginBottom: 2,
+  },
+  rmPersonName: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  rmArrowWrap: {
+    paddingHorizontal: 6,
+    marginBottom: 18,
+  },
+
+  /* Changed by */
+  rmChangedByRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 12,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#ffffff10',
+    gap: 6,
+  },
+  rmChangedByLabel: {
+    color: '#8A90B4',
+    fontSize: 9,
+    fontWeight: '600',
+    letterSpacing: 0.4,
+  },
+  rmChangedByAvatar: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#1e255a',
+  },
+  rmChangedByName: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+
+  rmHistoryCancelBtn: {
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 24,
+    paddingVertical: 12,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  rmHistoryCancelText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+
+  rmHistoryScroll: {
+    maxHeight: SCREEN_HEIGHT * 0.52,
+    width:'100%',
+    marginBottom: 8,
+  },
+  rmHistoryCard: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#3d45b055',
+  },
+  rmHistoryLabel: {
+    color: '#FFB85D',
+    fontSize: 13,
+    marginBottom: 4,
+  },
+  rmHistoryValue: {
+    color: '#fff',
+    fontWeight: '600',
+  },
+  rmHistoryMeta: {
+    color: '#a0b4e8',
+    fontSize: 11,
+    marginTop: 2,
+  },
+  rmHistoryCancelBtn: {
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 24,
+    paddingVertical: 12,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  rmHistoryCancelText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
 });

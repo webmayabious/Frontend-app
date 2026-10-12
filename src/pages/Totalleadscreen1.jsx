@@ -14,6 +14,8 @@ import {
   Image,
   Animated,
   Dimensions,
+  Keyboard,
+  DeviceEventEmitter,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import Icon from 'react-native-vector-icons/MaterialIcons';
@@ -306,40 +308,207 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => {
   </View>
 )};
 
-const DropdownField = ({ label, data, placeholder, value, onChange }) => {
-  const [isFocus, setIsFocus] = useState(false);
+const LIST_HEIGHT = 220;
+const FIELD_TOP_OFFSET = Platform.OS === 'ios' ? 280 : 250;
+// Inline dropdown, same behaviour/look as EmployeeDropdown
+const DropdownField = ({
+  label,
+  data,
+  value,
+  onChange,
+  error,
+  scrollRef,
+  scrollYRef,
+  placeholder,
+}) => {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const dropAnim = useRef(new Animated.Value(0)).current;
+  const wrapRef = useRef(null);
+
+  const options = data || [];
+  const selected = options.find(o => o.value === value);
+  const initial = selected?.label?.[0]?.toUpperCase();
+
+  const filtered = options.filter(o =>
+    String(o.label ?? '').toLowerCase().includes(search.toLowerCase()),
+  );
+
+  const maxHeight = dropAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, LIST_HEIGHT],
+  });
+
+  // After the list has expanded, scroll up just enough to keep it above the BottomNav
+ // Animate the screen so this field moves up toward the top
+const scrollFieldUp = () => {
+  if (!wrapRef.current || !scrollRef?.current) return;
+  wrapRef.current.measureInWindow((x, y) => {
+    const delta = y - FIELD_TOP_OFFSET;
+    if (delta > 0) {
+      scrollRef.current.scrollTo({
+        y: (scrollYRef?.current || 0) + delta,
+        animated: true,
+      });
+    }
+  });
+};
+// const handleSearchFocus = () => {
+//     setTimeout(() => {
+//       if (!wrapRef.current || !scrollRef?.current) return;
+//       wrapRef.current.measureInWindow((x, y) => {
+//         const delta = y - SEARCH_TOP_OFFSET;
+//         if (delta > 0) {
+//           scrollRef.current.scrollTo({
+//             y: (scrollYRef?.current || 0) + delta,
+//             animated: true,
+//           });
+//         }
+//       });
+//     }, 350); // wait for the keyboard animation
+//   };
+const close = (duration = 180) => {
+  Keyboard.dismiss();
+  Animated.timing(dropAnim, {
+    toValue: 0,
+    duration,
+    useNativeDriver: false,
+  }).start(() => {
+    setOpen(false);
+    setSearch('');
+    DeviceEventEmitter.emit('toggleBottomNav', true);   // show the nav again
+  });
+};
+
+const toggle = () => {
+  if (open) {
+    close();
+  } else {
+    DeviceEventEmitter.emit('toggleBottomNav', false);  // hide the nav as soon as it opens
+    setOpen(true);
+    scrollFieldUp();
+    Animated.timing(dropAnim, {
+      toValue: 1,
+      duration: 200,
+      useNativeDriver: false,
+    }).start(scrollFieldUp);
+  }
+};
+
+useEffect(() => {
+  return () => DeviceEventEmitter.emit('toggleBottomNav', true);  // restore on leaving the screen
+}, []);
+
+  const handleSelect = item => {
+    onChange && onChange(item.value);
+    close(150);
+  };
+
   return (
-    <View style={styles.filterInputWrapper}>
-      <Text style={styles.filterLabel}>{label}</Text>
-      <Dropdown
+    <View ref={wrapRef} collapsable={false} style={styles.field}>
+     {label ? <Text style={styles.dropLabel}>{label}</Text> : null}
+
+      {/* Trigger */}
+      <TouchableOpacity
         style={[
-          styles.filterDropdown,
-          isFocus && { borderColor: '#00e5ff', borderWidth: 1.5 },
+          styles.dropdown,
+          open && styles.dropdownOpen,
+          error && styles.inputError,
+          { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
         ]}
-        containerStyle={styles.dropdownContainer}
-        placeholderStyle={styles.placeholderStyle}
-        selectedTextStyle={styles.selectedTextStyle}
-        itemTextStyle={{ color: '#0b0b0b', fontWeight: '500' }}
-        activeColor="#e6f7ff"
-        data={data || []}
-        labelField="label"
-        valueField="value"
-        placeholder={placeholder}
-        value={value}
-        onFocus={() => setIsFocus(true)}
-        onBlur={() => setIsFocus(false)}
-        onChange={item => {
-          setIsFocus(false);
-          onChange && onChange(item.value);
-        }}
-        renderRightIcon={() => (
-          <Icon
-            name={isFocus ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
-            size={20}
-            color="#00e5ff"
-          />
-        )}
-      />
+        onPress={toggle}
+        activeOpacity={0.8}
+      >
+        <View style={styles.ddTriggerLeft}>
+          {/* {selected ? (
+            <View style={styles.ddAvatar}>
+              <Text style={styles.ddAvatarTxt}>{initial}</Text>
+            </View>
+          ) : null} */}
+          <Text
+            style={selected ? styles.selectedText : styles.placeholder}
+            numberOfLines={1}
+          >
+            {selected ? selected.label : placeholder || 'Select...'}
+          </Text>
+        </View>
+        <Icon
+          name={open ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
+          size={20}
+          color="#8a9daf"
+        />
+      </TouchableOpacity>
+
+      {/* Inline list */}
+      {open && (
+        <Animated.View
+          style={[styles.dropdownMenu, { maxHeight, opacity: dropAnim }]}
+        >
+          <View style={styles.ddSearchWrap}>
+            <Icon name="search" size={16} color="#000" style={{ marginRight: 6 }} />
+            <TextInput
+              style={styles.ddSearchInput}
+              placeholder="Search..."
+              placeholderTextColor="#000"
+              value={search}
+              onChangeText={setSearch}
+             
+              autoCorrect={false}
+              autoCapitalize="none"
+              returnKeyType="search"
+            />
+            {search.length > 0 && (
+              <TouchableOpacity
+                onPress={() => setSearch('')}
+                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+              >
+                <Icon name="close" size={14} color="#ccc" />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          <ScrollView
+            style={{ maxHeight: 155 }}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="always"
+            nestedScrollEnabled
+          >
+            {filtered.length === 0 ? (
+              <Text style={styles.ddNoResult}>No results found</Text>
+            ) : (
+              filtered.map(item => {
+                const isActive = item.value === value;
+                return (
+                  <TouchableOpacity
+                    key={String(item.value)}
+                    style={[styles.dropdownItem, isActive && styles.dropdownItemActive]}
+                    onPress={() => handleSelect(item)}
+                    activeOpacity={0.7}
+                  >
+                    {/* <View style={[styles.ddAvatar, isActive && styles.ddAvatarSelected]}>
+                      <Text style={[styles.ddAvatarTxt, isActive && { color: '#fff' }]}>
+                        {String(item.label ?? '')[0]?.toUpperCase()}
+                      </Text>
+                    </View> */}
+                    <Text
+                      style={[
+                        styles.dropdownItemText,
+                        isActive && styles.dropdownItemTextActive,
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {item.label}
+                    </Text>
+                    {isActive && <Icon name="check" size={16} color="#1482cc" />}
+                  </TouchableOpacity>
+                );
+              })
+            )}
+          </ScrollView>
+        </Animated.View>
+      )}
+
+      {error ? <Text style={styles.errorText}>{error}</Text> : null}
     </View>
   );
 };
@@ -390,7 +559,8 @@ const FilterModal = ({
   const scaleAnim = useRef(new Animated.Value(0.85)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
   const [mounted, setMounted] = useState(false);
-
+const scrollRef1 = useRef(null);
+  const scrollYRef = useRef(0); 
   useEffect(() => {
     if (visible) {
       setMounted(true);
@@ -447,6 +617,11 @@ const FilterModal = ({
 
         <ScrollView
           style={styles.filterScrollView}
+            ref={scrollRef1}
+          onScroll={e => {
+            scrollYRef.current = e.nativeEvent.contentOffset.y;
+          }}
+          scrollEventThrottle={16}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
           nestedScrollEnabled={true}
@@ -457,6 +632,8 @@ const FilterModal = ({
             placeholder="Select Location"
             value={filters.location}
             onChange={value => onChange('location', value)}
+             scrollRef={scrollRef1}
+              scrollYRef={scrollYRef}
           />
           <DropdownField
             label="Relationship Manager"
@@ -464,6 +641,8 @@ const FilterModal = ({
             placeholder="Select RM"
             value={filters.rm_id}
             onChange={value => onChange('rm_id', value)}
+             scrollRef={scrollRef1}
+              scrollYRef={scrollYRef}
           />
 
           <View
@@ -499,6 +678,8 @@ const FilterModal = ({
             placeholder="Select Project"
             value={filters.project}
             onChange={value => onChange('project', value)}
+             scrollRef={scrollRef1}
+              scrollYRef={scrollYRef}
           />
           <DropdownField
             label="Lead Status"
@@ -506,6 +687,8 @@ const FilterModal = ({
             placeholder="Select Status"
             value={filters.active}
             onChange={value => onChange('active', value)}
+             scrollRef={scrollRef1}
+              scrollYRef={scrollYRef}
           />
          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 12, marginBottom: 10 }}>
   <Text
@@ -533,6 +716,8 @@ const FilterModal = ({
             placeholder="Select Status"
             value={filters.call_status}
             onChange={value => onChange('call_status', value)}
+             scrollRef={scrollRef1}
+              scrollYRef={scrollYRef}
           />
           <DropdownField
             label="Lead Qualification"
@@ -540,6 +725,8 @@ const FilterModal = ({
             placeholder="Select Qualification"
             value={filters.lead_qualification}
             onChange={value => onChange('lead_qualification', value)}
+             scrollRef={scrollRef1}
+              scrollYRef={scrollYRef}
           />
           <DropdownField
             label="Lead Status"
@@ -547,6 +734,8 @@ const FilterModal = ({
             placeholder="Select Status"
             value={filters.lead_status}
             onChange={value => onChange('lead_status', value)}
+             scrollRef={scrollRef1}
+              scrollYRef={scrollYRef}
           />
           <DropdownField
             label="Lead Sub Status"
@@ -554,6 +743,8 @@ const FilterModal = ({
             placeholder="Select Sub Status"
             value={filters.lead_sub_status}
             onChange={value => onChange('lead_sub_status', value)}
+             scrollRef={scrollRef1}
+              scrollYRef={scrollYRef}
           />
           <View
             style={{
@@ -743,8 +934,15 @@ const Totalleadscreen1 = () => {
     initialPageParam: 1,
   });
 
-  const leads = Lead?.pages?.flatMap(page => page.data) || [];
-
+  // const leads = Lead?.pages?.flatMap(page => page.data) || [];
+const leads = Array.from(
+  new Map(
+    (Lead?.pages?.flatMap(page => page.data) || []).map(item => [
+      item.id,
+      item,
+    ]),
+  ).values(),
+);
   const handleLoadMore = () => {
     if (hasNextPage && !isFetchingNextPage) fetchNextPage();
   };
@@ -900,7 +1098,7 @@ const Totalleadscreen1 = () => {
                               </TouchableOpacity>
             <TouchableOpacity
               style={styles.backBtn}
-              onPress={() => navigation.goBack()}
+            onPress={() => navigation.navigate('LeadsListScreen')}
             >
               <View style={styles.backButton}>
                 <Image
@@ -1323,6 +1521,66 @@ readMore: {
     borderColor: '#3d55cc',
   },
   dropdownContainer: { backgroundColor: '#fff', borderRadius: 8 },
+  dropLabel: { color: '#00cfff', fontSize: 10, fontWeight: '700', letterSpacing: 0.4, textTransform: 'uppercase', marginBottom: 5 },
+  dropdown: {
+    height: 40,
+ backgroundColor: '#ffffff12',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    justifyContent: 'center',
+    borderWidth: 1,
+      borderColor: '#3d55cc',
+  },
+  dropdownOpen: { borderColor: '#4aa3df', 
+    // backgroundColor: '#28304a' 
+  },
+  dropdownMenu: {
+    marginTop: 4,
+   backgroundColor: '#ffffff',
+    borderRadius: 12,
+    // borderWidth: 1,
+    // borderColor: '#39415a',
+    overflow: Platform.OS === 'ios' ? 'visible' : 'hidden',
+   
+  },
+  dropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    // borderBottomWidth: 1,
+    // borderBottomColor: '#323a52',
+  },
+  dropdownItemActive: { backgroundColor: 'rgba(74,163,223,0.15)' },
+  dropdownItemText: { flex: 1, fontSize: 13, color: '#000', fontWeight: '500' },
+  dropdownItemTextActive: { color: '#7cc4f2', fontWeight: '700' },
+  placeholder: { color: '#8a9daf', fontSize: 13 },
+  selectedText: { color: '#e6ebf2', fontSize: 13, fontWeight: '600' },
+  ddTriggerLeft: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 },
+  ddAvatar: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: 'rgba(20,130,204,0.14)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ddAvatarSelected: { backgroundColor: '#1482cc' },
+  ddAvatarTxt: { fontSize: 11, fontWeight: '700', color: '#1482cc' },
+  ddSearchWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#babdc5',
+    backgroundColor: '#b1b5c0',
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
+  },
+  ddSearchInput: { flex: 1, fontSize: 13, color: '#000', padding: 0 },
+  ddNoResult: { textAlign: 'center', color: '#6b7690', fontSize: 12, paddingVertical: 16 },
   placeholderStyle: { color: '#7a8fc4', fontSize: 13 },
   selectedTextStyle: { color: '#fff', fontSize: 13 },
 
