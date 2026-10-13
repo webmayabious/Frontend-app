@@ -1,4 +1,4 @@
-// MissedFollowup.js
+
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
@@ -17,46 +17,29 @@ import {
   Keyboard,
   Animated,
   DeviceEventEmitter,
+  Modal,
+  PanResponder,
+  KeyboardAvoidingView,
+  Easing,
 } from 'react-native';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import api from '../api/AxiosInstance';
 import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import Header from '../Layout/Header';
-import BottomNav from '../navigations/BottomNav';
+
 import { Dropdown } from 'react-native-element-dropdown';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import Icon1 from 'react-native-vector-icons/Ionicons';
 const COLORS = {
-  bg: '#080d5a',
-  cardBg: '#ffffff0e',
-  cardSelected: '#0d1a6e',
-  headerBg: '#0A0F2E',
-  accent: '#00cfff',
-  accentDim: '#00cfff18',
-  accentBorder: '#00cfff40',
   white: '#FFFFFF',
   mutedText: '#8A90B4',
-  labelText: '#FFB85D',
-  gold: '#f4c542',
-  goldDim: '#f4c54218',
-  goldBorder: '#f4c54235',
-  green: '#00C48C',
-  red: '#FF6B6B',
-  borderColor: '#ffffff20',
-  modalBg: '#0f1550',
-  sectionBg: 'rgba(255,255,255,0.13)',
 };
-const STATUSBAR_HEIGHT =
-  Platform.OS === 'android' ? StatusBar.currentHeight : 44;
-const SCREEN_HEIGHT = Dimensions.get('window').height;
+const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window');
+const scale = size => (SCREEN_WIDTH / 375) * size;
+const verticalScale = size => (SCREEN_HEIGHT / 812) * size;
+
 /* ================= CALL ================= */
-// const makeCall = phoneNumber => {
-//   if (!phoneNumber) return;
-//   Alert.alert('Call', `Do you want to call ${phoneNumber}?`, [
-//     { text: 'Cancel', style: 'cancel' },
-//     { text: 'Call', onPress: () => Linking.openURL(`tel:${phoneNumber}`) },
-//   ]);
-// };
 const makeCall = phoneNumber => {
   if (!phoneNumber) return;
 
@@ -80,7 +63,6 @@ const makeCall = phoneNumber => {
           if (supported) {
             await Linking.openURL(appUrl);
           } else {
-            // Opens WhatsApp Web or the app if installed
             await Linking.openURL(webUrl);
           }
         } catch (error) {
@@ -94,7 +76,8 @@ const makeCall = phoneNumber => {
     },
   ]);
 };
-const sendMail = async (email) => {
+
+const sendMail = async email => {
   if (!email) return;
 
   try {
@@ -105,59 +88,22 @@ const sendMail = async (email) => {
       if (supported) {
         await Linking.openURL(gmailUrl);
       } else {
-        // Fallback to mailto
         await Linking.openURL(`mailto:${email}`);
       }
     } else {
-      // iOS
       await Linking.openURL(`mailto:${email}`);
     }
   } catch (error) {
     Alert.alert('Error', 'Unable to open email app.');
   }
 };
-// const DropdownField = ({ label, data, placeholder, value, onChange }) => {
-//   const [isFocus, setIsFocus] = useState(false);
-//   return (
-//     <View style={styles.inputWrapper}>
-//       <Text style={styles.label}>{label}</Text>
-//       <Dropdown
-//         style={[
-//           styles.dropdown,
-//           isFocus && { borderColor: '#00e5ff', borderWidth: 1.5 },
-//         ]}
-//         containerStyle={styles.dropdownContainer}
-//         placeholderStyle={styles.placeholderStyle}
-//         selectedTextStyle={styles.selectedTextStyle}
-//         itemTextStyle={{ color: '#0b0b0b', fontWeight: '500' }}
-//         activeColor="#e6f7ff"
-//         data={data || []}
-//         labelField="label"
-//         valueField="value"
-//         placeholder={placeholder}
-//         value={value}
-//         itemContainerStyle={styles.itemContainer}
-//         onFocus={() => setIsFocus(true)}
-//         onBlur={() => setIsFocus(false)}
-//         onChange={item => {
-//           setIsFocus(false);
-//           onChange && onChange(item.value);
-//         }}
-//         renderRightIcon={() => (
-//           <Icon
-//             name={isFocus ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
-//             size={20}
-//             color="#00e5ff"
-//           />
-//         )}
-//       />
-//     </View>
-//   );
-// };
-const LIST_HEIGHT = 220;
 
+/* ================= INLINE DROPDOWN ================= */
+const ITEM_H = 42;
+const SEARCH_H = 44;
+const MAX_LIST_H = 220;
 const FIELD_TOP_OFFSET = Platform.OS === 'ios' ? 280 : 200;
-// Inline dropdown, same behaviour/look as EmployeeDropdown
+
 const DropdownField = ({
   label,
   data,
@@ -168,92 +114,102 @@ const DropdownField = ({
   scrollYRef,
   placeholder,
 }) => {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(false); // what the user wants
+  const [mounted, setMounted] = useState(false); // keeps list alive while closing
   const [search, setSearch] = useState('');
-  const dropAnim = useRef(new Animated.Value(0)).current;
+  const heightAnim = useRef(new Animated.Value(0)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
   const wrapRef = useRef(null);
+  const justOpened = useRef(false);
 
   const options = data || [];
   const selected = options.find(o => o.value === value);
-  const initial = selected?.label?.[0]?.toUpperCase();
 
   const filtered = options.filter(o =>
-    String(o.label ?? '').toLowerCase().includes(search.toLowerCase()),
+    String(o.label ?? '')
+      .toLowerCase()
+      .includes(search.toLowerCase()),
   );
 
-  const maxHeight = dropAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, LIST_HEIGHT],
-  });
+  // list height follows the real content, capped at MAX_LIST_H
+  const contentH = filtered.length === 0 ? 48 : filtered.length * ITEM_H;
+  const targetH = Math.min(SEARCH_H + contentH, MAX_LIST_H);
 
-  // After the list has expanded, scroll up just enough to keep it above the BottomNav
- // Animate the screen so this field moves up toward the top
-const scrollFieldUp = () => {
-  if (!wrapRef.current || !scrollRef?.current) return;
-  wrapRef.current.measureInWindow((x, y) => {
-    const delta = y - FIELD_TOP_OFFSET;
-    if (delta > 0) {
-      scrollRef.current.scrollTo({
-        y: (scrollYRef?.current || 0) + delta,
-        animated: true,
-      });
+  const scrollFieldIntoView = () => {
+    if (!wrapRef.current || !scrollRef?.current) return;
+    wrapRef.current.measureInWindow((x, y) => {
+      const delta = y - FIELD_TOP_OFFSET;
+      if (delta > 0) {
+        scrollRef.current.scrollTo({
+          y: (scrollYRef?.current || 0) + delta,
+          animated: true,
+        });
+      }
+    });
+  };
+
+  // single place that runs every animation
+  useEffect(() => {
+    if (!open && !mounted) return;
+
+    Animated.parallel([
+      Animated.timing(heightAnim, {
+        toValue: open ? targetH : 0,
+        duration: open ? 220 : 180,
+        easing: open ? Easing.out(Easing.cubic) : Easing.in(Easing.cubic),
+        useNativeDriver: false,
+      }),
+      Animated.timing(fadeAnim, {
+        toValue: open ? 1 : 0,
+        duration: open ? 220 : 160,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: false,
+      }),
+    ]).start(({ finished }) => {
+      if (!finished) return;
+      if (open) {
+        if (justOpened.current) {
+          justOpened.current = false;
+          scrollFieldIntoView();
+        }
+      } else {
+        setMounted(false);
+        setSearch('');
+        DeviceEventEmitter.emit('toggleBottomNav', true);
+      }
+    });
+  }, [open, targetH]);
+
+  useEffect(() => {
+    return () => DeviceEventEmitter.emit('toggleBottomNav', true);
+  }, []);
+
+  const toggle = () => {
+    if (open) {
+      Keyboard.dismiss();
+      setOpen(false);
+    } else {
+      DeviceEventEmitter.emit('toggleBottomNav', false);
+      justOpened.current = true;
+      setMounted(true);
+      setOpen(true);
     }
-  });
-};
-// const handleSearchFocus = () => {
-//     setTimeout(() => {
-//       if (!wrapRef.current || !scrollRef?.current) return;
-//       wrapRef.current.measureInWindow((x, y) => {
-//         const delta = y - SEARCH_TOP_OFFSET;
-//         if (delta > 0) {
-//           scrollRef.current.scrollTo({
-//             y: (scrollYRef?.current || 0) + delta,
-//             animated: true,
-//           });
-//         }
-//       });
-//     }, 350); // wait for the keyboard animation
-//   };
-const close = (duration = 180) => {
-  Keyboard.dismiss();
-  Animated.timing(dropAnim, {
-    toValue: 0,
-    duration,
-    useNativeDriver: false,
-  }).start(() => {
-    setOpen(false);
-    setSearch('');
-    DeviceEventEmitter.emit('toggleBottomNav', true);   // show the nav again
-  });
-};
-
-const toggle = () => {
-  if (open) {
-    close();
-  } else {
-    DeviceEventEmitter.emit('toggleBottomNav', false);  // hide the nav as soon as it opens
-    setOpen(true);
-    scrollFieldUp();
-    Animated.timing(dropAnim, {
-      toValue: 1,
-      duration: 200,
-      useNativeDriver: false,
-    }).start(scrollFieldUp);
-  }
-};
-
-useEffect(() => {
-  return () => DeviceEventEmitter.emit('toggleBottomNav', true);  // restore on leaving the screen
-}, []);
+  };
 
   const handleSelect = item => {
     onChange && onChange(item.value);
-    close(150);
+    Keyboard.dismiss();
+    setOpen(false);
   };
+
+  const arrowRotate = fadeAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '180deg'],
+  });
 
   return (
     <View ref={wrapRef} collapsable={false} style={styles.field}>
-     {label ? <Text style={styles.dropLabel}>{label}</Text> : null}
+      {label ? <Text style={styles.inputLabel}>{label}</Text> : null}
 
       {/* Trigger */}
       <TouchableOpacity
@@ -261,17 +217,11 @@ useEffect(() => {
           styles.dropdown,
           open && styles.dropdownOpen,
           error && styles.inputError,
-          { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
         ]}
         onPress={toggle}
         activeOpacity={0.8}
       >
         <View style={styles.ddTriggerLeft}>
-          {/* {selected ? (
-            <View style={styles.ddAvatar}>
-              <Text style={styles.ddAvatarTxt}>{initial}</Text>
-            </View>
-          ) : null} */}
           <Text
             style={selected ? styles.selectedText : styles.placeholder}
             numberOfLines={1}
@@ -279,27 +229,44 @@ useEffect(() => {
             {selected ? selected.label : placeholder || 'Select...'}
           </Text>
         </View>
-        <Icon
-          name={open ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
-          size={20}
-          color="#8a9daf"
-        />
+        <Animated.View style={{ transform: [{ rotate: arrowRotate }] }}>
+          <Icon name="keyboard-arrow-down" size={20} color="#8a9daf" />
+        </Animated.View>
       </TouchableOpacity>
 
-      {/* Inline list */}
-      {open && (
+      {/* Animated list */}
+      {mounted && (
         <Animated.View
-          style={[styles.dropdownMenu, { maxHeight, opacity: dropAnim }]}
+          style={[
+            styles.dropdownMenu,
+            {
+              height: heightAnim,
+              opacity: fadeAnim,
+              overflow: 'hidden',
+              transform: [
+                {
+                  translateY: fadeAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [-6, 0],
+                  }),
+                },
+              ],
+            },
+          ]}
         >
-          <View style={styles.ddSearchWrap}>
-            <Icon name="search" size={16} color="#000" style={{ marginRight: 6 }} />
+          <View style={[styles.ddSearchWrap, { height: SEARCH_H }]}>
+            <Icon
+              name="search"
+              size={16}
+              color="#aaa"
+              style={{ marginRight: 6 }}
+            />
             <TextInput
               style={styles.ddSearchInput}
               placeholder="Search..."
-              placeholderTextColor="#000"
+              placeholderTextColor="#bbb"
               value={search}
               onChangeText={setSearch}
-             
               autoCorrect={false}
               autoCapitalize="none"
               returnKeyType="search"
@@ -315,7 +282,6 @@ useEffect(() => {
           </View>
 
           <ScrollView
-            style={{ maxHeight: 155 }}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="always"
             nestedScrollEnabled
@@ -328,15 +294,14 @@ useEffect(() => {
                 return (
                   <TouchableOpacity
                     key={String(item.value)}
-                    style={[styles.dropdownItem, isActive && styles.dropdownItemActive]}
+                    style={[
+                      styles.dropdownItem,
+                      { height: ITEM_H },
+                      isActive && styles.dropdownItemActive,
+                    ]}
                     onPress={() => handleSelect(item)}
                     activeOpacity={0.7}
                   >
-                    {/* <View style={[styles.ddAvatar, isActive && styles.ddAvatarSelected]}>
-                      <Text style={[styles.ddAvatarTxt, isActive && { color: '#fff' }]}>
-                        {String(item.label ?? '')[0]?.toUpperCase()}
-                      </Text>
-                    </View> */}
                     <Text
                       style={[
                         styles.dropdownItemText,
@@ -346,7 +311,9 @@ useEffect(() => {
                     >
                       {item.label}
                     </Text>
-                    {isActive && <Icon name="check" size={16} color="#1482cc" />}
+                    {isActive && (
+                      <Icon name="check" size={16} color="#1482cc" />
+                    )}
                   </TouchableOpacity>
                 );
               })
@@ -359,24 +326,27 @@ useEffect(() => {
     </View>
   );
 };
+
 const InputField = ({ label, placeholder, icon, value, onChange, onPress }) => (
   <View style={styles.field}>
-    <Text style={styles.filterLabel}>{label}</Text>
+    <Text style={styles.inputLabel}>{label}</Text>
     <TouchableOpacity activeOpacity={0.8} onPress={onPress}>
       <View style={styles.filterInputContainer}>
         <TextInput
           placeholder={placeholder}
-          placeholderTextColor="#7a8fc4"
+          placeholderTextColor="#aab8c4"
           style={styles.filterInput}
           value={value}
           onChangeText={onChange}
           editable={!onPress}
+          pointerEvents={onPress ? 'none' : 'auto'}
         />
-        {icon && <Icon name={icon} size={18} color="#00bcd4" />}
+        {icon && <Icon name={icon} size={18} color="#1482cc" />}
       </View>
     </TouchableOpacity>
   </View>
 );
+
 const RemarksText = ({ remarks }) => {
   const [expanded, setExpanded] = useState(false);
 
@@ -389,24 +359,22 @@ const RemarksText = ({ remarks }) => {
         : `${remarks.substring(0, 80)}... `}
 
       {shouldShowReadMore && (
-        <Text
-          style={styles.readMore}
-          onPress={() => setExpanded(!expanded)}
-        >
+        <Text style={styles.readMore} onPress={() => setExpanded(!expanded)}>
           {expanded ? ' Read Less' : ' Read More'}
         </Text>
       )}
     </Text>
   );
 };
+
 /* ================= CARD ================= */
 const LeadCard = ({ item, navigation, setShowRemarks, setRemarksText }) => {
   const feedback = item?.propertyfeedbacks?.[0];
- const remarks =
-  item?.propertyfeedbacks
-    ?.map(x => x?.remarks)
-    ?.filter(Boolean)
-    ?.join(', ') || 'No Remarks Available';
+  const remarks =
+    item?.propertyfeedbacks
+      ?.map(x => x?.remarks)
+      ?.filter(Boolean)
+      ?.join(', ') || 'No Remarks Available';
   return (
     <View style={styles.card}>
       {/* HEADER */}
@@ -414,56 +382,46 @@ const LeadCard = ({ item, navigation, setShowRemarks, setRemarksText }) => {
         <View style={styles.nameRow}>
           <Text style={styles.name}>{item?.name || 'N/A'} ||</Text>
 
-          <Text style={{ color: '#00e5ff', fontSize: 11 }}>
+          <Text style={styles.ratingText}>
             {feedback?.propertyrating?.name}
           </Text>
 
-          {/* <View
+          <View
             style={[
               styles.activeBadge,
               {
-                backgroundColor: item?.active == 1 ? '#4caf50' : '#f44336',
+                backgroundColor:
+                  item?.active === '1'
+                    ? 'rgba(45,168,94,0.15)'
+                    : item?.active === '5'
+                    ? 'rgba(107,119,133,0.25)'
+                    : 'rgba(224,90,43,0.15)',
               },
             ]}
           >
-            <Text style={styles.activeText}>
-              {item?.active == 1 ? 'Active' : 'Inactive'}
+            <Text
+              style={[
+                styles.activeText,
+                {
+                  color:
+                    item?.active === '1'
+                      ? '#2da85e'
+                      : item?.active === '5'
+                      ? '#aab8c4'
+                      : '#e05a2b',
+                },
+              ]}
+            >
+              {item?.active === '1'
+                ? 'Active'
+                : item?.active === '5'
+                ? 'Booking Done'
+                : 'Inactive'}
             </Text>
-          </View> */}
-          <View
-  style={[
-    styles.activeBadge,
-    {
-      backgroundColor:
-        item?.active === '1'
-          ? '#4caf50'
-          : item?.active === '5'
-          ? '#6b7785'
-          : '#f44336',
-    },
-  ]}
->
-  <Text style={styles.activeText}>
-    {item?.active === '1'
-      ? 'Active'
-      : item?.active === '5'
-      ? 'Booking Done'
-      : 'Inactive'}
-  </Text>
-</View>
+          </View>
         </View>
 
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          {/* <TouchableOpacity
-            style={styles.remarksBtn}
-            onPress={() => {
-              setRemarksText(feedback?.remarks || 'No remarks available');
-              setShowRemarks(true);
-            }}
-          >
-            <Text style={styles.remarksText}>Remarks</Text>
-          </TouchableOpacity> */}
-
           <Icon
             name="edit"
             size={18}
@@ -479,53 +437,31 @@ const LeadCard = ({ item, navigation, setShowRemarks, setRemarksText }) => {
         {item?.propertyproject?.project_name} | {item?.propertylocation?.name}
       </Text>
 
-      {/* PHONE + EMAIL */}
-     <View style={styles.rowBetween}>
-         {/* <TouchableOpacity onPress={() => makeCall(data?.propertylead?.phone)}>
-           <Text style={styles.label}>
-             Phone:{' '}
-             <Text style={styles.remarksBtn}>{data?.propertylead?.phone || 'N/A'}</Text>
-           </Text>
-         </TouchableOpacity> */}
-          <View style={styles.rowBetween}>
-               <Text style={styles.label}>
-                 Lead Assigned Date:{' '}
-                 <Text style={styles.value}>
-                   {item?.lead_assigned_date ||
-                     'N/A'}
-                 </Text>
-               </Text>
-             </View>
-         <TouchableOpacity onPress={() => makeCall(item?.phone)}>
-           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-             <Text style={styles.label}>Phone:{' '}</Text>
-   
-             {/* <View style={styles.remarksBtn}> */}
-               <Text style={styles.phoneText}>
-                 {item?.phone || 'N/A'}
-               </Text>
-             {/* </View> */}
-           </View>
-         </TouchableOpacity>
-         
-       </View>
-       <View style={styles.rowBetween}> 
-         <TouchableOpacity
-   
-           onPress={() => sendMail(item?.email)}
-   
-         >
-           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-             <Text style={styles.label}>Email:{' '}</Text>
-   
-   
-             <Text style={styles.emailText}>
-               {item?.email || 'N/A'}
-             </Text>
-   
-           </View>
-         </TouchableOpacity>
-       </View>
+      {/* PHONE + ASSIGNED DATE */}
+      <View style={styles.rowBetween}>
+        <View style={styles.rowBetween}>
+          <Text style={styles.label}>
+            Lead Assigned Date:{' '}
+            <Text style={styles.value}>{item?.lead_assigned_date || 'N/A'}</Text>
+          </Text>
+        </View>
+        <TouchableOpacity onPress={() => makeCall(item?.phone)}>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Text style={styles.label}>Phone: </Text>
+            <Text style={styles.phoneText}>{item?.phone || 'N/A'}</Text>
+          </View>
+        </TouchableOpacity>
+      </View>
+
+      {/* EMAIL */}
+      <View style={styles.rowBetween}>
+        <TouchableOpacity onPress={() => sendMail(item?.email)}>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Text style={styles.label}>Email: </Text>
+            <Text style={styles.emailText}>{item?.email || 'N/A'}</Text>
+          </View>
+        </TouchableOpacity>
+      </View>
 
       {/* RM + CALLBACK */}
       <View style={styles.rowBetween}>
@@ -545,32 +481,28 @@ const LeadCard = ({ item, navigation, setShowRemarks, setRemarksText }) => {
       </View>
 
       {/* LEAD SOURCE */}
-      <Text style={{ color: '#fb9e08', fontSize: 12, marginTop: 4 }}>
+      <Text style={[styles.label, { marginTop: 4 }]}>
         Lead Source:{' '}
         <Text style={styles.value}>{item?.mrreference?.mrf_name}</Text>
       </Text>
-  <View
-  style={{
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginTop: 8,
-  }}
->
-  <Text
-    style={{
-      color: '#fb9e08',
-      fontSize: 12,
-      fontWeight: '600',
-      marginRight: 5,
-    }}
-  >
-    Remarks:
-  </Text>
 
-  <View style={{ flex: 1 }}>
-    <RemarksText remarks={remarks} />
-  </View>
-</View>
+      {/* REMARKS */}
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'flex-start',
+          marginTop: 8,
+        }}
+      >
+        <Text style={[styles.label, { fontWeight: '700', marginRight: 5 }]}>
+          Remarks:
+        </Text>
+
+        <View style={{ flex: 1 }}>
+          <RemarksText remarks={remarks} />
+        </View>
+      </View>
+
       {/* FOOTER */}
       <View style={styles.cardFooter}>
         <TouchableOpacity
@@ -592,11 +524,382 @@ const LeadCard = ({ item, navigation, setShowRemarks, setRemarksText }) => {
   );
 };
 
+/* ================= FILTER BOTTOM SHEET ================= */
+const IOSPickerOverlay = ({ target, tempDate, onDateChange, onDone, onCancel }) => (
+  <View style={styles.iosOverlayWrap}>
+    <TouchableOpacity
+      style={StyleSheet.absoluteFill}
+      activeOpacity={1}
+      onPress={onCancel}
+    />
+    <View style={styles.iosPickerContainer}>
+      <View style={styles.iosPickerHeader}>
+        <TouchableOpacity onPress={onCancel} style={styles.iosPickerHeaderBtn}>
+          <Text style={styles.iosPickerCancelText}>Cancel</Text>
+        </TouchableOpacity>
+        <Text style={styles.iosPickerTitle}>
+          {target === 'fromDate' ? 'From Date' : 'To Date'}
+        </Text>
+        <TouchableOpacity onPress={onDone} style={styles.iosPickerHeaderBtn}>
+          <Text style={styles.iosPickerDoneText}>Done</Text>
+        </TouchableOpacity>
+      </View>
+      <DateTimePicker
+        value={tempDate}
+        mode="date"
+        display="spinner"
+        themeVariant="light"
+        onChange={(_, d) => {
+          if (d) onDateChange(d);
+        }}
+        style={{ height: 215 }}
+      />
+    </View>
+  </View>
+);
+
+const FilterBottomSheet = ({
+  visible,
+  onClose,
+  onApply,
+  onReset,
+  filters,
+  onChange,
+  leadSourceOptions,
+  Property,
+  Rm,
+  projectOptions,
+  LeadStatus,
+}) => {
+  const insets = useSafeAreaInsets();
+  const translateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
+  const backdropAnim = useRef(new Animated.Value(0)).current;
+  const [modalMounted, setModalMounted] = useState(false);
+  const scrollAtTop = useRef(true);
+  const isClosing = useRef(false);
+
+  const scrollRef1 = useRef(null);
+  const scrollYRef = useRef(0);
+
+  const [showFromPicker, setShowFromPicker] = useState(false);
+  const [showToPicker, setShowToPicker] = useState(false);
+  const [iosPickerTarget, setIosPickerTarget] = useState(null);
+  const [iosTempDate, setIosTempDate] = useState(new Date());
+
+  const animateOpen = () => {
+    translateY.setValue(SCREEN_HEIGHT);
+    backdropAnim.setValue(0);
+    Animated.parallel([
+      Animated.spring(translateY, {
+        toValue: 0,
+        useNativeDriver: true,
+        damping: 26,
+        stiffness: 280,
+        mass: 0.9,
+      }),
+      Animated.timing(backdropAnim, {
+        toValue: 1,
+        duration: 260,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
+  const animateClose = (vy = 0) => {
+    if (isClosing.current) return;
+    isClosing.current = true;
+    Keyboard.dismiss();
+    const duration = vy > 1.2 ? 150 : 220;
+    Animated.parallel([
+      Animated.timing(translateY, {
+        toValue: SCREEN_HEIGHT,
+        duration,
+        useNativeDriver: true,
+      }),
+      Animated.timing(backdropAnim, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      isClosing.current = false;
+      setModalMounted(false);
+      setShowFromPicker(false);
+      setShowToPicker(false);
+      setIosPickerTarget(null);
+      onClose();
+    });
+  };
+
+  const snapBack = () => {
+    Animated.spring(translateY, {
+      toValue: 0,
+      useNativeDriver: true,
+      damping: 22,
+      stiffness: 300,
+      mass: 0.8,
+    }).start();
+  };
+
+  // Drag from the handle
+  const handlePan = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dy) > 4,
+      onPanResponderGrant: () => {
+        translateY.stopAnimation(val => {
+          translateY.setOffset(val);
+          translateY.setValue(0);
+        });
+      },
+      onPanResponderMove: (_, g) => {
+        translateY.setValue(g.dy > 0 ? g.dy : g.dy * 0.06);
+      },
+      onPanResponderRelease: (_, g) => {
+        translateY.flattenOffset();
+        if (g.dy > 80 || g.vy > 0.5) animateClose(g.vy);
+        else snapBack();
+      },
+      onPanResponderTerminate: () => {
+        translateY.flattenOffset();
+        snapBack();
+      },
+    }),
+  ).current;
+
+  // Drag down from the content when scrolled to top
+  const scrollPan = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_, g) =>
+        scrollAtTop.current && g.dy > 8 && Math.abs(g.dy) > Math.abs(g.dx),
+      onPanResponderGrant: () => {
+        translateY.stopAnimation(val => {
+          translateY.setOffset(val);
+          translateY.setValue(0);
+        });
+      },
+      onPanResponderMove: (_, g) => {
+        if (g.dy > 0) translateY.setValue(g.dy);
+      },
+      onPanResponderRelease: (_, g) => {
+        translateY.flattenOffset();
+        if (g.dy > 80 || g.vy > 0.5) animateClose(g.vy);
+        else snapBack();
+      },
+      onPanResponderTerminate: () => {
+        translateY.flattenOffset();
+        snapBack();
+      },
+    }),
+  ).current;
+
+  useEffect(() => {
+    if (visible) {
+      isClosing.current = false;
+      setModalMounted(true);
+      requestAnimationFrame(() => animateOpen());
+    } else {
+      if (modalMounted) animateClose();
+    }
+  }, [visible]);
+
+  /* ---- date handling (same logic as before) ---- */
+  const onDateChange = (event, selectedDate, key) => {
+    if (key === 'fromDate') setShowFromPicker(false);
+    else setShowToPicker(false);
+
+    if (event.type === 'dismissed' || !selectedDate) return;
+
+    onChange(key, selectedDate.toISOString().split('T')[0]);
+  };
+
+  const openDatePicker = key => {
+    if (Platform.OS === 'ios') {
+      setIosTempDate(filters[key] ? new Date(filters[key]) : new Date());
+      setIosPickerTarget(key);
+    } else if (key === 'fromDate') {
+      setShowFromPicker(true);
+    } else {
+      setShowToPicker(true);
+    }
+  };
+
+  const handleIosDone = () => {
+    onChange(iosPickerTarget, iosTempDate.toISOString().split('T')[0]);
+    setIosPickerTarget(null);
+  };
+  const handleIosCancel = () => setIosPickerTarget(null);
+
+  if (!modalMounted) return null;
+
+  return (
+    <Modal
+      transparent
+      visible={modalMounted}
+      onRequestClose={() => animateClose()}
+      animationType="none"
+      statusBarTranslucent
+      supportedOrientations={['portrait', 'landscape']}
+    >
+      <Animated.View style={[styles.backdrop, { opacity: backdropAnim }]}>
+        <TouchableOpacity
+          style={StyleSheet.absoluteFill}
+          activeOpacity={1}
+          onPress={() => animateClose()}
+        />
+      </Animated.View>
+
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.kavWrapper}
+        pointerEvents="box-none"
+      >
+        <Animated.View style={[styles.sheet, { transform: [{ translateY }] }]}>
+          <View {...handlePan.panHandlers} style={styles.dragHandleWrap}>
+            <View style={styles.dragHandleLight} />
+          </View>
+
+          <ScrollView
+            ref={scrollRef1}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            scrollEventThrottle={16}
+            onScroll={e => {
+              const y = e.nativeEvent.contentOffset.y;
+              scrollYRef.current = y;
+              scrollAtTop.current = y <= 2;
+            }}
+            contentContainerStyle={{
+              paddingBottom: Math.max(insets.bottom, 0) + 24,
+            }}
+            {...scrollPan.panHandlers}
+          >
+            <View style={styles.sheetHeader}>
+              <Text style={styles.sheetTitle}>Filter Leads</Text>
+            </View>
+
+            <DropdownField
+              label="Lead Source"
+              data={leadSourceOptions}
+              placeholder="Select"
+              value={filters.lead_source}
+              onChange={value => onChange('lead_source', value)}
+              scrollRef={scrollRef1}
+              scrollYRef={scrollYRef}
+            />
+            <DropdownField
+              label="Property Location"
+              data={Property}
+              placeholder="Select"
+              value={filters.location}
+              onChange={value => onChange('location', value)}
+              scrollRef={scrollRef1}
+              scrollYRef={scrollYRef}
+            />
+            <DropdownField
+              label="RM"
+              data={Rm}
+              placeholder="Select"
+              value={filters.rm_id}
+              onChange={value => onChange('rm_id', value)}
+              scrollRef={scrollRef1}
+              scrollYRef={scrollYRef}
+            />
+            <DropdownField
+              label="Project"
+              data={projectOptions}
+              placeholder="Select"
+              value={filters.project}
+              onChange={value => onChange('project', value)}
+              scrollRef={scrollRef1}
+              scrollYRef={scrollYRef}
+            />
+            <DropdownField
+              label="Lead Status"
+              data={LeadStatus}
+              placeholder="Select"
+              value={filters.status}
+              onChange={value => onChange('status', value)}
+              scrollRef={scrollRef1}
+              scrollYRef={scrollYRef}
+            />
+
+            <View style={styles.dateRow}>
+              <View style={{ width: '48%' }}>
+                <InputField
+                  label="From Date"
+                  placeholder="YYYY-MM-DD"
+                  icon="calendar-today"
+                  value={filters.fromDate}
+                  onPress={() => openDatePicker('fromDate')}
+                />
+              </View>
+              <View style={{ width: '48%' }}>
+                <InputField
+                  label="To Date"
+                  placeholder="YYYY-MM-DD"
+                  icon="calendar-today"
+                  value={filters.toDate}
+                  onPress={() => openDatePicker('toDate')}
+                />
+              </View>
+            </View>
+
+            {Platform.OS === 'android' && showFromPicker && (
+              <DateTimePicker
+                value={filters.fromDate ? new Date(filters.fromDate) : new Date()}
+                mode="date"
+                display="default"
+                onChange={(e, d) => onDateChange(e, d, 'fromDate')}
+              />
+            )}
+            {Platform.OS === 'android' && showToPicker && (
+              <DateTimePicker
+                value={filters.toDate ? new Date(filters.toDate) : new Date()}
+                mode="date"
+                display="default"
+                onChange={(e, d) => onDateChange(e, d, 'toDate')}
+              />
+            )}
+
+            <View style={styles.buttonRow}>
+              <TouchableOpacity style={styles.resetBtn} onPress={onReset}>
+                <Icon
+                  name="refresh"
+                  size={16}
+                  color="#5a7080"
+                  style={{ marginRight: 6 }}
+                />
+                <Text style={styles.resetBtnText}>Reset</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.applyBtn} onPress={onApply}>
+                <Text style={styles.applyBtnText}>Apply Filter</Text>
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+
+          {Platform.OS === 'ios' && iosPickerTarget !== null && (
+            <IOSPickerOverlay
+              target={iosPickerTarget}
+              tempDate={iosTempDate}
+              onDateChange={setIosTempDate}
+              onDone={handleIosDone}
+              onCancel={handleIosCancel}
+            />
+          )}
+        </Animated.View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+};
+
 /* ================= MAIN ================= */
 const MissedFollowup = () => {
   const navigation = useNavigation();
   const scrollRef = useRef();
   const isScrollingToTop = useRef(false);
+  const insets = useSafeAreaInsets();
   const [searchText, setSearchText] = useState('');
   const [showTopBtn, setShowTopBtn] = useState(false);
   const [showRemarks, setShowRemarks] = useState(false);
@@ -611,11 +914,8 @@ const MissedFollowup = () => {
     location: null,
     active: null,
     lead_source: null,
- 
   });
   const [appliedFilters, setAppliedFilters] = useState();
-    const [showFromPicker, setShowFromPicker] = useState(false);
-    const [showToPicker, setShowToPicker] = useState(false);
   const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } =
     useInfiniteQuery({
       queryKey: ['MissedFollowups', appliedFilters],
@@ -636,17 +936,15 @@ const MissedFollowup = () => {
         });
         return res.data;
       },
-        getNextPageParam: lastPage => {
-      const { currentPage, totalPages } = lastPage;
-      return currentPage < totalPages ? currentPage + 1 : undefined;
-    },
-    initialPageParam: 1,
+      getNextPageParam: lastPage => {
+        const { currentPage, totalPages } = lastPage;
+        return currentPage < totalPages ? currentPage + 1 : undefined;
+      },
+      initialPageParam: 1,
     });
 
   const leads = data?.pages?.flatMap(page => page.data) || [];
 
-  // ✅ Dedupe leads by id — prevents "same key" warnings & duplicate cards
-  // caused by overlapping pagination results.
   const uniqueLeadsMap = new Map();
   leads.forEach(item => {
     if (item?.id != null) {
@@ -655,9 +953,6 @@ const MissedFollowup = () => {
   });
   const uniqueLeads = Array.from(uniqueLeadsMap.values());
 
-  // ✅ Total count from server (last page carries the latest total/totalPages).
-  // Adjust the field name below (total / totalRecords / totalCount) to match
-  // whatever your API actually returns.
   const lastPageData = data?.pages?.[data.pages.length - 1];
   const totalCount =
     lastPageData?.total ??
@@ -665,7 +960,6 @@ const MissedFollowup = () => {
     lastPageData?.totalCount ??
     null;
 
-  // ✅ Infinite scroll handler — scroll position দেখে trigger করে
   const handleLoadMore = () => {
     if (hasNextPage && !isFetchingNextPage) {
       fetchNextPage();
@@ -735,32 +1029,14 @@ const MissedFollowup = () => {
   const LeadStatus = [
     { label: 'Active', value: '1' },
     { label: 'Inactive', value: '2' },
-     { label: 'Booking Done', value: '5' },
-    // { label: 'Site Visit', value: '3' },
-    // { label: 'Meeting Done', value: '4' },
-    // { label: 'Booking Done', value: '5' },
+    { label: 'Booking Done', value: '5' },
   ];
 
   /* ================= HANDLERS ================= */
   const onChange = (key, value) => {
     setFilters(prev => ({ ...prev, [key]: value }));
   };
-  const onDateChange = (event, selectedDate, key) => {
-    if (key === 'fromDate') {
-      setShowFromPicker(false);
-    } else {
-      setShowToPicker(false);
-    }
 
-    if (event.type === 'dismissed' || !selectedDate) return;
-
-    const date = selectedDate.toISOString().split('T')[0];
-
-    setFilters(prev => ({
-      ...prev,
-      [key]: date,
-    }));
-  };
   const applyFilter = () => {
     setAppliedFilters(filters);
     setShowFilterModal(false);
@@ -783,13 +1059,6 @@ const MissedFollowup = () => {
     setShowFilterModal(false);
   };
 
-  // if (isLoading) {
-  //   return (
-  //     <View style={styles.loader}>
-  //       <ActivityIndicator size="large" color="#00acc1" />
-  //     </View>
-  //   );
-  // }
   const scrollToTop = () => {
     isScrollingToTop.current = true;
     scrollRef.current?.scrollTo({ y: 0, animated: true });
@@ -797,288 +1066,175 @@ const MissedFollowup = () => {
       isScrollingToTop.current = false;
     }, 600);
   };
-   const scrollRef1 = useRef(null);
-      const scrollYRef = useRef(0); 
+
   return (
     <View style={styles.container}>
-      <StatusBar
-        translucent
-        backgroundColor="transparent"
-        barStyle="light-content"
+      <Image
+        source={require('../asset/image/logo/bg-img.png')}
+        style={styles.bgImageFixed}
+        resizeMode="cover"
       />
+      <View style={styles.overlay} />
+      <SafeAreaView style={styles.safeArea} edges={['left', 'right']}>
+        <StatusBar
+          translucent
+          backgroundColor="transparent"
+          barStyle="light-content"
+        />
 
-      {/* <Header /> */}
+        {/* TOP BAR: [back + icon + title] ............ [filter] */}
+        <View
+          style={[
+            styles.topBarContainer,
+            { paddingTop:  verticalScale(10) },
+            // insets.top +
+          ]}
+        >
+          <View style={styles.topBar}>
+            <View style={styles.leftHeader}>
+              <TouchableOpacity
+                onPress={() => navigation.navigate('Dashboard')}
+                style={styles.backBtn}
+                activeOpacity={0.7}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                 <Icon1
+                                   name="chevron-back"
+                                   size={20}
+                                   color="#fff"
+                                   style={styles.backIcon}
+                                 />
+              </TouchableOpacity>
+              <Icon name="notifications-off" size={20} color="#ffffff" />
+              <Text style={styles.screenTitle} numberOfLines={1}>
+                Missed Followups
+              </Text>
+            </View>
 
-      {/* TOP BAR */}
-      <View style={styles.topBarContainer}>
-        <View style={styles.topBar}>
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Icon name="notifications-off" size={18} color="#cfd8dc" />
-            <Text style={styles.screenTitle}>Missed Followups</Text>
-          </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <TouchableOpacity
-              style={[
-                styles.backBtn,
-                { marginRight: 8, borderColor: '#00e5ff' },
-              ]}
+              activeOpacity={0.7}
               onPress={() => setShowFilterModal(true)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
               <Icon name="filter-alt" size={18} color="#00e5ff" />
             </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => navigation.goBack()}
-              style={styles.backBtn}
-            >
-            <View style={styles.backButton}>
-                            <Image
-                              source={require('../asset/image/icon/Arrow.png')}
-                              style={{ width:12, height: 12, marginRight: 6 }}
-                            />
-                            <Text style={styles.backText}>Back</Text>
-                          </View>
-            </TouchableOpacity>
           </View>
         </View>
-      </View>
 
-      {/* LIST */}
-      <ScrollView
-        ref={scrollRef}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 120 }}
-        onScroll={event => {
-          const { layoutMeasurement, contentOffset, contentSize } =
-            event.nativeEvent;
-          const y = contentOffset.y;
+        {/* LIST */}
+        <ScrollView
+          ref={scrollRef}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.listContent}
+          onScroll={event => {
+            const { layoutMeasurement, contentOffset, contentSize } =
+              event.nativeEvent;
+            const y = contentOffset.y;
 
-          // Scroll to top button
-          setShowTopBtn(y > 200);
-          if (isScrollingToTop.current) return;
+            setShowTopBtn(y > 200);
+            if (isScrollingToTop.current) return;
 
-          const isNearBottom =
-            layoutMeasurement.height + y >= contentSize.height - 150;
-          if (isNearBottom) {
-            handleLoadMore();
-          }
-        }}
-        scrollEventThrottle={400}
-      >
-        {/* SEARCH */}
-     <View style={styles.searchBox}>
-            <Icon name="search" size={16} color={COLORS.mutedText} />
+            const isNearBottom =
+              layoutMeasurement.height + y >= contentSize.height - 150;
+            if (isNearBottom) {
+              handleLoadMore();
+            }
+          }}
+          scrollEventThrottle={400}
+        >
+          {/* SEARCH */}
+          <View style={styles.searchContainer}>
+            <View style={styles.searchBox}>
+              <Icon name="search" size={16} color={COLORS.mutedText} />
               <TextInput
                 placeholder="Search name / phone / email..."
-           placeholderTextColor={COLORS.mutedText}
+                placeholderTextColor={COLORS.mutedText}
                 value={searchText}
                 onChangeText={setSearchText}
-                // style={{
-                //   marginLeft: 8,
-                //   color: '#fff',
-                //   flex: 1,
-                //   height: '100%',
-                //   paddingVertical: Platform.OS === 'ios' ? 0 : 6,
-                // }}
                 style={styles.searchInput}
               />
             </View>
+          </View>
 
-        {/* COUNT */}
-        <Text style={styles.countText}>
-          Showing {filteredLeads.length}
-          {totalCount != null ? ` of ${totalCount}` : ''} entries
-        </Text>
-
-        {/* CARDS */}
-        {isLoading ? (
-          <Text style={{ color: '#fff', textAlign: 'center', marginTop: 20 }}>
-            Loading...
+          {/* COUNT */}
+          <Text style={styles.countText}>
+            Showing {filteredLeads.length}
+            {totalCount != null ? ` of ${totalCount}` : ''} entries
           </Text>
-        ) : filteredLeads.length > 0 ? (
-          filteredLeads.map((item, i) => (
-            <LeadCard
-              key={item?.id != null ? `lead-${item.id}` : `lead-idx-${i}`}
-              item={item}
-              navigation={navigation}
-              setShowRemarks={setShowRemarks}
-              setRemarksText={setRemarksText}
-            />
-          ))
-        ) : (
-          <Text style={styles.empty}>No missed followups found</Text>
-        )}
-        {isFetchingNextPage && (
-          <ActivityIndicator
-            size="small"
-            color="#999"
-            style={{
-              marginVertical: 12,
-              alignSelf: 'center',
-            }}
-          />
-        )}
-      </ScrollView>
 
-      {/* REMARKS MODAL */}
-      {showRemarks && (
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <Icon name="check-circle" size={32} color="#00acc1" />
-            <Text style={styles.modalTitle}>Latest Remarks</Text>
-            <Text style={styles.modalText}>{remarksText}</Text>
-
-            <TouchableOpacity
-              style={styles.modalCloseBtn}
-              onPress={() => setShowRemarks(false)}
-            >
-              <Text style={styles.modalCloseText}>OK</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
-      {showFilterModal && (
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <View style={styles.dragHandle} />
-            <Text style={styles.modalTitle}>Filter Leads</Text>
-
-            <ScrollView
-              style={{ width: '100%' }}
-                  ref={scrollRef1}
-          onScroll={e => {
-            scrollYRef.current = e.nativeEvent.contentOffset.y;
-          }}
-              showsVerticalScrollIndicator={false}
-            >
-              <DropdownField
-                label="Lead Source"
-                data={leadSourceOptions}
-                placeholder="Select"
-                value={filters.lead_source}
-                onChange={value => onChange('lead_source', value)}
-                   scrollRef={scrollRef1}
-              scrollYRef={scrollYRef}
-              />
-              <DropdownField
-                label="Property Location"
-                data={Property}
-                placeholder="Select"
-                value={filters.location}
-                onChange={value => onChange('location', value)}
-                   scrollRef={scrollRef1}
-              scrollYRef={scrollYRef}
-              />
-              <DropdownField
-                label="RM"
-                data={Rm}
-                placeholder="Select"
-                value={filters.rm_id}
-                onChange={value => onChange('rm_id', value)}
-                   scrollRef={scrollRef1}
-              scrollYRef={scrollYRef}
-              />
-
-              {/* Date Row */}
-              <View
-                style={{
-                  flexDirection: 'row',
-                  justifyContent: 'space-between',
-                  width: '100%',
-                }}
-              ></View>
-
-              <DropdownField
-                label="Project"
-                data={projectOptions}
-                placeholder="Select"
-                value={filters.project}
-                onChange={value => onChange('project', value)}
-                   scrollRef={scrollRef1}
-              scrollYRef={scrollYRef}
-              />
-              <DropdownField
-                label="Lead Status"
-                data={LeadStatus}
-                placeholder="Select"
-                value={filters.status}
-                onChange={value => onChange('status', value)}
-                   scrollRef={scrollRef1}
-              scrollYRef={scrollYRef}
-              />
-                 <View
-            style={{
-              flexDirection: 'row',
-              justifyContent: 'space-between',
-              width: '100%',
-            }}
-          >
-            <View style={{ width: '48%' }}>
-              <InputField
-                label="From Date"
-                placeholder="YYYY-MM-DD"
-                icon="calendar-today"
-                value={filters.fromDate}
-                onPress={() => setShowFromPicker(true)}
-              />
+          {/* CARDS */}
+          {isLoading ? (
+            <View style={styles.centerLoader}>
+              <ActivityIndicator size="large" color="#fff" />
             </View>
-            <View style={{ width: '48%' }}>
-              <InputField
-                label="To Date"
-                placeholder="YYYY-MM-DD"
-                icon="calendar-today"
-                value={filters.toDate}
-                onPress={() => setShowToPicker(true)}
+          ) : filteredLeads.length > 0 ? (
+            filteredLeads.map((item, i) => (
+              <LeadCard
+                key={item?.id != null ? `lead-${item.id}` : `lead-idx-${i}`}
+                item={item}
+                navigation={navigation}
+                setShowRemarks={setShowRemarks}
+                setRemarksText={setRemarksText}
               />
+            ))
+          ) : (
+            <View style={styles.emptyWrap}>
+              <Icon
+                name="notifications-off"
+                size={48}
+                color="rgba(255,255,255,0.25)"
+              />
+              <Text style={styles.empty}>No missed followups found</Text>
+            </View>
+          )}
+          {isFetchingNextPage && (
+            <View style={styles.footerLoader}>
+              <ActivityIndicator size="small" color="#1ea7ff" />
+              <Text style={styles.footerText}>Loading more...</Text>
+            </View>
+          )}
+        </ScrollView>
+
+        {/* REMARKS MODAL */}
+        {showRemarks && (
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalCard}>
+              <Icon name="check-circle" size={32} color="#4aa3df" />
+              <Text style={styles.modalTitle}>Latest Remarks</Text>
+              <Text style={styles.modalText}>{remarksText}</Text>
+
+              <TouchableOpacity
+                style={styles.modalCloseBtn}
+                onPress={() => setShowRemarks(false)}
+              >
+                <Text style={styles.modalCloseText}>OK</Text>
+              </TouchableOpacity>
             </View>
           </View>
-          {showFromPicker && (
-            <DateTimePicker
-              value={filters.fromDate ? new Date(filters.fromDate) : new Date()}
-              mode="date"
-              display="default"
-              onChange={(e, d) => onDateChange(e, d, 'fromDate')}
-            />
-          )}
-          {showToPicker && (
-            <DateTimePicker
-              value={filters.toDate ? new Date(filters.toDate) : new Date()}
-              mode="date"
-              display="default"
-              onChange={(e, d) => onDateChange(e, d, 'toDate')}
-            />
-          )}
-            </ScrollView>
+        )}
 
-            <TouchableOpacity
-              style={styles.modalCloseBtn}
-              onPress={applyFilter}
-            >
-              <Text style={styles.modalCloseText}>Apply Filter</Text>
-            </TouchableOpacity>
+        {/* FILTER BOTTOM SHEET (animated Modal) */}
+        <FilterBottomSheet
+          visible={showFilterModal}
+          onClose={() => setShowFilterModal(false)}
+          onApply={applyFilter}
+          onReset={resetFilters}
+          filters={filters}
+          onChange={onChange}
+          leadSourceOptions={leadSourceOptions}
+          Property={Property}
+          Rm={Rm}
+          projectOptions={projectOptions}
+          LeadStatus={LeadStatus}
+        />
 
-            <TouchableOpacity onPress={resetFilters} style={{ marginTop: 12 }}>
-              <Text style={{ color: '#ff5252', fontWeight: 'bold' }}>
-                Reset All
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={() => setShowFilterModal(false)}
-              style={{ marginTop: 15 }}
-            >
-              <Text style={{ color: '#fff' }}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
-      {/* TOP BUTTON */}
-      {showTopBtn && (
-        <TouchableOpacity style={styles.topButton} onPress={scrollToTop}>
-          <Icon name="keyboard-arrow-up" size={26} color="#fff" />
-        </TouchableOpacity>
-      )}
-
-      {/* <BottomNav /> */}
+        {/* TOP BUTTON */}
+        {showTopBtn && (
+          <TouchableOpacity style={styles.topButton} onPress={scrollToTop}>
+            <Icon name="keyboard-arrow-up" size={26} color="#fff" />
+          </TouchableOpacity>
+        )}
+      </SafeAreaView>
     </View>
   );
 };
@@ -1087,267 +1243,309 @@ export default MissedFollowup;
 
 /* ================= STYLES ================= */
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#070c4d' },
-  loader: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  container: { flex: 1, backgroundColor: '#1a2d3e' },
+  bgImageFixed: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: SCREEN_WIDTH,
+    height: Dimensions.get('screen').height,
+  },
+  safeArea: { flex: 1, backgroundColor: 'transparent' },
+  overlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: SCREEN_WIDTH,
+    height: Dimensions.get('screen').height,
+    backgroundColor: 'rgba(18,32,48,0.72)',
+  },
 
-  topBarContainer: { paddingHorizontal: 15, marginTop: 10 },
-
+  /* ── Header pill ── */
+  topBarContainer: {
+    paddingHorizontal: scale(10),
+    paddingBottom: verticalScale(10),
+  },
   topBar: {
+    height: 42,
+    borderRadius: scale(22),
+    backgroundColor: 'rgba(255,255,255,0.15)',
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#ffffff15',
-    padding: 10,
-    borderRadius: 20,
+    justifyContent: 'space-between',
+    paddingHorizontal: scale(14),
+  },
+  leftHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    marginRight: 10,
+  },
+  backBtn: {
+    paddingRight: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  backIcon: {
+    width: 20,
+    height: 20,
+    tintColor: '#ffffff',
+  },
+  screenTitle: {
+    color: '#ffffff',
+    fontSize: 17,
+    marginLeft: 6,
+    fontWeight: '700',
+    flexShrink: 1,
+  },
+
+  /* ── List ── */
+  listContent: { paddingHorizontal: 14, paddingBottom: 120 },
+  centerLoader: { alignItems: 'center', justifyContent: 'center', marginTop: 40 },
+  footerLoader: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 16,
+    gap: 8,
+  },
+  footerText: { color: 'rgba(255,255,255,0.50)', fontSize: 13 },
+  emptyWrap: { alignItems: 'center', marginTop: 80, gap: 12 },
+  empty: { color: 'rgba(255,255,255,0.40)', fontSize: 15 },
+  searchContainer: {
+    position: 'relative',
+    zIndex: 100,
     marginBottom: 10,
   },
-  remarksCardText: {
-  fontSize: 13,
-  color: '#ffffff',
-  lineHeight: 20,
-},
-
-readMore: {
-  color: '#00a8ff',
-  fontWeight: '600',
-  marginTop: 3,
-},
-  screenTitle: { color: '#cfd8dc', fontSize: 13, marginLeft: 6 },
-  backButton: {
-  flexDirection: 'row',
-  alignItems: 'center',
-},
-  backBtn: {
-    borderWidth: 1,
-    borderColor: '#888',
-    borderRadius: 20,
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-  },
-
-  backText: { color: '#fff', fontSize: 12 },
-
- searchBox: {
+  searchBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    margin: 12,
-    marginBottom:8,
+    backgroundColor: 'rgba(255,255,255,0.10)',
+    borderRadius: 12,
     borderWidth: 1,
- borderColor: COLORS.borderColor, borderRadius: 20,  backgroundColor: 'rgba(255,255,255,0.06)', 
+    borderColor: 'rgba(255,255,255,0.13)',
     paddingHorizontal: 12,
-    marginTop: 0,
-    height: Platform.OS === 'ios' ? 40 : 40,
+    paddingVertical: 9,
   },
-searchInput: { color: COLORS.white, marginLeft: 8, fontSize: 13, flex: 1, paddingVertical: 0 },
-
-
+  searchInput: { flex: 1, fontSize: 14, color: '#fff', padding: 0, marginLeft: 8 },
   countText: {
-    color: '#a0b4e8',
+    color: '#ffb300',
     fontSize: 12,
-    fontWeight: '600',
-    marginLeft: 15,
+    fontWeight: '700',
     marginBottom: 8,
   },
 
+  /* ── Card ── */
   card: {
-    marginHorizontal: 15,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#ffffff6e',
-    borderRadius: 12,
+    backgroundColor: '#rgba(4, 35, 70, 0.62)',
+    borderRadius: 4,
     padding: 12,
-    backgroundColor: '#ffffff20',
+    marginBottom: 10,
+    borderLeftWidth: 4,
+    borderLeftColor: '#52c97c',
   },
-
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
+    marginBottom: 4,
   },
-
-nameRow: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  flex: 1,
-  flexWrap: 'wrap',
-  marginRight: 8,          
-},
-
-  name: { color: '#fff', fontWeight: 'bold', flexShrink: 1 },
-
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    flexWrap: 'wrap',
+    marginRight: 8,
+  },
+  name: { color: '#ffffff', fontSize: 15, fontWeight: '600', flexShrink: 1 },
+  ratingText: { color: '#4FC3F7', fontSize: 11, marginLeft: 4 },
   activeBadge: {
-    borderRadius: 10,
-    paddingHorizontal: 6,
-    marginLeft: 6,
-  },
-
-  activeText: { color: '#fff', fontSize: 10 },
-
-  remarksBtn: {
-    backgroundColor: '#00acc1',
-    borderRadius: 10,
+    borderRadius: 12,
     paddingHorizontal: 8,
     paddingVertical: 3,
+    marginLeft: 6,
   },
+  activeText: { fontSize: 11, fontWeight: '600' },
+  remarksCardText: { fontSize: 11.5, color: '#ffffff', lineHeight: 18 },
+  readMore: { color: '#4FC3F7', fontWeight: '600', marginTop: 3 },
   phoneText: {
-  color: '#00acc1',
-  backgroundColor: 'rgba(0, 172, 193, 0.15)',
-  paddingHorizontal: 4,
-  paddingVertical: 2,
-  borderRadius: 4,
-  fontWeight: '600',
-},
-  remarksText: { color: '#fff', fontSize: 10 },
-
-  location: {
-    color: '#00e5ff',
-    marginTop: 5,
+    color: '#4FC3F7',
+    backgroundColor: 'rgba(20,130,204,0.10)',
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    borderRadius: 4,
+    fontWeight: '600',
+    fontSize: 11.5,
   },
-
-rowBetween: {
-  flexDirection: 'row',
-  justifyContent: 'space-between',
-  marginTop: 5,
-  gap: 6,
-  flexWrap: 'wrap',        
-},
-
-label: {
-  // color: '#a0b4e8',
-   color: '#FFB85D',
-  fontSize: 12,
-  // marginBottom: 5,
-  fontWeight: '500',
-  // flex: 1,                 
-  // flexShrink: 1,           
-},
+  location: { color: '#4FC3F7', marginTop: 2, fontSize: 12 },
+  rowBetween: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 5,
+    gap: 6,
+    flexWrap: 'wrap',
+  },
+  label: { fontSize: 11.5, color: '#afaea5', lineHeight: 18 },
+  value: { color: '#ffffff', fontSize: 11.5, flexShrink: 1 },
   emailText: {
-    color: '#00acc1',
+    color: '#4FC3F7',
     textDecorationLine: 'underline',
     fontWeight: '500',
-    fontSize: 12,
-
-
+    fontSize: 11.5,
   },
- value: { color: '#fff', flexShrink: 1 }, 
-
   cardFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 10,
+    alignItems: 'center',
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
   },
-
   button: {
-    backgroundColor: '#00acc1',
-    borderRadius: 20,
+    backgroundColor: 'rgba(74,163,223,0.18)',
+    borderWidth: 1,
+    borderColor: 'rgba(74,163,223,0.45)',
+    borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 5,
   },
+  buttonText: { color: '#7cc4f2', fontSize: 12, fontWeight: '600' },
+  completed: { color: '#afaea5', fontSize: 12 },
 
-  buttonText: { color: '#fff', fontSize: 12 },
-
-  completed: { color: '#aaa', fontSize: 12 },
-
-  empty: { color: '#aaa', textAlign: 'center', marginTop: 20 },
-
+  /* ── Top button (FAB style) ── */
   topButton: {
     position: 'absolute',
-    bottom: 100,
+    bottom: 16.5,
     right: 20,
-    backgroundColor: '#00acc1',
+    backgroundColor: '#4aa3df',
     width: 50,
     height: 50,
     borderRadius: 25,
     justifyContent: 'center',
     alignItems: 'center',
+    shadowColor: '#1a7abf',
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.6,
+    shadowRadius: 10,
+    elevation: 12,
   },
 
+  /* ── Remarks modal ── */
   modalOverlay: {
     position: 'absolute',
-    width: '100%',
-    height: '100%',
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.45)',
     justifyContent: 'center',
     alignItems: 'center',
-    bottom:45
   },
-
   modalCard: {
-  width: '88%',
+    width: '88%',
     maxHeight: SCREEN_HEIGHT * 0.72,
-    backgroundColor: '#1a1f6b',
+    backgroundColor: '#21283a',
     borderWidth: 1,
-    borderColor: '#3d45b0',
-    borderRadius: 18,
+    borderColor: '#39415a',
+    borderRadius: 24,
     paddingHorizontal: 20,
-    paddingTop: 14,
+    paddingTop: 18,
     paddingBottom: 18,
     alignItems: 'center',
   },
-
   modalTitle: {
-    color: '#00e5ff',
+    color: '#e6ebf2',
     fontSize: 18,
     marginBottom: 10,
-    fontWeight: 'bold',
+    fontWeight: '700',
   },
-
-  modalText: {
-    color: '#fff',
-    textAlign: 'center',
-    marginBottom: 15,
-  },
-
+  modalText: { color: '#c3cbdb', textAlign: 'center', marginBottom: 15 },
   modalCloseBtn: {
-    backgroundColor: '#00acc1',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 24,
-    marginTop: 6,
-    width: '100%',
+    backgroundColor: '#1e9ce8',
+    height: 48,
+    borderRadius: 14,
+    justifyContent: 'center',
     alignItems: 'center',
+    width: '100%',
+  },
+  modalCloseText: { color: '#ffffff', fontWeight: '600', fontSize: 15 },
+
+  /* ── Filter bottom sheet ── */
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+  },
+  kavWrapper: { flex: 1, justifyContent: 'flex-end' },
+  sheet: {
+    backgroundColor: '#21283a',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    maxHeight: SCREEN_HEIGHT * 0.9,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 20,
+  },
+  dragHandleWrap: { alignItems: 'center', paddingBottom: 8, paddingTop: 4 },
+  dragHandleLight: {
+    width: 38,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#b0bec5',
+    alignSelf: 'center',
+  },
+  sheetHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  sheetTitle: { color: '#d7dbe2', fontSize: 18, fontWeight: '700' },
+  dateRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
   },
 
-  modalCloseText: { color: '#fff', fontWeight: '600', fontSize: 14 },
-  inputWrapper: { width: '100%', marginBottom: 12 },
-  dragHandle: {
-    width: 36,
-    height: 4,
-    backgroundColor: '#3d55cc',
-    borderRadius: 2,
-    marginBottom: 14,
+  inputLabel: {
+    color: '#9aa8bd',
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: 0,
+    marginTop: 0,
   },
-  // dropdown: {
-  //   height: 40,
-  //   backgroundColor: '#ffffff12',
-  //   borderRadius: 8,
-  //   paddingHorizontal: 10,
-  //   borderWidth: 1,
-  //   borderColor: '#3d55cc',
-  // },
-  // dropdownContainer: { backgroundColor: '#fff', borderRadius: 8 },
-    // dropdownContainer: { backgroundColor: '#fff', borderRadius: 8 },
-  dropLabel: { color: '#00cfff', fontSize: 10, fontWeight: '700', letterSpacing: 0.4, textTransform: 'uppercase', marginBottom: 5 },
+  field: { marginBottom: 5, width: '100%' },
+
   dropdown: {
-    height: 40,
-  backgroundColor: '#2b2f66',
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    justifyContent: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#2b3348',
     borderWidth: 1,
     borderColor: '#39415a',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
   },
-  dropdownOpen: { borderColor: '#4aa3df', 
-    // backgroundColor: '#28304a' 
-  },
+  dropdownOpen: { borderColor: '#4aa3df', backgroundColor: '#28304a' },
+  inputError: { borderColor: '#e05a2b' },
+  errorText: { color: '#e05a2b', fontSize: 11, marginTop: 4 },
   dropdownMenu: {
     marginTop: 4,
-   backgroundColor: '#ffffff',
+    backgroundColor: '#2b3348',
     borderRadius: 12,
-    // borderWidth: 1,
-    // borderColor: '#39415a',
+    borderWidth: 1,
+    borderColor: '#39415a',
     overflow: Platform.OS === 'ios' ? 'visible' : 'hidden',
-   
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 6,
   },
   dropdownItem: {
     flexDirection: 'row',
@@ -1355,56 +1553,129 @@ label: {
     gap: 10,
     paddingHorizontal: 14,
     paddingVertical: 10,
-    // borderBottomWidth: 1,
-    // borderBottomColor: '#323a52',
+    borderBottomWidth: 1,
+    borderBottomColor: '#323a52',
   },
   dropdownItemActive: { backgroundColor: 'rgba(74,163,223,0.15)' },
-  dropdownItemText: { flex: 1, fontSize: 13, color: '#000', fontWeight: '500' },
+  dropdownItemText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#c3cbdb',
+    fontWeight: '500',
+  },
   dropdownItemTextActive: { color: '#7cc4f2', fontWeight: '700' },
   placeholder: { color: '#8a9daf', fontSize: 13 },
   selectedText: { color: '#e6ebf2', fontSize: 13, fontWeight: '600' },
-  ddTriggerLeft: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 },
-  ddAvatar: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: 'rgba(20,130,204,0.14)',
+  ddTriggerLeft: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 8,
+    flex: 1,
   },
-  ddAvatarSelected: { backgroundColor: '#1482cc' },
-  ddAvatarTxt: { fontSize: 11, fontWeight: '700', color: '#1482cc' },
   ddSearchWrap: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#babdc5',
-    backgroundColor: '#b1b5c0',
+    borderBottomColor: '#39415a',
+    backgroundColor: '#28304a',
     borderTopLeftRadius: 12,
     borderTopRightRadius: 12,
   },
-  ddSearchInput: { flex: 1, fontSize: 13, color: '#000', padding: 0 },
-  ddNoResult: { textAlign: 'center', color: '#6b7690', fontSize: 12, paddingVertical: 16 },
-  placeholderStyle: { color: '#aaa', fontSize: 13 },
-  selectedTextStyle: { color: '#fff', fontSize: 13 },
-   field: { marginBottom: 12, width: '100%' },
+  ddSearchInput: { flex: 1, fontSize: 13, color: '#e6ebf2', padding: 0 },
+  ddNoResult: {
+    textAlign: 'center',
+    color: '#6b7690',
+    fontSize: 12,
+    paddingVertical: 16,
+  },
+
   filterInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#ffffff12',
+    justifyContent: 'space-between',
+    backgroundColor: '#2b3348',
     borderWidth: 1,
-    borderColor: '#3d55cc',
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    height: 40,
+    borderColor: '#39415a',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    height: 48,
   },
-     filterLabel: {
-    color: '#a0b4e8',
-    fontSize: 12,
-    marginBottom: 5,
+  filterInput: {
+    flex: 1,
+    color: '#aab8c4',
+    fontSize: 14,
     fontWeight: '500',
+    paddingVertical: 0,
   },
-  filterInput: { flex: 1, color: '#fff', fontSize: 13, paddingVertical: 0 },
+
+  buttonRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 4,
+    gap: 10,
+  },
+  resetBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 14,
+    backgroundColor: '#2b3348',
+    borderWidth: 1,
+    borderColor: '#39415a',
+  },
+  resetBtnText: { fontSize: 14, color: '#c3cbdb', fontWeight: '600' },
+  applyBtn: {
+    flex: 1,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: '#1e9ce8',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  applyBtnText: { color: '#ffffff', fontSize: 15, fontWeight: '600' },
+
+  /* ── iOS date picker overlay ── */
+  iosOverlayWrap: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.30)',
+    justifyContent: 'flex-end',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    overflow: 'hidden',
+    zIndex: 999,
+  },
+  iosPickerContainer: {
+    backgroundColor: '#ffffff',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    paddingBottom: 34,
+  },
+  iosPickerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e8edf2',
+  },
+  iosPickerHeaderBtn: { minWidth: 60 },
+  iosPickerTitle: {
+    color: '#1a2d3e',
+    fontSize: 16,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  iosPickerCancelText: { color: '#e53935', fontSize: 16, fontWeight: '500' },
+  iosPickerDoneText: {
+    color: '#1482cc',
+    fontSize: 16,
+    fontWeight: '600',
+    textAlign: 'right',
+  },
 });

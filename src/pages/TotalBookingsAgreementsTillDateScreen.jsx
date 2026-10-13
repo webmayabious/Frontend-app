@@ -1,4 +1,3 @@
-// TotalBookingsAgreementsTillDateScreen.js
 import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
@@ -16,36 +15,26 @@ import {
   Animated,
   Keyboard,
   DeviceEventEmitter,
+  ActivityIndicator,
+  Modal,
+  PanResponder,
+  KeyboardAvoidingView,
+  Easing,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { useNavigation } from '@react-navigation/native';
 import { useQuery } from '@tanstack/react-query';
 import api from '../api/AxiosInstance';
 import DateTimePicker from '@react-native-community/datetimepicker';
-
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import Icon1 from 'react-native-vector-icons/Ionicons';
 const COLORS = {
-  bg: '#080d5a',
-  cardBg: '#ffffff0e',
-  cardSelected: '#0d1a6e',
-  headerBg: '#0A0F2E',
-  accent: '#00cfff',
-  accentDim: '#00cfff18',
-  accentBorder: '#00cfff40',
   white: '#FFFFFF',
   mutedText: '#8A90B4',
-  labelText: '#FFB85D',
-  gold: '#f4c542',
-  goldDim: '#f4c54218',
-  goldBorder: '#f4c54235',
-  green: '#00C48C',
-  red: '#FF6B6B',
-  borderColor: '#ffffff20',
-  modalBg: '#0f1550',
-  sectionBg: 'rgba(255,255,255,0.13)',
 };
-const STATUSBAR_HEIGHT =
-  Platform.OS === 'android' ? StatusBar.currentHeight : 44;
-const SCREEN_HEIGHT = Dimensions.get('window').height;
+const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window');
+const scale = size => (SCREEN_WIDTH / 375) * size;
+const verticalScale = size => (SCREEN_HEIGHT / 812) * size;
 
 /* ================= CALL ================= */
 const makeCall = phoneNumber => {
@@ -107,7 +96,9 @@ const sendMail = async email => {
 };
 
 /* ================= INLINE DROPDOWN ================= */
-const LIST_HEIGHT = 220;
+const ITEM_H = 42;
+const SEARCH_H = 44;
+const MAX_LIST_H = 220;
 const FIELD_TOP_OFFSET = Platform.OS === 'ios' ? 280 : 200;
 
 const DropdownField = ({
@@ -120,10 +111,13 @@ const DropdownField = ({
   scrollYRef,
   placeholder,
 }) => {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(false); // what the user wants
+  const [mounted, setMounted] = useState(false); // keeps list alive while closing
   const [search, setSearch] = useState('');
-  const dropAnim = useRef(new Animated.Value(0)).current;
+  const heightAnim = useRef(new Animated.Value(0)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
   const wrapRef = useRef(null);
+  const justOpened = useRef(false);
 
   const options = data || [];
   const selected = options.find(o => o.value === value);
@@ -134,13 +128,11 @@ const DropdownField = ({
       .includes(search.toLowerCase()),
   );
 
-  const maxHeight = dropAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, LIST_HEIGHT],
-  });
+  // list height follows the real content, capped at MAX_LIST_H
+  const contentH = filtered.length === 0 ? 48 : filtered.length * ITEM_H;
+  const targetH = Math.min(SEARCH_H + contentH, MAX_LIST_H);
 
-  // Scroll the modal so this field moves up toward the top
-  const scrollFieldUp = () => {
+  const scrollFieldIntoView = () => {
     if (!wrapRef.current || !scrollRef?.current) return;
     wrapRef.current.measureInWindow((x, y) => {
       const delta = y - FIELD_TOP_OFFSET;
@@ -153,46 +145,68 @@ const DropdownField = ({
     });
   };
 
-  const close = (duration = 180) => {
-    Keyboard.dismiss();
-    Animated.timing(dropAnim, {
-      toValue: 0,
-      duration,
-      useNativeDriver: false,
-    }).start(() => {
-      setOpen(false);
-      setSearch('');
-      DeviceEventEmitter.emit('toggleBottomNav', true);
-    });
-  };
+  // single place that runs every animation
+  useEffect(() => {
+    if (!open && !mounted) return;
 
-  const toggle = () => {
-    if (open) {
-      close();
-    } else {
-      DeviceEventEmitter.emit('toggleBottomNav', false);
-      setOpen(true);
-      scrollFieldUp();
-      Animated.timing(dropAnim, {
-        toValue: 1,
-        duration: 200,
+    Animated.parallel([
+      Animated.timing(heightAnim, {
+        toValue: open ? targetH : 0,
+        duration: open ? 220 : 180,
+        easing: open ? Easing.out(Easing.cubic) : Easing.in(Easing.cubic),
         useNativeDriver: false,
-      }).start(scrollFieldUp);
-    }
-  };
+      }),
+      Animated.timing(fadeAnim, {
+        toValue: open ? 1 : 0,
+        duration: open ? 220 : 160,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: false,
+      }),
+    ]).start(({ finished }) => {
+      if (!finished) return;
+      if (open) {
+        if (justOpened.current) {
+          justOpened.current = false;
+          scrollFieldIntoView();
+        }
+      } else {
+        setMounted(false);
+        setSearch('');
+        DeviceEventEmitter.emit('toggleBottomNav', true);
+      }
+    });
+  }, [open, targetH]);
 
   useEffect(() => {
     return () => DeviceEventEmitter.emit('toggleBottomNav', true);
   }, []);
 
+  const toggle = () => {
+    if (open) {
+      Keyboard.dismiss();
+      setOpen(false);
+    } else {
+      DeviceEventEmitter.emit('toggleBottomNav', false);
+      justOpened.current = true;
+      setMounted(true);
+      setOpen(true);
+    }
+  };
+
   const handleSelect = item => {
     onChange && onChange(item.value);
-    close(150);
+    Keyboard.dismiss();
+    setOpen(false);
   };
+
+  const arrowRotate = fadeAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '180deg'],
+  });
 
   return (
     <View ref={wrapRef} collapsable={false} style={styles.field}>
-      {label ? <Text style={styles.dropLabel}>{label}</Text> : null}
+      {label ? <Text style={styles.inputLabel}>{label}</Text> : null}
 
       {/* Trigger */}
       <TouchableOpacity
@@ -200,11 +214,6 @@ const DropdownField = ({
           styles.dropdown,
           open && styles.dropdownOpen,
           error && styles.inputError,
-          {
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          },
         ]}
         onPress={toggle}
         activeOpacity={0.8}
@@ -217,29 +226,42 @@ const DropdownField = ({
             {selected ? selected.label : placeholder || 'Select...'}
           </Text>
         </View>
-        <Icon
-          name={open ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
-          size={20}
-          color="#8a9daf"
-        />
+        <Animated.View style={{ transform: [{ rotate: arrowRotate }] }}>
+          <Icon name="keyboard-arrow-down" size={20} color="#8a9daf" />
+        </Animated.View>
       </TouchableOpacity>
 
-      {/* Inline list */}
-      {open && (
+      {/* Animated list */}
+      {mounted && (
         <Animated.View
-          style={[styles.dropdownMenu, { maxHeight, opacity: dropAnim }]}
+          style={[
+            styles.dropdownMenu,
+            {
+              height: heightAnim,
+              opacity: fadeAnim,
+              overflow: 'hidden',
+              transform: [
+                {
+                  translateY: fadeAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [-6, 0],
+                  }),
+                },
+              ],
+            },
+          ]}
         >
-          <View style={styles.ddSearchWrap}>
+          <View style={[styles.ddSearchWrap, { height: SEARCH_H }]}>
             <Icon
               name="search"
               size={16}
-              color="#000"
+              color="#aaa"
               style={{ marginRight: 6 }}
             />
             <TextInput
               style={styles.ddSearchInput}
               placeholder="Search..."
-              placeholderTextColor="#000"
+              placeholderTextColor="#bbb"
               value={search}
               onChangeText={setSearch}
               autoCorrect={false}
@@ -257,7 +279,6 @@ const DropdownField = ({
           </View>
 
           <ScrollView
-            style={{ maxHeight: 155 }}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="always"
             nestedScrollEnabled
@@ -272,6 +293,7 @@ const DropdownField = ({
                     key={String(item.value)}
                     style={[
                       styles.dropdownItem,
+                      { height: ITEM_H },
                       isActive && styles.dropdownItemActive,
                     ]}
                     onPress={() => handleSelect(item)}
@@ -304,216 +326,402 @@ const DropdownField = ({
 
 const InputField = ({ label, placeholder, icon, value, onChange, onPress }) => (
   <View style={styles.field}>
-    <Text style={styles.filterLabel}>{label}</Text>
+    <Text style={styles.inputLabel}>{label}</Text>
     <TouchableOpacity activeOpacity={0.8} onPress={onPress}>
       <View style={styles.filterInputContainer}>
         <TextInput
           placeholder={placeholder}
-          placeholderTextColor="#7a8fc4"
+          placeholderTextColor="#aab8c4"
           style={styles.filterInput}
           value={value}
           onChangeText={onChange}
           editable={!onPress}
+          pointerEvents={onPress ? 'none' : 'auto'}
         />
-        {icon && <Icon name={icon} size={18} color="#00bcd4" />}
+        {icon && <Icon name={icon} size={18} color="#1482cc" />}
       </View>
     </TouchableOpacity>
   </View>
 );
 
-/* ================= FILTER MODAL ================= */
-const FilterModal = ({
+/* ================= FILTER BOTTOM SHEET ================= */
+const IOSPickerOverlay = ({ target, tempDate, onDateChange, onDone, onCancel }) => (
+  <View style={styles.iosOverlayWrap}>
+    <TouchableOpacity
+      style={StyleSheet.absoluteFill}
+      activeOpacity={1}
+      onPress={onCancel}
+    />
+    <View style={styles.iosPickerContainer}>
+      <View style={styles.iosPickerHeader}>
+        <TouchableOpacity onPress={onCancel} style={styles.iosPickerHeaderBtn}>
+          <Text style={styles.iosPickerCancelText}>Cancel</Text>
+        </TouchableOpacity>
+        <Text style={styles.iosPickerTitle}>
+          {target === 'fromDate' ? 'From Date' : 'To Date'}
+        </Text>
+        <TouchableOpacity onPress={onDone} style={styles.iosPickerHeaderBtn}>
+          <Text style={styles.iosPickerDoneText}>Done</Text>
+        </TouchableOpacity>
+      </View>
+      <DateTimePicker
+        value={tempDate}
+        mode="date"
+        display="spinner"
+        themeVariant="light"
+        onChange={(_, d) => {
+          if (d) onDateChange(d);
+        }}
+        style={{ height: 215 }}
+      />
+    </View>
+  </View>
+);
+
+const FilterBottomSheet = ({
   visible,
   onClose,
-  filters,
-  onChange,
   onApply,
   onReset,
+  filters,
+  onChange,
   Property,
   Rm,
   projectOptions,
   LeadStatus,
-  showFromPicker,
-  showToPicker,
-  setShowFromPicker,
-  setShowToPicker,
-  onDateChange,
 }) => {
-  const scaleAnim = useRef(new Animated.Value(0.85)).current;
-  const opacityAnim = useRef(new Animated.Value(0)).current;
-  const [mounted, setMounted] = useState(false);
+  const insets = useSafeAreaInsets();
+  const translateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
+  const backdropAnim = useRef(new Animated.Value(0)).current;
+  const [modalMounted, setModalMounted] = useState(false);
+  const scrollAtTop = useRef(true);
+  const isClosing = useRef(false);
 
-  // refs for inline dropdown auto-scroll
   const scrollRef1 = useRef(null);
   const scrollYRef = useRef(0);
 
+  const [showFromPicker, setShowFromPicker] = useState(false);
+  const [showToPicker, setShowToPicker] = useState(false);
+  const [iosPickerTarget, setIosPickerTarget] = useState(null);
+  const [iosTempDate, setIosTempDate] = useState(new Date());
+
+const animateOpen = () => {
+  // Reset animation values before opening
+  translateY.stopAnimation();
+  backdropAnim.stopAnimation();
+
+  translateY.setValue(SCREEN_HEIGHT);
+  backdropAnim.setValue(0);
+
+  Animated.parallel([
+    Animated.spring(translateY, {
+      toValue: 0,
+      damping: 32,
+      stiffness: 180,
+      mass: 1,
+      overshootClamping: true,
+      useNativeDriver: true,
+    }),
+
+    Animated.timing(backdropAnim, {
+      toValue: 1,
+      duration: 280,
+      useNativeDriver: true,
+    }),
+  ]).start();
+};
+
+const animateClose = (vy = 0) => {
+  if (isClosing.current) return;
+
+  isClosing.current = true;
+
+  Keyboard.dismiss();
+
+  translateY.stopAnimation();
+  backdropAnim.stopAnimation();
+
+  const duration = vy > 1.2 ? 180 : 250;
+
+  Animated.parallel([
+    Animated.timing(translateY, {
+      toValue: SCREEN_HEIGHT,
+      duration,
+      easing: Easing.inOut(Easing.cubic),
+      useNativeDriver: true,
+    }),
+
+    Animated.timing(backdropAnim, {
+      toValue: 0,
+      duration: 220,
+      easing: Easing.out(Easing.quad),
+      useNativeDriver: true,
+    }),
+  ]).start(({ finished }) => {
+    isClosing.current = false;
+
+    if (finished) {
+      setModalMounted(false);
+      setShowFromPicker(false);
+      setShowToPicker(false);
+      setIosPickerTarget(null);
+      onClose();
+    }
+  });
+};
+
+  const snapBack = () => {
+    Animated.spring(translateY, {
+      toValue: 0,
+      useNativeDriver: true,
+      damping: 22,
+      stiffness: 300,
+      mass: 0.8,
+    }).start();
+  };
+
+  // Drag from the handle
+  const handlePan = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dy) > 4,
+      onPanResponderGrant: () => {
+        translateY.stopAnimation(val => {
+          translateY.setOffset(val);
+          translateY.setValue(0);
+        });
+      },
+      onPanResponderMove: (_, g) => {
+        translateY.setValue(g.dy > 0 ? g.dy : g.dy * 0.06);
+      },
+      onPanResponderRelease: (_, g) => {
+        translateY.flattenOffset();
+        if (g.dy > 80 || g.vy > 0.5) animateClose(g.vy);
+        else snapBack();
+      },
+      onPanResponderTerminate: () => {
+        translateY.flattenOffset();
+        snapBack();
+      },
+    }),
+  ).current;
+
+  // Drag down from the content when scrolled to top
+  const scrollPan = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_, g) =>
+        scrollAtTop.current && g.dy > 8 && Math.abs(g.dy) > Math.abs(g.dx),
+      onPanResponderGrant: () => {
+        translateY.stopAnimation(val => {
+          translateY.setOffset(val);
+          translateY.setValue(0);
+        });
+      },
+      onPanResponderMove: (_, g) => {
+        if (g.dy > 0) translateY.setValue(g.dy);
+      },
+      onPanResponderRelease: (_, g) => {
+        translateY.flattenOffset();
+        if (g.dy > 80 || g.vy > 0.5) animateClose(g.vy);
+        else snapBack();
+      },
+      onPanResponderTerminate: () => {
+        translateY.flattenOffset();
+        snapBack();
+      },
+    }),
+  ).current;
+
   useEffect(() => {
     if (visible) {
-      setMounted(true);
-      Animated.parallel([
-        Animated.spring(scaleAnim, {
-          toValue: 1,
-          useNativeDriver: true,
-          bounciness: 5,
-          speed: 16,
-        }),
-        Animated.timing(opacityAnim, {
-          toValue: 1,
-          duration: 220,
-          useNativeDriver: true,
-        }),
-      ]).start();
+      isClosing.current = false;
+      setModalMounted(true);
+      requestAnimationFrame(() => animateOpen());
     } else {
-      Animated.parallel([
-        Animated.timing(scaleAnim, {
-          toValue: 0.85,
-          duration: 180,
-          useNativeDriver: true,
-        }),
-        Animated.timing(opacityAnim, {
-          toValue: 0,
-          duration: 180,
-          useNativeDriver: true,
-        }),
-      ]).start(() => setMounted(false));
+      if (modalMounted) animateClose();
     }
   }, [visible]);
 
-  if (!mounted) return null;
+  /* ---- date handling (same logic as before) ---- */
+  const onDateChange = (event, selectedDate, key) => {
+    if (key === 'fromDate') setShowFromPicker(false);
+    else setShowToPicker(false);
+
+    if (event.type === 'dismissed' || !selectedDate) return;
+
+    onChange(key, selectedDate.toISOString().split('T')[0]);
+  };
+
+  const openDatePicker = key => {
+    if (Platform.OS === 'ios') {
+      setIosTempDate(filters[key] ? new Date(filters[key]) : new Date());
+      setIosPickerTarget(key);
+    } else if (key === 'fromDate') {
+      setShowFromPicker(true);
+    } else {
+      setShowToPicker(true);
+    }
+  };
+
+  const handleIosDone = () => {
+    onChange(iosPickerTarget, iosTempDate.toISOString().split('T')[0]);
+    setIosPickerTarget(null);
+  };
+  const handleIosCancel = () => setIosPickerTarget(null);
+
+  if (!modalMounted) return null;
 
   return (
-    <Animated.View style={[styles.modalOverlay, { opacity: opacityAnim }]}>
-      {/* Backdrop tap to close */}
-      <TouchableOpacity
-        style={StyleSheet.absoluteFill}
-        activeOpacity={1}
-        onPress={onClose}
-      />
-
-      {/* Modal card */}
-      <Animated.View
-        style={[
-          styles.filterModalCard,
-          { transform: [{ scale: scaleAnim }], opacity: opacityAnim },
-        ]}
-      >
-        <View style={styles.dragHandle} />
-        <Text style={styles.modalTitle}>Filter Leads</Text>
-        <View style={styles.modalDivider} />
-
-        <ScrollView
-          ref={scrollRef1}
-          onScroll={e => {
-            scrollYRef.current = e.nativeEvent.contentOffset.y;
-          }}
-          scrollEventThrottle={16}
-          style={styles.filterScrollView}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-          nestedScrollEnabled={true}
-        >
-          <DropdownField
-            label="Property Location"
-            data={Property}
-            placeholder="Select Location"
-            value={filters.location}
-            onChange={value => onChange('location', value)}
-            scrollRef={scrollRef1}
-            scrollYRef={scrollYRef}
-          />
-          <DropdownField
-            label="Relationship Manager"
-            data={Rm}
-            placeholder="Select RM"
-            value={filters.rm}
-            onChange={value => onChange('rm', value)}
-            scrollRef={scrollRef1}
-            scrollYRef={scrollYRef}
-          />
-          <DropdownField
-            label="Project"
-            data={projectOptions}
-            placeholder="Select Project"
-            value={filters.project}
-            onChange={value => onChange('project', value)}
-            scrollRef={scrollRef1}
-            scrollYRef={scrollYRef}
-          />
-          <DropdownField
-            label="Approval Status"
-            data={LeadStatus}
-            placeholder="Select Status"
-            value={filters.booking_approval_status}
-            onChange={value => onChange('booking_approval_status', value)}
-            scrollRef={scrollRef1}
-            scrollYRef={scrollYRef}
-          />
-          <View
-            style={{
-              flexDirection: 'row',
-              justifyContent: 'space-between',
-              width: '100%',
-            }}
-          >
-            <View style={{ width: '48%' }}>
-              <InputField
-                label="From Date"
-                placeholder="YYYY-MM-DD"
-                icon="calendar-today"
-                value={filters.fromDate}
-                onPress={() => setShowFromPicker(true)}
-              />
-            </View>
-            <View style={{ width: '48%' }}>
-              <InputField
-                label="To Date"
-                placeholder="YYYY-MM-DD"
-                icon="calendar-today"
-                value={filters.toDate}
-                onPress={() => setShowToPicker(true)}
-              />
-            </View>
-          </View>
-          {showFromPicker && (
-            <DateTimePicker
-              value={filters.fromDate ? new Date(filters.fromDate) : new Date()}
-              mode="date"
-              display="default"
-              onChange={(e, d) => onDateChange(e, d, 'fromDate')}
-            />
-          )}
-          {showToPicker && (
-            <DateTimePicker
-              value={filters.toDate ? new Date(filters.toDate) : new Date()}
-              mode="date"
-              display="default"
-              onChange={(e, d) => onDateChange(e, d, 'toDate')}
-            />
-          )}
-          {/* extra space so the last dropdown can scroll fully into view */}
-          <View style={{ height: 120 }} />
-        </ScrollView>
-
-        <View style={styles.modalDivider} />
-
-        <TouchableOpacity style={styles.modalCloseBtn} onPress={onApply}>
-          <Text style={styles.modalCloseText}>Apply Filter</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity onPress={onReset} style={{ marginTop: 14 }}>
-          <Text style={{ color: '#ff6b6b', fontWeight: 'bold', fontSize: 14 }}>
-            Reset All
-          </Text>
-        </TouchableOpacity>
-
+    <Modal
+      transparent
+      visible={modalMounted}
+      onRequestClose={() => animateClose()}
+      animationType="none"
+      statusBarTranslucent
+      supportedOrientations={['portrait', 'landscape']}
+    >
+      <Animated.View style={[styles.backdrop, { opacity: backdropAnim }]}>
         <TouchableOpacity
-          onPress={onClose}
-          style={{ marginTop: 12, marginBottom: 4 }}
-        >
-          <Text style={{ color: '#a0b4e8', fontSize: 13 }}>Cancel</Text>
-        </TouchableOpacity>
+          style={StyleSheet.absoluteFill}
+          activeOpacity={1}
+          onPress={() => animateClose()}
+        />
       </Animated.View>
-    </Animated.View>
+
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.kavWrapper}
+        pointerEvents="box-none"
+      >
+        <Animated.View style={[styles.sheet, { transform: [{ translateY }] }]}>
+          <View {...handlePan.panHandlers} style={styles.dragHandleWrap}>
+            <View style={styles.dragHandleLight} />
+          </View>
+
+          <ScrollView
+            ref={scrollRef1}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            scrollEventThrottle={16}
+            nestedScrollEnabled
+            onScroll={e => {
+              const y = e.nativeEvent.contentOffset.y;
+              scrollYRef.current = y;
+              scrollAtTop.current = y <= 2;
+            }}
+            contentContainerStyle={{
+              paddingBottom: Math.max(insets.bottom, 0) + 24,
+            }}
+            {...scrollPan.panHandlers}
+          >
+            <View style={styles.sheetHeader}>
+              <Text style={styles.sheetTitle}>Filter Leads</Text>
+            </View>
+
+            <DropdownField
+              label="Property Location"
+              data={Property}
+              placeholder="Select Location"
+              value={filters.location}
+              onChange={value => onChange('location', value)}
+              scrollRef={scrollRef1}
+              scrollYRef={scrollYRef}
+            />
+            <DropdownField
+              label="Relationship Manager"
+              data={Rm}
+              placeholder="Select RM"
+              value={filters.rm}
+              onChange={value => onChange('rm', value)}
+              scrollRef={scrollRef1}
+              scrollYRef={scrollYRef}
+            />
+            <DropdownField
+              label="Project"
+              data={projectOptions}
+              placeholder="Select Project"
+              value={filters.project}
+              onChange={value => onChange('project', value)}
+              scrollRef={scrollRef1}
+              scrollYRef={scrollYRef}
+            />
+            <DropdownField
+              label="Approval Status"
+              data={LeadStatus}
+              placeholder="Select Status"
+              value={filters.booking_approval_status}
+              onChange={value => onChange('booking_approval_status', value)}
+              scrollRef={scrollRef1}
+              scrollYRef={scrollYRef}
+            />
+
+            <View style={styles.dateRow}>
+              <View style={{ width: '48%' }}>
+                <InputField
+                  label="From Date"
+                  placeholder="YYYY-MM-DD"
+                  icon="calendar-today"
+                  value={filters.fromDate}
+                  onPress={() => openDatePicker('fromDate')}
+                />
+              </View>
+              <View style={{ width: '48%' }}>
+                <InputField
+                  label="To Date"
+                  placeholder="YYYY-MM-DD"
+                  icon="calendar-today"
+                  value={filters.toDate}
+                  onPress={() => openDatePicker('toDate')}
+                />
+              </View>
+            </View>
+
+            {Platform.OS === 'android' && showFromPicker && (
+              <DateTimePicker
+                value={filters.fromDate ? new Date(filters.fromDate) : new Date()}
+                mode="date"
+                display="default"
+                onChange={(e, d) => onDateChange(e, d, 'fromDate')}
+              />
+            )}
+            {Platform.OS === 'android' && showToPicker && (
+              <DateTimePicker
+                value={filters.toDate ? new Date(filters.toDate) : new Date()}
+                mode="date"
+                display="default"
+                onChange={(e, d) => onDateChange(e, d, 'toDate')}
+              />
+            )}
+
+            <View style={styles.buttonRow}>
+              <TouchableOpacity style={styles.resetBtn} onPress={onReset}>
+                <Icon
+                  name="refresh"
+                  size={16}
+                  color="#5a7080"
+                  style={{ marginRight: 6 }}
+                />
+                <Text style={styles.resetBtnText}>Reset</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.applyBtn} onPress={onApply}>
+                <Text style={styles.applyBtnText}>Apply Filter</Text>
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+
+          {Platform.OS === 'ios' && iosPickerTarget !== null && (
+            <IOSPickerOverlay
+              target={iosPickerTarget}
+              tempDate={iosTempDate}
+              onDateChange={setIosTempDate}
+              onDone={handleIosDone}
+              onCancel={handleIosCancel}
+            />
+          )}
+        </Animated.View>
+      </KeyboardAvoidingView>
+    </Modal>
   );
 };
 
@@ -531,19 +739,31 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
             {
               backgroundColor:
                 data?.active === '1'
-                  ? '#4caf50'
+                  ? 'rgba(45,168,94,0.15)'
                   : data?.active === '5'
-                    ? '#6b7785'
-                    : '#f44336',
+                  ? 'rgba(107,119,133,0.25)'
+                  : 'rgba(224,90,43,0.15)',
             },
           ]}
         >
-          <Text style={styles.activeText}>
+          <Text
+            style={[
+              styles.activeText,
+              {
+                color:
+                  data?.active === '1'
+                    ? '#2da85e'
+                    : data?.active === '5'
+                    ? '#aab8c4'
+                    : '#e05a2b',
+              },
+            ]}
+          >
             {data?.active === '1'
               ? 'Active'
               : data?.active === '5'
-                ? 'Booking Done'
-                : 'Inactive'}
+              ? 'Booking Done'
+              : 'Inactive'}
           </Text>
         </View>
       </View>
@@ -648,6 +868,7 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
 /* ================= MAIN ================= */
 const TotalBookingsAgreementsTillDateScreen = () => {
   const navigation = useNavigation();
+  const insets = useSafeAreaInsets();
   const [showRemarks, setShowRemarks] = useState(false);
   const [remarksText, setRemarksText] = useState('');
   const [searchText, setSearchText] = useState('');
@@ -670,8 +891,6 @@ const TotalBookingsAgreementsTillDateScreen = () => {
     lead_source: null,
   });
   const [appliedFilters, setAppliedFilters] = useState();
-  const [showFromPicker, setShowFromPicker] = useState(false);
-  const [showToPicker, setShowToPicker] = useState(false);
 
   /* ================= API ================= */
   const { data: Lead, isLoading } = useQuery({
@@ -787,163 +1006,163 @@ const TotalBookingsAgreementsTillDateScreen = () => {
   const [showTopBtn, setShowTopBtn] = useState(false);
   const scrollRef = useRef();
 
-  const onDateChange = (event, selectedDate, key) => {
-    if (key === 'fromDate') {
-      setShowFromPicker(false);
-    } else {
-      setShowToPicker(false);
-    }
-
-    if (event.type === 'dismissed' || !selectedDate) return;
-
-    const date = selectedDate.toISOString().split('T')[0];
-
-    setFilters(prev => ({
-      ...prev,
-      [key]: date,
-    }));
-  };
-
   const scrollToTop = () => {
     scrollRef.current?.scrollTo({ y: 0, animated: true });
   };
 
   return (
     <View style={styles.container}>
-      <StatusBar
-        translucent
-        backgroundColor="transparent"
-        barStyle="light-content"
+      <Image
+        source={require('../asset/image/logo/bg-img.png')}
+        style={styles.bgImageFixed}
+        resizeMode="cover"
       />
+      <View style={styles.overlay} />
+      <SafeAreaView style={styles.safeArea} edges={['left', 'right']}>
+        <StatusBar
+          translucent
+          backgroundColor="transparent"
+          barStyle="light-content"
+        />
 
-      {/* Title Row */}
-      <View style={styles.topBarContainer}>
-        <View style={styles.topBar}>
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Icon name="history" size={18} color="#cfd8dc" />
-            <Text style={styles.screenTitle}>
-              Total Bookings Agreements Till Date
-            </Text>
-          </View>
+        {/* TOP BAR: [back + icon + title] ............ [filter] */}
+        <View
+          style={[
+            styles.topBarContainer,
+            { paddingTop: verticalScale(10) },
+            // insets.top +
+          ]}
+        >
+          <View style={styles.topBar}>
+            <View style={styles.leftHeader}>
+              <TouchableOpacity
+                onPress={() => navigation.goBack()}
+                style={styles.backBtn}
+                activeOpacity={0.7}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                  <Icon1
+                                    name="chevron-back"
+                                    size={20}
+                                    color="#fff"
+                                    style={styles.backIcon}
+                                  />
+              </TouchableOpacity>
+              <Icon name="history" size={20} color="#ffffff" />
+              <Text style={styles.screenTitle} numberOfLines={1}>
+                Total Bookings Agreements Till Date
+              </Text>
+            </View>
 
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <TouchableOpacity
-              style={styles.backBtn}
-              onPress={() => navigation.goBack()}
+              activeOpacity={0.7}
+              onPress={() => setShowFilterModal(true)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
-              <View style={styles.backButton}>
-                <Image
-                  source={require('../asset/image/icon/Arrow.png')}
-                  style={{ width: 12, height: 12, marginRight: 6 }}
-                />
-                <Text style={styles.backText}>Back</Text>
-              </View>
+              <Icon name="filter-alt" size={18} color="#00e5ff" />
             </TouchableOpacity>
           </View>
         </View>
-      </View>
 
-      <ScrollView
-        ref={scrollRef}
-        showsVerticalScrollIndicator={false}
-        onScroll={event => {
-          const y = event.nativeEvent.contentOffset.y;
-          setShowTopBtn(y > 200);
-        }}
-        scrollEventThrottle={16}
-      >
-        <View style={styles.searchBox}>
-          <Icon name="search" size={16} color={COLORS.mutedText} />
-          <TextInput
-            placeholder="Search name / phone / email..."
-            placeholderTextColor={COLORS.mutedText}
-            value={searchText}
-            onChangeText={setSearchText}
-            style={styles.searchInput}
-          />
-        </View>
+        {/* LIST */}
+        <ScrollView
+          ref={scrollRef}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.listContent}
+          onScroll={event => {
+            const y = event.nativeEvent.contentOffset.y;
+            setShowTopBtn(y > 200);
+          }}
+          scrollEventThrottle={16}
+        >
+          {/* SEARCH */}
+          <View style={styles.searchContainer}>
+            <View style={styles.searchBox}>
+              <Icon name="search" size={16} color={COLORS.mutedText} />
+              <TextInput
+                placeholder="Search name / phone / email..."
+                placeholderTextColor={COLORS.mutedText}
+                value={searchText}
+                onChangeText={setSearchText}
+                style={styles.searchInput}
+              />
+            </View>
+          </View>
 
-        {/* COUNT + FILTER (same line) */}
-        <View style={styles.countFilterRow}>
+          {/* COUNT */}
           <Text style={styles.countText}>
             Showing {filteredfollowUps?.length || 0}
             {Lead?.length != null ? ` of ${Lead.length}` : ''} Records
           </Text>
 
-          <TouchableOpacity onPress={() => setShowFilterModal(true)}>
-            <Icon name="filter-alt" size={18} color="#00e5ff" />
-          </TouchableOpacity>
-        </View>
-
-        {isLoading ? (
-          <Text style={{ color: '#fff', textAlign: 'center', marginTop: 20 }}>
-            Loading...
-          </Text>
-        ) : filteredfollowUps?.length > 0 ? (
-          filteredfollowUps?.map((visit, i) => (
-            <SiteCard
-              key={visit?.id != null ? `booking-${visit.id}` : `booking-idx-${i}`}
-              data={visit}
-              setShowRemarks={setShowRemarks}
-              setRemarksText={setRemarksText}
-              navigation={navigation}
-            />
-          ))
-        ) : (
-          <Text
-            style={{ textAlign: 'center', marginTop: 20, color: '#ffffff' }}
-          >
-            No data found
-          </Text>
-        )}
-        <View style={{ height: 100 }} />
-      </ScrollView>
-
-      {/* REMARKS MODAL */}
-      {showRemarks && (
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <View style={styles.checkIcon}>
-              <Icon name="check-circle" size={32} color="#00acc1" />
+          {/* CARDS */}
+          {isLoading ? (
+            <View style={styles.centerLoader}>
+              <ActivityIndicator size="large" color="#fff" />
             </View>
+          ) : filteredfollowUps?.length > 0 ? (
+            filteredfollowUps?.map((visit, i) => (
+              <SiteCard
+                key={
+                  visit?.id != null ? `booking-${visit.id}` : `booking-idx-${i}`
+                }
+                data={visit}
+                setShowRemarks={setShowRemarks}
+                setRemarksText={setRemarksText}
+                navigation={navigation}
+              />
+            ))
+          ) : (
+            <View style={styles.emptyWrap}>
+              <Icon
+                name="history"
+                size={48}
+                color="rgba(255,255,255,0.25)"
+              />
+              <Text style={styles.empty}>No data found</Text>
+            </View>
+          )}
+        </ScrollView>
 
-            <Text style={styles.modalTitle}>Latest Remarks</Text>
+        {/* REMARKS MODAL */}
+        {showRemarks && (
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalCard}>
+              <Icon name="check-circle" size={32} color="#4aa3df" />
+              <Text style={styles.modalTitle}>Latest Remarks</Text>
+              <Text style={styles.modalText}>{remarksText}</Text>
 
-            <Text style={styles.modalText}>{remarksText}</Text>
-
-            <TouchableOpacity
-              style={styles.modalCloseBtn}
-              onPress={() => setShowRemarks(false)}
-            >
-              <Text style={styles.modalCloseText}>OK</Text>
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.modalCloseBtn}
+                onPress={() => setShowRemarks(false)}
+              >
+                <Text style={styles.modalCloseText}>OK</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
-      )}
+        )}
 
-      <FilterModal
-        visible={showFilterModal}
-        onClose={() => setShowFilterModal(false)}
-        filters={filters}
-        onChange={onChange}
-        onApply={applyFilter}
-        onReset={resetFilters}
-        Property={Property}
-        Rm={Rm}
-        projectOptions={projectOptions}
-        LeadStatus={LeadStatus}
-        showFromPicker={showFromPicker}
-        showToPicker={showToPicker}
-        onDateChange={onDateChange}
-        setShowFromPicker={setShowFromPicker}
-        setShowToPicker={setShowToPicker}
-      />
+        {/* FILTER BOTTOM SHEET (animated Modal) */}
+        <FilterBottomSheet
+          visible={showFilterModal}
+          onClose={() => setShowFilterModal(false)}
+          onApply={applyFilter}
+          onReset={resetFilters}
+          filters={filters}
+          onChange={onChange}
+          Property={Property}
+          Rm={Rm}
+          projectOptions={projectOptions}
+          LeadStatus={LeadStatus}
+        />
 
-      {showTopBtn && (
-        <TouchableOpacity style={styles.topButton} onPress={scrollToTop}>
-          <Icon name="keyboard-arrow-up" size={26} color="#fff" />
-        </TouchableOpacity>
-      )}
+        {/* TOP BUTTON */}
+        {showTopBtn && (
+          <TouchableOpacity style={styles.topButton} onPress={scrollToTop}>
+            <Icon name="keyboard-arrow-up" size={26} color="#fff" />
+          </TouchableOpacity>
+        )}
+      </SafeAreaView>
     </View>
   );
 };
@@ -952,304 +1171,291 @@ export default TotalBookingsAgreementsTillDateScreen;
 
 /* ================= STYLES ================= */
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#070c4d' },
+  container: { flex: 1, backgroundColor: '#1a2d3e' },
+  bgImageFixed: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: SCREEN_WIDTH,
+    height: Dimensions.get('screen').height,
+  },
+  safeArea: { flex: 1, backgroundColor: 'transparent' },
+  overlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: SCREEN_WIDTH,
+    height: Dimensions.get('screen').height,
+    backgroundColor: 'rgba(18,32,48,0.72)',
+  },
 
-  topBarContainer: { paddingHorizontal: 15, marginTop: 10 },
-
+  /* ── Header pill ── */
+  topBarContainer: {
+    paddingHorizontal: scale(10),
+    paddingBottom: verticalScale(10),
+  },
   topBar: {
+    height: 42,
+    borderRadius: scale(22),
+    backgroundColor: 'rgba(255,255,255,0.15)',
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#ffffff15',
-    padding: 10,
-    borderRadius: 20,
+    justifyContent: 'space-between',
+    paddingHorizontal: scale(14),
+  },
+  leftHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    marginRight: 10,
+  },
+  backBtn: {
+    paddingRight: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  backIcon: {
+    width: 20,
+    height: 20,
+    tintColor: '#ffffff',
+  },
+  screenTitle: {
+    color: '#ffffff',
+    fontSize: 15,
+    marginLeft: 6,
+    fontWeight: '700',
+    flexShrink: 1,
+  },
+
+  /* ── List ── */
+  listContent: { paddingHorizontal: 14, paddingBottom: 120 },
+  centerLoader: { alignItems: 'center', justifyContent: 'center', marginTop: 40 },
+  emptyWrap: { alignItems: 'center', marginTop: 80, gap: 12 },
+  empty: { color: 'rgba(255,255,255,0.40)', fontSize: 15 },
+  searchContainer: {
+    position: 'relative',
+    zIndex: 100,
     marginBottom: 10,
   },
-
-  screenTitle: {
-    color: '#cfd8dc',
-    fontSize: 13,
-    marginLeft: 6,
-  },
-
-  backBtn: {
-    borderWidth: 1,
-    borderColor: '#888',
-    borderRadius: 20,
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-  },
-
-  backButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-
-  backText: { color: '#fff', fontSize: 12 },
-
   searchBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    margin: 12,
-    marginBottom: 8,
+    backgroundColor: 'rgba(255,255,255,0.10)',
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: COLORS.borderColor,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderColor: 'rgba(255,255,255,0.13)',
     paddingHorizontal: 12,
-    marginTop: 0,
-    height: 40,
+    paddingVertical: 9,
   },
   searchInput: {
-    color: COLORS.white,
-    marginLeft: 8,
-    fontSize: 13,
     flex: 1,
-    paddingVertical: 0,
+    fontSize: 14,
+    color: '#fff',
+    padding: 0,
+    marginLeft: 8,
   },
-
-  countFilterRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginHorizontal: 15,
-    marginTop: 8,
+  countText: {
+    color: '#ffb300',
+    fontSize: 12,
+    fontWeight: '700',
     marginBottom: 8,
   },
 
-  countText: {
-    color: '#a0b4e8',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-
+  /* ── Card ── */
   card: {
-    marginHorizontal: 15,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#ffffff6e',
-    borderRadius: 12,
+    backgroundColor: '#rgba(4, 35, 70, 0.62)',
+    borderRadius: 4,
     padding: 12,
-    backgroundColor: '#ffffff20',
-  },
-  emailText: {
-    color: '#00acc1',
-    textDecorationLine: 'underline',
-    fontWeight: '500',
-    fontSize: 12,
+    marginBottom: 10,
+    borderLeftWidth: 4,
+    borderLeftColor: '#52c97c',
   },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
+    marginBottom: 4,
   },
-
   nameRow: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
     flexWrap: 'wrap',
+    marginRight: 8,
   },
-
-  name: {
-    color: '#fff',
-    fontWeight: 'bold',
-    flexShrink: 1,
-  },
-
+  name: { color: '#ffffff', fontSize: 15, fontWeight: '600', flexShrink: 1 },
   activeBadge: {
-    backgroundColor: '#4caf50',
-    borderRadius: 10,
-    paddingHorizontal: 6,
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
     marginLeft: 6,
   },
-
-  activeText: { color: '#fff', fontSize: 10 },
-
+  activeText: { fontSize: 11, fontWeight: '600' },
   phoneText: {
-    color: '#00acc1',
-    backgroundColor: 'rgba(0, 172, 193, 0.15)',
+    color: '#4FC3F7',
+    backgroundColor: 'rgba(20,130,204,0.10)',
     paddingHorizontal: 4,
     paddingVertical: 2,
     borderRadius: 4,
     fontWeight: '600',
+    fontSize: 11.5,
   },
-
   location: {
-    color: '#00e5ff',
-    marginTop: 5,
+    color: '#4FC3F7',
+    marginTop: 2,
+    fontSize: 12,
     flexWrap: 'wrap',
     lineHeight: 16,
   },
-
   rowBetween: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginTop: 5,
     gap: 6,
+    flexWrap: 'wrap',
+  },
+  label: { fontSize: 11.5, color: '#afaea5', lineHeight: 18 },
+  value: { color: '#ffffff', fontSize: 11.5, flexShrink: 1 },
+  emailText: {
+    color: '#4FC3F7',
+    textDecorationLine: 'underline',
+    fontWeight: '500',
+    fontSize: 11.5,
   },
 
-  label: {
-    color: '#FFB85D',
-    fontSize: 12,
-    paddingTop: 2,
-  },
-  value: {
-    color: '#fff',
-    flexShrink: 1,
-  },
-
+  /* ── Top button (FAB style) ── */
   topButton: {
     position: 'absolute',
-    bottom: 100,
+    bottom: 16.5,
     right: 20,
-    backgroundColor: '#00acc1',
+    backgroundColor: '#4aa3df',
     width: 50,
     height: 50,
     borderRadius: 25,
     justifyContent: 'center',
     alignItems: 'center',
+    shadowColor: '#1a7abf',
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.6,
+    shadowRadius: 10,
+    elevation: 12,
   },
 
+  /* ── Remarks modal ── */
   modalOverlay: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-    bottom: 80, // BottomNav height
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.45)',
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 999,
-    elevation: 999,
   },
   modalCard: {
-    width: '85%',
-    backgroundColor: '#2f2f8f',
-    borderRadius: 12,
-    padding: 20,
-    alignItems: 'center',
-  },
-
-  checkIcon: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#e6f7ff',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-
-  filterModalCard: {
     width: '88%',
     maxHeight: SCREEN_HEIGHT * 0.72,
-    backgroundColor: '#1a1f6b',
+    backgroundColor: '#21283a',
     borderWidth: 1,
-    borderColor: '#3d45b0',
-    borderRadius: 18,
+    borderColor: '#39415a',
+    borderRadius: 24,
     paddingHorizontal: 20,
-    paddingTop: 14,
+    paddingTop: 18,
     paddingBottom: 18,
     alignItems: 'center',
   },
-
-  filterScrollView: {
-    width: '100%',
-    flexGrow: 0,
-  },
-
   modalTitle: {
-    color: '#00e5ff',
+    color: '#e6ebf2',
     fontSize: 18,
     marginBottom: 10,
-    fontWeight: 'bold',
+    fontWeight: '700',
   },
-
-  modalDivider: {
-    width: '100%',
-    height: 1,
-    backgroundColor: '#3d45b033',
-    marginVertical: 10,
-  },
-
-  modalText: {
-    color: '#fff',
-    textAlign: 'center',
-    marginBottom: 15,
-  },
-
+  modalText: { color: '#c3cbdb', textAlign: 'center', marginBottom: 15 },
   modalCloseBtn: {
-    backgroundColor: '#00acc1',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 24,
-    marginTop: 6,
-    width: '100%',
+    backgroundColor: '#1e9ce8',
+    height: 48,
+    borderRadius: 14,
+    justifyContent: 'center',
     alignItems: 'center',
+    width: '100%',
   },
+  modalCloseText: { color: '#ffffff', fontWeight: '600', fontSize: 15 },
 
-  modalCloseText: {
-    color: '#fff',
-    fontWeight: '600',
-    fontSize: 14,
+  /* ── Filter bottom sheet ── */
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.45)',
   },
-
-  dragHandle: {
-    width: 36,
+  kavWrapper: { flex: 1, justifyContent: 'flex-end' },
+  sheet: {
+    backgroundColor: '#21283a',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    maxHeight: SCREEN_HEIGHT * 0.9,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 20,
+  },
+  dragHandleWrap: { alignItems: 'center', paddingBottom: 8, paddingTop: 4 },
+  dragHandleLight: {
+    width: 38,
     height: 4,
-    backgroundColor: '#3d55cc',
     borderRadius: 2,
-    marginBottom: 14,
+    backgroundColor: '#b0bec5',
+    alignSelf: 'center',
+  },
+  sheetHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  sheetTitle: { color: '#d7dbe2', fontSize: 18, fontWeight: '700' },
+  dateRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
   },
 
-  /* ---- filter fields ---- */
-  field: { marginBottom: 12, width: '100%' },
-
-  filterLabel: {
-    color: '#a0b4e8',
-    fontSize: 12,
-    marginBottom: 5,
-    fontWeight: '500',
+  inputLabel: {
+    color: '#9aa8bd',
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: 2,
+    marginTop: 2,
   },
-  filterInputContainer: {
+  field: { marginBottom: 5, width: '100%' },
+
+  dropdown: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#ffffff12',
-    borderWidth: 1,
-    borderColor: '#3d55cc',
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    height: 40,
-  },
-  filterInput: { flex: 1, color: '#fff', fontSize: 13, paddingVertical: 0 },
-
-  /* ---- inline dropdown ---- */
-  dropLabel: {
-    color: '#00cfff',
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 0.4,
-    textTransform: 'uppercase',
-    marginBottom: 5,
-  },
-  dropdown: {
-    height: 40,
-    backgroundColor: '#2b2f66',
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    justifyContent: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#2b3348',
     borderWidth: 1,
     borderColor: '#39415a',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
   },
-  dropdownOpen: { borderColor: '#4aa3df' },
-  inputError: { borderColor: '#FF6B6B' },
-  errorText: { color: '#FF6B6B', fontSize: 11, marginTop: 4 },
+  dropdownOpen: { borderColor: '#4aa3df', backgroundColor: '#28304a' },
+  inputError: { borderColor: '#e05a2b' },
+  errorText: { color: '#e05a2b', fontSize: 11, marginTop: 4 },
   dropdownMenu: {
     marginTop: 4,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#2b3348',
     borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#39415a',
     overflow: Platform.OS === 'ios' ? 'visible' : 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 6,
   },
   dropdownItem: {
     flexDirection: 'row',
@@ -1257,9 +1463,16 @@ const styles = StyleSheet.create({
     gap: 10,
     paddingHorizontal: 14,
     paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#323a52',
   },
   dropdownItemActive: { backgroundColor: 'rgba(74,163,223,0.15)' },
-  dropdownItemText: { flex: 1, fontSize: 13, color: '#000', fontWeight: '500' },
+  dropdownItemText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#c3cbdb',
+    fontWeight: '500',
+  },
   dropdownItemTextActive: { color: '#7cc4f2', fontWeight: '700' },
   placeholder: { color: '#8a9daf', fontSize: 13 },
   selectedText: { color: '#e6ebf2', fontSize: 13, fontWeight: '600' },
@@ -1275,16 +1488,104 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#babdc5',
-    backgroundColor: '#b1b5c0',
+    borderBottomColor: '#39415a',
+    backgroundColor: '#28304a',
     borderTopLeftRadius: 12,
     borderTopRightRadius: 12,
   },
-  ddSearchInput: { flex: 1, fontSize: 13, color: '#000', padding: 0 },
+  ddSearchInput: { flex: 1, fontSize: 13, color: '#e6ebf2', padding: 0 },
   ddNoResult: {
     textAlign: 'center',
     color: '#6b7690',
     fontSize: 12,
     paddingVertical: 16,
+  },
+
+  filterInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#2b3348',
+    borderWidth: 1,
+    borderColor: '#39415a',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    height: 48,
+  },
+  filterInput: {
+    flex: 1,
+    color: '#aab8c4',
+    fontSize: 14,
+    fontWeight: '500',
+    paddingVertical: 0,
+  },
+
+  buttonRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 4,
+    gap: 10,
+  },
+  resetBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 14,
+    backgroundColor: '#2b3348',
+    borderWidth: 1,
+    borderColor: '#39415a',
+  },
+  resetBtnText: { fontSize: 14, color: '#c3cbdb', fontWeight: '600' },
+  applyBtn: {
+    flex: 1,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: '#1e9ce8',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  applyBtnText: { color: '#ffffff', fontSize: 15, fontWeight: '600' },
+
+  /* ── iOS date picker overlay ── */
+  iosOverlayWrap: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.30)',
+    justifyContent: 'flex-end',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    overflow: 'hidden',
+    zIndex: 999,
+  },
+  iosPickerContainer: {
+    backgroundColor: '#ffffff',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    paddingBottom: 34,
+  },
+  iosPickerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e8edf2',
+  },
+  iosPickerHeaderBtn: { minWidth: 60 },
+  iosPickerTitle: {
+    color: '#1a2d3e',
+    fontSize: 16,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  iosPickerCancelText: { color: '#e53935', fontSize: 16, fontWeight: '500' },
+  iosPickerDoneText: {
+    color: '#1482cc',
+    fontSize: 16,
+    fontWeight: '600',
+    textAlign: 'right',
   },
 });
