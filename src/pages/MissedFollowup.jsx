@@ -511,6 +511,7 @@ const LeadCard = ({ item, navigation, setShowRemarks, setRemarksText }) => {
             navigation.navigate('AllInteractionsScreen', { id: item.id })
           }
         >
+          <Icon name="forum" size={12} color={'#00cfff'} />
           <Text style={styles.buttonText}>View Interaction</Text>
         </TouchableOpacity>
 
@@ -1100,9 +1101,9 @@ const MissedFollowup = () => {
               >
                  <Icon1
                                    name="chevron-back"
-                                   size={20}
+                                   size={23}
                                    color="#fff"
-                                   style={styles.backIcon}
+                                  //  style={styles.backIcon}
                                  />
               </TouchableOpacity>
               <Icon name="notifications-off" size={20} color="#ffffff" />
@@ -1189,7 +1190,7 @@ const MissedFollowup = () => {
           )}
           {isFetchingNextPage && (
             <View style={styles.footerLoader}>
-              <ActivityIndicator size="small" color="#1ea7ff" />
+              <ActivityIndicator size="small" color="#fff" />
               <Text style={styles.footerText}>Loading more...</Text>
             </View>
           )}
@@ -1282,7 +1283,7 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   backBtn: {
-    paddingRight: 8,
+    paddingRight: 12,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1300,7 +1301,7 @@ const styles = StyleSheet.create({
   },
 
   /* ── List ── */
-  listContent: { paddingHorizontal: 14, paddingBottom: 120 },
+  listContent: { paddingHorizontal: scale(10), paddingBottom: verticalScale(10) },
   centerLoader: { alignItems: 'center', justifyContent: 'center', marginTop: 40 },
   footerLoader: {
     flexDirection: 'row',
@@ -1403,20 +1404,17 @@ const styles = StyleSheet.create({
     borderTopColor: '#f0f0f0',
   },
   button: {
-    backgroundColor: 'rgba(74,163,223,0.18)',
-    borderWidth: 1,
-    borderColor: 'rgba(74,163,223,0.45)',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
+    flexDirection: 'row', alignItems: 'center', gap: 5, flexShrink: 1,
+    backgroundColor:'#00cfff18', borderWidth: 1, borderColor: '#00cfff40',
+    borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5,
   },
-  buttonText: { color: '#7cc4f2', fontSize: 12, fontWeight: '600' },
-  completed: { color: '#afaea5', fontSize: 12 },
+  buttonText: { color: '#00cfff', fontSize: 11, fontWeight: '600' },
+  completed: { color: '#8A90B4', fontSize: 11, flexShrink: 1, textAlign: 'right' },
 
   /* ── Top button (FAB style) ── */
   topButton: {
     position: 'absolute',
-    bottom: 16.5,
+    bottom: 100,
     right: 20,
     backgroundColor: '#4aa3df',
     width: 50,
@@ -1429,6 +1427,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.6,
     shadowRadius: 10,
     elevation: 12,
+    zIndex: 999,
   },
 
   /* ── Remarks modal ── */

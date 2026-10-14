@@ -1044,7 +1044,7 @@ const TotalBookingsAgreementsPerMonth = () => {
                 activeOpacity={0.7}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
-                <Icon1 name="chevron-back" size={20} color="#fff" />
+                <Icon1 name="chevron-back" size={23} color="#fff" />
               </TouchableOpacity>
               <Icon name="receipt-long" size={20} color="#ffffff" />
               <Text style={styles.screenTitle} numberOfLines={1}>
@@ -1184,7 +1184,7 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   backBtn: {
-    paddingRight: 8,
+    paddingRight: 12,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1197,7 +1197,7 @@ const styles = StyleSheet.create({
   },
 
   /* ── List ── */
-  listContent: { paddingHorizontal: 14, paddingBottom: 120 },
+  listContent: { paddingHorizontal: scale(10), paddingBottom: verticalScale(10) },
   centerLoader: { alignItems: 'center', justifyContent: 'center', marginTop: 40 },
   emptyWrap: { alignItems: 'center', marginTop: 80, gap: 12 },
   empty: { color: 'rgba(255,255,255,0.40)', fontSize: 15 },
@@ -1295,7 +1295,7 @@ const styles = StyleSheet.create({
   /* ── Top button (FAB style) ── */
   topButton: {
     position: 'absolute',
-    bottom: 16.5,
+    bottom: 100,
     right: 20,
     backgroundColor: '#4aa3df',
     width: 50,
@@ -1308,6 +1308,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.6,
     shadowRadius: 10,
     elevation: 12,
+    zIndex: 999,
   },
 
   /* ── Filter bottom sheet ── */

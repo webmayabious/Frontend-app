@@ -541,6 +541,7 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => {
             })
           }
         >
+          <Icon name="forum" size={12} color={'#00cfff'} />
           <Text style={styles.buttonText}>View Interaction</Text>
         </TouchableOpacity>
 
@@ -1295,9 +1296,9 @@ useFocusEffect(
                 /> */}
                   <Icon1
                     name="chevron-back"
-                    size={20}
+                    size={23}
                     color="#fff"
-                    style={styles.backIcon}
+                    // style={styles.backIcon}
                   />
               </TouchableOpacity>
               <Icon name="people" size={20} color="#ffffff" />
@@ -1512,7 +1513,7 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   backBtn: {
-    paddingRight: 8,
+    paddingRight: 12,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1530,7 +1531,7 @@ const styles = StyleSheet.create({
   },
 
   /* ── List ── */
-  listContent: { paddingHorizontal: 14, paddingBottom: 20 },
+  listContent: { paddingHorizontal: scale(10), paddingBottom: verticalScale(10) },
   centerLoader: { alignItems: 'center', justifyContent: 'center', marginTop: 40 },
   refreshingText: { color: '#fff', marginTop: 8, fontSize: 12 },
   emptyWrap: { alignItems: 'center', marginTop: 80, gap: 12 },
@@ -1650,18 +1651,23 @@ const styles = StyleSheet.create({
     gap: 6,
   },
 
-   button: {
-    backgroundColor: 'rgba(74,163,223,0.18)',
-    borderWidth: 1,
-    borderColor: 'rgba(74,163,223,0.45)',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
+  //  button: {
+  //   backgroundColor: 'rgba(74,163,223,0.18)',
+  //   borderWidth: 1,
+  //   borderColor: 'rgba(74,163,223,0.45)',
+  //   borderRadius: 12,
+  //   paddingHorizontal: 12,
+  //   paddingVertical: 5,
+  // },
+  button: {
+    flexDirection: 'row', alignItems: 'center', gap: 5, flexShrink: 1,
+    backgroundColor:'#00cfff18', borderWidth: 1, borderColor: '#00cfff40',
+    borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5,
   },
-  buttonText: { color: '#7cc4f2', fontSize: 12, fontWeight: '600' },
+  buttonText: { color: '#00cfff', fontSize: 11, fontWeight: '600' },
   completed: {
-    color: '#afaea5',
-    fontSize: 11.5,
+    color: '#8A90B4',
+    fontSize: 11,
     flexShrink: 1,
     textAlign: 'right',
   },
@@ -1669,7 +1675,7 @@ const styles = StyleSheet.create({
   /* ── Top button (FAB style) ── */
   topButton: {
     position: 'absolute',
-    bottom: 16.5,
+    bottom: 100,
     right: 20,
     backgroundColor: '#4aa3df',
     width: 50,
@@ -1682,6 +1688,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.6,
     shadowRadius: 10,
     elevation: 12,
+    zIndex: 999,
   },
 
   /* ── Remarks modal ── */

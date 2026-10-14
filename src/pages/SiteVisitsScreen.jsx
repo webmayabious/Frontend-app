@@ -409,6 +409,7 @@ const EmailLink = ({ email }) => (
 const CardFooter = ({ onViewInteraction, status }) => (
   <View style={styles.cardFooter}>
     <TouchableOpacity style={styles.button} onPress={onViewInteraction}>
+      <Icon name="forum" size={12} color={'#00cfff'} />
       <Text style={styles.buttonText}>View Interaction</Text>
     </TouchableOpacity>
     <Text style={styles.completed}>{status}</Text>
@@ -428,9 +429,9 @@ const TopBar = ({ icon, title, onBack, onFilter }) => (
         
   <Icon1
                     name="chevron-back"
-                    size={20}
+                    size={23}
                     color="#fff"
-                    style={styles.backIcon}
+                    // style={styles.backIcon}
                   />
         </TouchableOpacity>
         <Icon name={icon} size={20} color="#ffffff" />
@@ -1255,7 +1256,7 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   backBtn: {
-    paddingRight: 8,
+    paddingRight: 12,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1273,7 +1274,7 @@ const styles = StyleSheet.create({
   },
 
   /* ── List ── */
-  listContent: { paddingHorizontal: 14, paddingBottom: 20 },
+  listContent: { paddingHorizontal: scale(10), paddingBottom: verticalScale(10) },
   centerLoader: { alignItems: 'center', justifyContent: 'center', marginTop: 40 },
   emptyWrap: { alignItems: 'center', marginTop: 80, gap: 12 },
   empty: { color: 'rgba(255,255,255,0.40)', fontSize: 15 },
@@ -1397,17 +1398,22 @@ const styles = StyleSheet.create({
     marginTop: 10,
     gap: 6,
   },
+  // button: {
+  //   backgroundColor: '#1e9ce8',
+  //   borderRadius: 14,
+  //   paddingHorizontal: 12,
+  //   paddingVertical: 6,
+  //   flexShrink: 1,
+  // },
   button: {
-    backgroundColor: '#1e9ce8',
-    borderRadius: 14,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    flexShrink: 1,
+    flexDirection: 'row', alignItems: 'center', gap: 5, flexShrink: 1,
+    backgroundColor:'#00cfff18', borderWidth: 1, borderColor: '#00cfff40',
+    borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5,
   },
-  buttonText: { color: '#ffffff', fontSize: 12, fontWeight: '600' },
+  buttonText: { color: '#00cfff', fontSize: 11, fontWeight: '600' },
   completed: {
-    color: '#afaea5',
-    fontSize: 11.5,
+    color: '#8A90B4',
+    fontSize: 11,
     flexShrink: 1,
     textAlign: 'right',
   },
@@ -1415,7 +1421,7 @@ const styles = StyleSheet.create({
   /* ── Top button (FAB style) ── */
   topButton: {
     position: 'absolute',
-    bottom: 16.5,
+    bottom: 100,
     right: 20,
     backgroundColor: '#4aa3df',
     width: 50,
@@ -1428,6 +1434,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.6,
     shadowRadius: 10,
     elevation: 12,
+    zindex:999,
   },
 
   /* ── Remarks modal ── */

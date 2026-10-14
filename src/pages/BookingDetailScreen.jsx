@@ -326,7 +326,7 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
 
-  listContent: { paddingHorizontal: 14, paddingBottom: 120 },
+  listContent: { paddingHorizontal: scale(10), paddingBottom: verticalScale(10) },
 
   /* Card (same as list page) */
   card: {

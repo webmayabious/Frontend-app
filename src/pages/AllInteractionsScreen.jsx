@@ -1,7 +1,7 @@
 // AllInteractionsScreen.js
 // React Native CLI - JavaScript
 
-import React, { useState } from 'react';
+import React, { useState , useRef} from 'react';
 import {
   View,
   Text,
@@ -170,6 +170,14 @@ const AllInteractionsScreen = ({ route }) => {
   const { id } = route.params;
   const navigation = useNavigation();
 
+  // ─── Scroll to Top Logic ────────────────────────────────────────────────────
+  const [showTopBtn, setShowTopBtn] = useState(false);
+  const scrollRef = useRef();
+
+  const scrollToTop = () => {
+    scrollRef.current?.scrollTo({ y: 0, animated: true });
+  };
+
   const { data: feedback, isLoading } = useQuery({
     queryKey: ['feedback', id],
     queryFn: async () => {
@@ -227,8 +235,14 @@ const AllInteractionsScreen = ({ route }) => {
 
         {/* LIST */}
         <ScrollView
+          ref={scrollRef}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.listContent}
+          onScroll={event => {                               // ← added
+            const y = event.nativeEvent.contentOffset.y;
+            setShowTopBtn(y > 200);
+          }}
+          scrollEventThrottle={16}
         >
           {/* COUNT */}
           {!isLoading && (
@@ -255,6 +269,14 @@ const AllInteractionsScreen = ({ route }) => {
             </View>
           )}
         </ScrollView>
+
+        {/* ─── TOP BUTTON ───────────────────────────────────────────────────── */}
+        {showTopBtn && (
+          <TouchableOpacity style={styles.topButton} onPress={scrollToTop}>
+            <Icon name="keyboard-arrow-up" size={26} color="#fff" />
+          </TouchableOpacity>
+        )}
+
       </SafeAreaView>
     </View>
   );
@@ -417,5 +439,26 @@ const styles = StyleSheet.create({
   readMore: {
     color: '#4FC3F7',
     fontWeight: '600',
+  },
+
+  /* ── Top button (FAB style) ── */
+  topButton: {
+    position: 'absolute',
+    bottom: 100,                    // safe for bottom tab / home indicator
+    right: 20,
+    backgroundColor: '#4aa3df',
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
+    // iOS shadow
+    shadowColor: '#1a7abf',
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.6,
+    shadowRadius: 10,
+    // Android shadow
+    elevation: 12,
+    zIndex: 999,
   },
 });

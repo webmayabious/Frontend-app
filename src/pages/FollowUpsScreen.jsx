@@ -428,9 +428,9 @@ const TopBar = ({ icon, title, onBack, onFilter }) => (
          
   <Icon1
                     name="chevron-back"
-                    size={20}
+                    size={23}
                     color="#fff"
-                    style={styles.backIcon}
+                    // style={styles.backIcon}
                   />
         </TouchableOpacity>
         <Icon name={icon} size={20} color="#ffffff" />
@@ -1074,7 +1074,7 @@ const FollowUpsScreen = () => {
             ListFooterComponent={
               isFetchingNextPage ? (
                 <View style={{ paddingVertical: 15 }}>
-                  <ActivityIndicator size="small" color="#00e5ff" />
+                  <ActivityIndicator size="small" color="#fff" />
                 </View>
               ) : (
                 <View style={{ height: 100 }} />
@@ -1215,7 +1215,7 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   backBtn: {
-    paddingRight: 8,
+    paddingRight: 12,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1233,7 +1233,7 @@ const styles = StyleSheet.create({
   },
 
   /* ── List ── */
-  listContent: { paddingHorizontal: 14, paddingBottom: 20 },
+  listContent: { paddingHorizontal: scale(10), paddingBottom: verticalScale(10) },
   centerLoader: { alignItems: 'center', justifyContent: 'center', marginTop: 40 },
   emptyWrap: { alignItems: 'center', marginTop: 80, gap: 12 },
   empty: { color: 'rgba(255,255,255,0.40)', fontSize: 15 },
@@ -1375,7 +1375,7 @@ const styles = StyleSheet.create({
   /* ── Top button (FAB style) ── */
   topButton: {
     position: 'absolute',
-    bottom: 16.5,
+    bottom: 100,
     right: 20,
     backgroundColor: '#4aa3df',
     width: 50,
@@ -1388,6 +1388,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.6,
     shadowRadius: 10,
     elevation: 12,
+    zIndex: 999,
   },
 
   /* ── Remarks modal ── */
