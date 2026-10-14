@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   TouchableOpacity,
   TextInput,
   FlatList,
@@ -21,16 +20,18 @@ import {
 import { ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import Icon1 from 'react-native-vector-icons/Ionicons';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
-import BottomNav from '../navigations/BottomNav';
-import Header from '../Layout/Header';
 import { useNavigation } from '@react-navigation/native';
 import api from '../api/AxiosInstance';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
 const screenHeight = Dimensions.get('window').height;
+const SCREEN_WIDTH = Dimensions.get('window').width;
 const PAGE_SIZE = 20;
+const scale = size => (SCREEN_WIDTH / 375) * size;
+const verticalScale = size => (screenHeight / 812) * size;
 
 // ─── COLORS ──────────────────────────────────────────────────────────────────
 
@@ -51,7 +52,7 @@ const COLORS = {
   green: '#00C48C',
   red: '#FF6B6B',
   borderColor: '#ffffff20',
-  modalBg: '#0f1550',
+  modalBg: '#21283a',
   sectionBg: 'rgba(255,255,255,0.13)',
 };
 
@@ -77,7 +78,6 @@ const ALERT_TYPES = {
   info: { icon: 'info', color: COLORS.accent },
 };
 
-// Title er shuru r emoji (✅ ❌ ⚠️) theke type bujhe, emoji ta soriye dey
 const parseAlert = (title = '', buttons = []) => {
   const raw = String(title);
   let type = 'info';
@@ -136,14 +136,14 @@ const CustomAlertHost = () => {
   };
 
   const opacity = anim.interpolate({ inputRange: [0, 1], outputRange: [0, 1], extrapolate: 'clamp' });
-  const scale = anim.interpolate({ inputRange: [0, 1], outputRange: [0.88, 1] });
+  const scaleAnim = anim.interpolate({ inputRange: [0, 1], outputRange: [0.88, 1] });
 
   return (
     <Modal transparent visible animationType="none" statusBarTranslucent onRequestClose={dismiss}>
       <Animated.View style={[styles.alertOverlay, { opacity }]}>
         <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={dismiss} />
 
-        <Animated.View style={[styles.alertBox, { opacity, transform: [{ scale }] }]}>
+        <Animated.View style={[styles.alertBox, { opacity, transform: [{ scale: scaleAnim }] }]}>
           <View style={[styles.alertTopBar, { backgroundColor: t.color }]} />
 
           <View style={[styles.alertIconWrap, { backgroundColor: t.color + '1f', borderColor: t.color + '55' }]}>
@@ -378,13 +378,6 @@ const InputField = ({ label, placeholder, icon, value, onChange, onPress }) => (
 
 // ─── MAKE CALL ────────────────────────────────────────────────────────────────
 
-// const makeCall = phoneNumber => {
-//   if (!phoneNumber) return;
-//   Alert.alert('Call', `Do you want to call ${phoneNumber}?`, [
-//     { text: 'Cancel', style: 'cancel' },
-//     { text: 'Call', onPress: () => Linking.openURL(`tel:${phoneNumber}`) },
-//   ]);
-// };
 const makeCall = phoneNumber => {
   if (!phoneNumber) return;
 
@@ -805,14 +798,45 @@ const ChangeRM = ({ setHideBottomNav }) => {
 
   return (
     <View style={styles.container}>
+      {/* Same background as Meeting / Dashboard screens */}
+      <Image
+        source={require('../asset/image/bg-img.png')}
+        style={styles.bgImageFixed}
+        resizeMode="cover"
+      />
+      <View style={styles.overlay} />
+
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
-      <View style={styles.sectionHeader}>
-        <View style={styles.sectionTitleRow}>
-          <MaterialCommunityIcons name="account-switch" size={16} color={COLORS.accent} />
-          <Text style={styles.sectionTitle}>Change RM</Text>
-        </View>
-        <View style={styles.sectionActions}>
+      {/* TOP BAR: [back + icon + title] ............ [change] */}
+      <View
+        style={[styles.topBarContainer, { paddingTop: verticalScale(10) }]}
+      >
+        <View style={styles.topBar}>
+          <View style={styles.leftHeader}>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('Dashboard')}
+              style={styles.backBtn}
+              activeOpacity={0.7}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Icon1
+                name="chevron-back"
+                size={20}
+                color="#fff"
+                style={styles.backIcon}
+              />
+            </TouchableOpacity>
+            <MaterialCommunityIcons
+              name="account-switch"
+              size={20}
+              color="#ffffff"
+            />
+            <Text style={styles.screenTitle} numberOfLines={1}>
+              Change RM
+            </Text>
+          </View>
+
           <TouchableOpacity
             style={styles.changeBtn}
             onPress={() => {
@@ -831,21 +855,9 @@ const ChangeRM = ({ setHideBottomNav }) => {
               setShowrmModal(true);
             }}
             activeOpacity={0.75}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
             <Text style={styles.changeBtnText}>Change</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.closeBtn}
-            onPress={() => navigation.navigate('Dashboard')}
-            activeOpacity={0.75}
-          >
-            <View style={styles.backButton}>
-              <Image
-                source={require('../asset/image/icon/Arrow.png')}
-                style={{ width: 11, height: 11, marginRight: 4 }}
-              />
-              <Text style={styles.closeBtnText}>Back</Text>
-            </View>
           </TouchableOpacity>
         </View>
       </View>
@@ -964,15 +976,6 @@ const ChangeRM = ({ setHideBottomNav }) => {
               )}
             </ScrollView>
 
-            {/* {rms && (
-              <View style={styles.selectedRMBadge}>
-                <Icon name="person-pin" size={14} color={COLORS.accent} />
-                <Text style={styles.selectedRMText}>
-                  {Rm.find(r => r.value === rms)?.label}
-                </Text>
-              </View>
-            )} */}
-
             <View style={styles.modalBtnRow}>
               <TouchableOpacity
                 style={styles.cancelBtn}
@@ -1024,13 +1027,11 @@ const ChangeRM = ({ setHideBottomNav }) => {
 
             <View style={styles.filterDivider} />
 
-            {/* ✅ keyboardShouldPersistTaps="handled" — keyboard-এর উপরে scroll থাকবে */}
             <ScrollView
               showsVerticalScrollIndicator={false}
               contentContainerStyle={{ paddingBottom: 8 }}
               keyboardShouldPersistTaps="handled"
             >
-              {/* ✅ SearchableDropdown replace করা হয়েছে */}
               <SearchableDropdown
                 label="Property Location"
                 data={Property}
@@ -1094,7 +1095,7 @@ const ChangeRM = ({ setHideBottomNav }) => {
 
             <View style={styles.filterBtnRow}>
               <TouchableOpacity style={styles.resetBtn} onPress={resetFilters}>
-                <Icon name="refresh" size={14} color={COLORS.red} />
+                <Icon name="refresh" size={14} color="#5a7080" />
                 <Text style={styles.resetBtnText}>Reset</Text>
               </TouchableOpacity>
               <View style={styles.filterActionBtns}>
@@ -1124,7 +1125,22 @@ export default ChangeRM;
 const styles = StyleSheet.create({
 
   // ── Layout ──
-  container: { flex: 1, backgroundColor: COLORS.bg },
+  container: { flex: 1, backgroundColor: '#1a2d3e' },
+  bgImageFixed: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: SCREEN_WIDTH,
+    height: Dimensions.get('screen').height,
+  },
+  overlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: SCREEN_WIDTH,
+    height: Dimensions.get('screen').height,
+    backgroundColor: 'rgba(18,32,48,0.72)',
+  },
   scrollContent: { paddingHorizontal: 12, paddingBottom: 100 },
   centeredText: { color: COLORS.white, textAlign: 'center', marginTop: 24, fontSize: 14, opacity: 0.7 },
   initialLoader: { paddingVertical: 32, alignItems: 'center' },
@@ -1132,27 +1148,52 @@ const styles = StyleSheet.create({
   footerText: { color: COLORS.accent, fontSize: 12 },
   footerEndText: { color: COLORS.mutedText, fontSize: 12 },
 
-  // ── Section Header ──
-  sectionHeader: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: COLORS.sectionBg, borderRadius: 20, marginHorizontal: 12,
-    marginTop: 10, marginBottom: 10, paddingHorizontal: 14, paddingVertical: 8,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)',
+  /* ── Header pill (same as Missed Followups) ── */
+  topBarContainer: {
+    paddingHorizontal: scale(10),
+    paddingBottom: verticalScale(10),
   },
-  sectionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
-  sectionTitle: { color: COLORS.white, fontSize: 14, fontWeight: '700' },
-  sectionActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  topBar: {
+    height: 42,
+    borderRadius: scale(22),
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: scale(14),
+  },
+  leftHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    marginRight: 10,
+  },
+  backBtn: {
+    paddingRight: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  backIcon: {
+    width: 20,
+    height: 20,
+    tintColor: '#ffffff',
+  },
+  screenTitle: {
+    color: '#ffffff',
+    fontSize: 17,
+    marginLeft: 6,
+    fontWeight: '700',
+    flexShrink: 1,
+  },
   changeBtn: {
-    backgroundColor: 'rgba(0,207,255,0.12)', borderRadius: 16, paddingHorizontal: 14,
-    paddingVertical: 5, borderWidth: 1.5, borderColor: COLORS.accent,
+    backgroundColor: 'rgba(0,207,255,0.12)',
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 5,
+    borderWidth: 1.5,
+    borderColor: COLORS.accent,
   },
   changeBtnText: { color: COLORS.white, fontSize: 11, fontWeight: '600' },
-  closeBtn: {
-    backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 16, paddingHorizontal: 12,
-    paddingVertical: 5, borderWidth: 1, borderColor: 'rgba(255,255,255,0.25)',
-  },
-  closeBtnText: { color: COLORS.white, fontSize: 11, fontWeight: '600' },
-  backButton: { flexDirection: 'row', alignItems: 'center' },
 
   // ── Search ──
   searchRow: { marginBottom: 8, marginTop: 2 },
@@ -1177,7 +1218,7 @@ const styles = StyleSheet.create({
   selectedBadgeText: { color: COLORS.accent, fontSize: 11, fontWeight: '600' },
   filterBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: 'rgba(58,63,122,0.8)', paddingHorizontal: 12, paddingVertical: 6,
+    backgroundColor: 'rgba(36, 37, 56, 0.27)', paddingHorizontal: 12, paddingVertical: 6,
     borderRadius: 20, borderWidth: 1, borderColor: COLORS.borderColor,
   },
   filterBtnText: { color: COLORS.white, fontSize: 11, fontWeight: '500' },
@@ -1192,10 +1233,10 @@ const styles = StyleSheet.create({
 
   // ── Lead Card ──
   card: {
-    backgroundColor: COLORS.cardBg, borderRadius: 12, padding: 12, marginBottom: 10,
+    backgroundColor: 'rgba(4, 35, 70, 0.62)', borderRadius: 12, padding: 12, marginBottom: 10,
     borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.2)',
   },
-  cardSelected: { borderColor: 'rgba(0,207,255,0.45)', backgroundColor: COLORS.cardSelected },
+  cardSelected: { borderColor: 'rgba(0,207,255,0.45)' },
   cardTop: { marginBottom: 8 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   cardName: { color: COLORS.white, fontWeight: '800', fontSize: 13, flex: 1, minWidth: 0 },
@@ -1206,7 +1247,7 @@ const styles = StyleSheet.create({
   leftCol: { flex: 1, gap: 5, minWidth: 0 },
   rightCol: { flex: 1, gap: 5, minWidth: 0 },
   infoRow: { flexDirection: 'row', alignItems: 'center', gap: 5, minWidth: 0 },
-  infoTouch: { flexShrink: 1 },          // 👈 notun add koro
+  infoTouch: { flexShrink: 1 },
   infoText: { color: COLORS.mutedText, fontSize: 11, flexShrink: 1 },
   rmLabelCard: { color: COLORS.gold, fontSize: 11, fontWeight: '600' },
   rmValue: { color: COLORS.gold, fontSize: 11, fontWeight: '600', flexShrink: 1 },
@@ -1217,27 +1258,28 @@ const styles = StyleSheet.create({
   // ── Change RM Modal ──
   modalOverlay: {
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center',
     alignItems: 'center', zIndex: 1000,
   },
   modalContainer: {
-    width: '90%', backgroundColor: COLORS.modalBg, borderRadius: 16, padding: 18,
-    maxHeight: '75%', borderWidth: 1, borderColor: COLORS.borderColor,
+    width: '90%', backgroundColor: COLORS.modalBg, borderRadius: 20, padding: 18,
+    maxHeight: '75%', borderWidth: 1, borderColor: '#39415a',
   },
   modalHeader: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12,
   },
-  modalTitle: { color: COLORS.accent, fontSize: 15, fontWeight: '700' },
+  modalTitle: { color: '#d7dbe2', fontSize: 17, fontWeight: '700' },
   infoBox: {
     flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: COLORS.goldDim,
     borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7, marginBottom: 12,
     borderWidth: 1, borderColor: COLORS.goldBorder,
   },
   infoBoxText: { color: COLORS.gold, fontSize: 12, fontWeight: '500' },
-  rmLabel: { color: COLORS.white, marginBottom: 6, fontSize: 13, fontWeight: '500' },
+  rmLabel: { color: '#9aa8bd', marginBottom: 6, fontSize: 13, fontWeight: '600' },
   dropdownList: {
-    maxHeight: 200, borderWidth: 1, borderColor: COLORS.borderColor,
-    borderRadius: 10, marginBottom: 12, marginTop: 4,
+    maxHeight: 200, borderWidth: 1, borderColor: '#39415a',
+    backgroundColor: '#2b3348',
+    borderRadius: 12, marginBottom: 12, marginTop: 4,
   },
   phoneText: {
     color: '#00acc1',
@@ -1258,10 +1300,10 @@ const styles = StyleSheet.create({
   },
   dropdownItem: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 12, paddingVertical: 11, borderBottomWidth: 0.5,
-    borderBottomColor: 'rgba(255,255,255,0.08)',
+    paddingHorizontal: 12, paddingVertical: 11, borderBottomWidth: 1,
+    borderBottomColor: '#323a52',
   },
-  dropdownItemSelected: { backgroundColor: COLORS.accentDim },
+  dropdownItemSelected: { backgroundColor: 'rgba(74,163,223,0.15)' },
   rmItemLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   rmRadio: {
     width: 16, height: 16, borderRadius: 8, borderWidth: 1.5,
@@ -1280,38 +1322,37 @@ const styles = StyleSheet.create({
   selectedRMText: { color: COLORS.accent, fontSize: 12, fontWeight: '600' },
   modalBtnRow: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10 },
   cancelBtn: {
-    backgroundColor: 'rgba(255,255,255,0.08)', paddingHorizontal: 18, paddingVertical: 9,
-    borderRadius: 20, borderWidth: 1, borderColor: COLORS.borderColor,
+    backgroundColor: '#2b3348', paddingHorizontal: 18, paddingVertical: 9,
+    borderRadius: 14, borderWidth: 1, borderColor: '#39415a',
   },
-  cancelBtnText: { color: COLORS.white, fontWeight: '500', fontSize: 13 },
+  cancelBtnText: { color: '#c3cbdb', fontWeight: '600', fontSize: 13 },
   assignBtn: {
-    backgroundColor: COLORS.accent, paddingHorizontal: 18, paddingVertical: 9,
-    borderRadius: 20, minWidth: 80, alignItems: 'center',
+    backgroundColor: '#1e9ce8', paddingHorizontal: 18, paddingVertical: 9,
+    borderRadius: 14, minWidth: 80, alignItems: 'center',
   },
-  assignBtnDisabled: { backgroundColor: 'rgba(0,207,255,0.3)' },
+  assignBtnDisabled: { backgroundColor: 'rgba(30,156,232,0.35)' },
   assignBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
 
   // ── Filter Bottom Sheet ──
   bottomSheetOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: 'rgba(0,0,0,0.45)',
     justifyContent: 'flex-end',
     zIndex: 99999,
     elevation: 99999,
   },
   bottomSheet: {
-    backgroundColor: COLORS.modalBg, borderTopLeftRadius: 22, borderTopRightRadius: 22,
+    backgroundColor: COLORS.modalBg, borderTopLeftRadius: 24, borderTopRightRadius: 24,
     padding: 18, paddingBottom: 30, maxHeight: '85%',
-    borderWidth: 1, borderColor: COLORS.borderColor, borderBottomWidth: 0,
   },
   handleBar: {
-    width: 40, height: 4, backgroundColor: 'rgba(255,255,255,0.2)',
+    width: 38, height: 4, backgroundColor: '#b0bec5',
     borderRadius: 4, alignSelf: 'center', marginBottom: 14,
   },
   filterModalTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  filterDivider: { height: 0.5, backgroundColor: 'rgba(255,255,255,0.12)', marginVertical: 12 },
+  filterDivider: { height: 1, backgroundColor: 'rgba(255,255,255,0.08)', marginVertical: 12 },
   filterLabel: {
-    color: COLORS.accent, fontSize: 11, fontWeight: '700', letterSpacing: 0.5,
+    color: '#8a9daf', fontSize: 11, fontWeight: '600', letterSpacing: 0.6,
     textTransform: 'uppercase', marginBottom: 6, marginTop: 4,
   },
   dateRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
@@ -1323,14 +1364,14 @@ const styles = StyleSheet.create({
   },
   resetBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 14, paddingVertical: 8,
-    borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255,82,82,0.35)',
-    backgroundColor: 'rgba(255,82,82,0.1)',
+    borderRadius: 14, borderWidth: 1, borderColor: '#39415a',
+    backgroundColor: '#2b3348',
   },
-  resetBtnText: { color: COLORS.red, fontSize: 13, fontWeight: '500' },
+  resetBtnText: { color: '#c3cbdb', fontSize: 13, fontWeight: '600' },
   filterActionBtns: { flexDirection: 'row', gap: 10 },
   applyBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: COLORS.accent,
-    paddingHorizontal: 18, paddingVertical: 8, borderRadius: 20, minWidth: 80, justifyContent: 'center',
+    flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#1e9ce8',
+    paddingHorizontal: 18, paddingVertical: 8, borderRadius: 14, minWidth: 80, justifyContent: 'center',
   },
   applyBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
 
@@ -1338,42 +1379,41 @@ const styles = StyleSheet.create({
   inputWrapper: { marginBottom: 10, width: '100%' },
   field: { marginBottom: 10 },
   inputContainer: {
-    flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.07)',
-    borderWidth: 1, borderColor: COLORS.borderColor, borderRadius: 10, paddingHorizontal: 10, height: 42,
+    flexDirection: 'row', alignItems: 'center', backgroundColor: '#2b3348',
+    borderWidth: 1, borderColor: '#39415a', borderRadius: 12, paddingHorizontal: 12, height: 46,
   },
   input: { color: COLORS.white, flex: 1, fontSize: 13 },
 
   // ── Searchable Dropdown ──
   dropdownTrigger: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    height: 42, backgroundColor: 'rgba(255,255,255,0.07)',
-    borderRadius: 10, paddingHorizontal: 12,
-    borderWidth: 1, borderColor: COLORS.borderColor,
+    height: 46, backgroundColor: '#2b3348',
+    borderRadius: 12, paddingHorizontal: 14,
+    borderWidth: 1, borderColor: '#39415a',
   },
   dropdownTriggerText: { color: COLORS.white, fontSize: 13, flex: 1 },
   dropdownTriggerIcons: { flexDirection: 'row', alignItems: 'center', gap: 6 },
 
   // ── Searchable Dropdown Modal ──
   sdModalOverlay: {
-    flex: 1, backgroundColor: 'rgba(0,0,0,0.7)',
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.45)',
     justifyContent: 'flex-end',
   },
   sdKAV: { justifyContent: 'flex-end' },
   sdContainer: {
-    backgroundColor: COLORS.modalBg, borderTopLeftRadius: 20, borderTopRightRadius: 20,
+    backgroundColor: COLORS.modalBg, borderTopLeftRadius: 24, borderTopRightRadius: 24,
     padding: 16, paddingBottom: Platform.OS === 'ios' ? 34 : 20,
     maxHeight: screenHeight * 0.65,
-    borderWidth: 1, borderColor: COLORS.borderColor, borderBottomWidth: 0,
   },
   sdHeader: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12,
   },
-  sdTitle: { color: COLORS.accent, fontSize: 14, fontWeight: '700' },
+  sdTitle: { color: '#d7dbe2', fontSize: 15, fontWeight: '700' },
   sdSearchBox: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 10,
+    backgroundColor: '#28304a', borderRadius: 12,
     paddingHorizontal: 12, height: 42, gap: 8,
-    borderWidth: 1, borderColor: COLORS.accentBorder, marginBottom: 8,
+    borderWidth: 1, borderColor: '#39415a', marginBottom: 8,
   },
   sdSearchInput: { flex: 1, color: COLORS.white, fontSize: 13 },
   sdCount: { color: COLORS.mutedText, fontSize: 11, marginBottom: 6, paddingLeft: 2 },
@@ -1381,20 +1421,20 @@ const styles = StyleSheet.create({
   sdItem: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 12, paddingVertical: 13,
-    borderBottomWidth: 0.5, borderBottomColor: 'rgba(255,255,255,0.08)',
+    borderBottomWidth: 1, borderBottomColor: '#323a52',
   },
-  sdItemSelected: { backgroundColor: COLORS.accentDim },
+  sdItemSelected: { backgroundColor: 'rgba(74,163,223,0.15)' },
   sdItemText: { color: COLORS.mutedText, fontSize: 13, flex: 1 },
   sdItemTextSelected: { color: COLORS.accent, fontWeight: '600' },
   sdEmpty: { alignItems: 'center', paddingVertical: 32, gap: 8 },
   sdEmptyText: { color: COLORS.mutedText, fontSize: 13 },
 
   // ── Custom Alert ──
-  alertOverlay: { flex: 1, backgroundColor: 'rgba(3,6,40,0.78)', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24 },
+  alertOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24 },
   alertBox: {
     width: '100%', maxWidth: 340, backgroundColor: COLORS.modalBg, borderRadius: 22,
     paddingHorizontal: 20, paddingTop: 28, paddingBottom: 20, alignItems: 'center',
-    borderWidth: 1, borderColor: COLORS.borderColor, overflow: 'hidden',
+    borderWidth: 1, borderColor: '#39415a', overflow: 'hidden',
     shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.45, shadowRadius: 20, elevation: 14,
   },
   alertTopBar: { position: 'absolute', top: 0, left: 0, right: 0, height: 3 },

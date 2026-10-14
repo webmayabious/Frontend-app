@@ -1013,7 +1013,7 @@ const TotalBookingsAgreementsTillDateScreen = () => {
   return (
     <View style={styles.container}>
       <Image
-        source={require('../asset/image/logo/bg-img.png')}
+        source={require('../asset/image/bg-img.png')}
         style={styles.bgImageFixed}
         resizeMode="cover"
       />
@@ -1268,7 +1268,7 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 10,
     borderLeftWidth: 4,
-    borderLeftColor: '#52c97c',
+    borderLeftColor: '#a78bfa',
   },
   cardHeader: {
     flexDirection: 'row',

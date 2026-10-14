@@ -1,6 +1,5 @@
 // AllInteractionsScreen.js
 // React Native CLI - JavaScript
-// Usage: Drop this file in your screens/ folder and register in your navigator
 
 import React, { useState } from 'react';
 import {
@@ -9,60 +8,45 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  SafeAreaView,
   StatusBar,
   Image,
+  Dimensions,
+  ActivityIndicator,
 } from 'react-native';
-import BottomNav from '../navigations/BottomNav';
-import Header from '../Layout/Header';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
-import api from '../api/AxiosInstance';
 import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-// import Toast from 'react-native-toast-message';
+import Icon1 from 'react-native-vector-icons/Ionicons';
+import api from '../api/AxiosInstance';
+
+const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window');
+const scale = size => (SCREEN_WIDTH / 375) * size;
+const verticalScale = size => (SCREEN_HEIGHT / 812) * size;
+
+// ─── Colors ───────────────────────────────────────────────────────────────────
+
+const COLORS = {
+  white: '#FFFFFF',
+  mutedText: '#8A90B4',
+  labelText: '#afaea5',
+  orange: '#ffb300',
+  cyan: '#4FC3F7',
+};
 
 // ─── Status Colors ────────────────────────────────────────────────────────────
 
 const statusColors = {
-  'Call Completed': '#00C48C',
+  'Call Completed': '#2da85e',
   BusyT: '#F5A623',
-  'Unable To Contact': '#FF6B6B',
-  'Call Status-3': '#8A90B4',
+  'Unable To Contact': '#e05a2b',
+  'Call Status-3': '#aab8c4',
 };
 
-// ─── Section Header ───────────────────────────────────────────────────────────
+// ─── Remarks (Read more / less) ───────────────────────────────────────────────
 
-const SectionHeader = ({ navigation, route }) => (
-  <View style={styles.sectionHeader}>
-    <View style={styles.sectionTitleRow}>
-      <Text style={styles.sectionIcon}>👥</Text>
-      <Text style={styles.sectionTitle}>All Interactions</Text>
-    </View>
-    <View style={styles.sectionActions}>
-      <TouchableOpacity
-        style={styles.addNewBtn}
-        onPress={() =>
-          navigation.navigate('AddNewInteraction', { id: route.params.id })
-        }
-        activeOpacity={0.75}
-      >
-        <Text style={styles.addNewText}>Add New Interaction</Text>
-      </TouchableOpacity>
-      <TouchableOpacity
-        style={styles.closeBtn}
-        onPress={() => navigation.goBack()}
-        activeOpacity={0.75}
-      >
-        <Text style={styles.closeBtnText}>✕</Text>
-      </TouchableOpacity>
-    </View>
-  </View>
-);
-
-// ─── Interaction Card ─────────────────────────────────────────────────────────
 const RemarksText = ({ remarks }) => {
   const [expanded, setExpanded] = useState(false);
-
   const shouldShowReadMore = remarks.length > 80;
 
   return (
@@ -72,136 +56,109 @@ const RemarksText = ({ remarks }) => {
         : `${remarks.substring(0, 80)}... `}
 
       {shouldShowReadMore && (
-        <Text
-          style={styles.readMore}
-          onPress={() => setExpanded(!expanded)}
-        >
+        <Text style={styles.readMore} onPress={() => setExpanded(!expanded)}>
           {expanded ? ' Read Less' : ' Read More'}
         </Text>
       )}
     </Text>
   );
 };
-const InteractionCard = ({ item, setShowRemarks, setRemarksText }) => {
-   const remarks = item?.remarks || 'No Remarks Available';
-  return(
-  <View style={styles.card}>
-    {/* Card Header */}
-    <View style={styles.cardHeader}>
-      <View style={styles.cardTitleRow}>
-        <Text style={styles.cardName}>{item?.lead?.name}</Text>
-        <Text style={styles.cardTemp}> | {item?.rating?.name}</Text>
-      </View>
-      {/* <TouchableOpacity
-        style={styles.remarksBtn}
-        onPress={() => {
-          setRemarksText(item?.remarks || 'No remarks available');
-          setShowRemarks(true);
-        }}
-        activeOpacity={0.8}
-      >
-        <Text style={styles.remarksBtnText}>Remarks</Text>
-      </TouchableOpacity> */}
-    </View>
- <Text style={styles.leadQualification}>
-      project:{' '}
-      <Text style={styles.leadQualificationValue}>
-        {item?.project_id?.name}
-      </Text>
-    </Text>
-    {/* Lead Qualification */}
-    <Text style={styles.leadQualification}>
-      Lead Qualification:{' '}
-      <Text style={styles.leadQualificationValue}>
-        {item?.lead_qualification?.name}
-      </Text>
-    </Text>
 
-    {/* Status Row */}
-    <View style={styles.statusRow}>
-      <Text style={styles.statusLabel}>
-        Lead Status:{' '}
-        <Text style={styles.statusValue}>{item?.lead_status?.name}</Text>
-      </Text>
-      <Text style={styles.fieldLabel}>
-        Site Visit Date:{' '}
-        <Text style={styles.fieldValue}>{item?.dates?.site_visit}</Text>
-      </Text>
-    </View>
+// ─── Interaction Card ─────────────────────────────────────────────────────────
 
-    {/* Lead Sub Status */}
-    <Text style={styles.statusLabel}>
-      Lead Sub Status:{' '}
-      <Text style={styles.statusValue}>{item?.lead_sub_status?.name}</Text>
-    </Text>
+const InteractionCard = ({ item }) => {
+  const remarks = item?.remarks || 'No Remarks Available';
 
-    {/* Call Back */}
-    <Text style={styles.fieldLabelHighlight}>
-      Call Back Date & Time:{' '}
-      <Text style={styles.fieldValueHighlight}>
-        {item?.dates?.call_back}/{item?.dates?.call_back_time}
-      </Text>
-    </Text>
-
-    {/* Closure Row */}
-    <View style={styles.closureRow}>
-      <Text style={styles.fieldLabel}>
-        Expected Closure Date:{' '}
-        <Text style={styles.fieldValue}>{item?.dates?.expected_closure}</Text>
-      </Text>
-      <Text
-        style={[
-          styles.callResult,
-          { color: statusColors[item?.call_status?.name] || '#8A90B4' },
-        ]}
-      >
-        {item?.call_status?.name}
-      </Text>
-    </View>
-     <View
-      style={{
-        flexDirection: 'row',
-        alignItems: 'flex-start',
-        marginTop: 8,
-      }}
-    >
-      <Text
-        style={{
-          color: '#fb9e08',
-          fontSize: 12,
-          fontWeight: '600',
-          marginRight: 5,
-        }}
-      >
-        Remarks:
-      </Text>
-    
-      <View style={{ flex: 1 }}>
-        <RemarksText remarks={remarks} />
-      </View>
-    </View>
-  </View>
-)};
-
-// ─── Remarks Modal ────────────────────────────────────────────────────────────
-
-const RemarksModal = ({ visible, text, onClose }) => {
-  if (!visible) return null;
   return (
-    <View style={styles.modalOverlay}>
-      <View style={styles.modalCard}>
-        <View style={styles.checkIcon}>
-          <Icon name="check-circle" size={32} color="#00acc1" />
+    <View style={styles.card}>
+      {/* Header */}
+      <View style={styles.cardHeader}>
+        <View style={styles.nameRow}>
+          <Text style={styles.name}>{item?.lead?.name || 'N/A'}</Text>
+          {item?.rating?.name ? (
+            <View style={styles.ratingBadge}>
+              <Text style={styles.ratingText}>{item.rating.name}</Text>
+            </View>
+          ) : null}
         </View>
-        <Text style={styles.modalTitle}>Latest Remarks</Text>
-        <Text style={styles.modalText}>{text}</Text>
-        <TouchableOpacity
-          style={styles.modalCloseBtn}
-          onPress={onClose}
-          activeOpacity={0.8}
+      </View>
+
+      {/* Project */}
+      <Text style={styles.projectText}>
+        {item?.project_id?.name || 'N/A'}
+      </Text>
+
+      {/* Lead Qualification */}
+      <View style={styles.rowBetween}>
+        <Text style={styles.label}>
+          Lead Qualification:{' '}
+          <Text style={styles.value}>
+            {item?.lead_qualification?.name || 'N/A'}
+          </Text>
+        </Text>
+      </View>
+
+      {/* Lead Status */}
+      <View style={styles.rowBetween}>
+        <Text style={styles.label}>
+          Lead Status:{' '}
+          <Text style={styles.value}>{item?.lead_status?.name || 'N/A'}</Text>
+        </Text>
+      </View>
+
+      {/* Lead Sub Status */}
+      <View style={styles.rowBetween}>
+        <Text style={styles.label}>
+          Lead Sub Status:{' '}
+          <Text style={styles.value}>
+            {item?.lead_sub_status?.name || 'N/A'}
+          </Text>
+        </Text>
+      </View>
+
+      {/* Site Visit */}
+      <View style={styles.rowBetween}>
+        <Text style={styles.label}>
+          Site Visit Date:{' '}
+          <Text style={styles.value}>{item?.dates?.site_visit || 'N/A'}</Text>
+        </Text>
+      </View>
+
+      {/* Call Back */}
+      <View style={styles.rowBetween}>
+        <Text style={styles.labelHighlight}>
+          Call Back Date & Time:{' '}
+          <Text style={styles.value}>
+            {item?.dates?.call_back || 'N/A'}/
+            {item?.dates?.call_back_time || 'N/A'}
+          </Text>
+        </Text>
+      </View>
+
+      {/* Closure + call status */}
+      <View style={styles.rowBetween}>
+        <Text style={styles.label}>
+          Expected Closure Date:{' '}
+          <Text style={styles.value}>
+            {item?.dates?.expected_closure || 'N/A'}
+          </Text>
+        </Text>
+        <Text
+          style={[
+            styles.callResult,
+            { color: statusColors[item?.call_status?.name] || '#aab8c4' },
+          ]}
         >
-          <Text style={styles.modalCloseText}>OK</Text>
-        </TouchableOpacity>
+          {item?.call_status?.name}
+        </Text>
+      </View>
+
+      {/* Remarks */}
+      <View style={styles.remarksRow}>
+        <Text style={styles.remarksLabel}>Remarks:</Text>
+        <View style={{ flex: 1 }}>
+          <RemarksText remarks={remarks} />
+        </View>
       </View>
     </View>
   );
@@ -210,342 +167,255 @@ const RemarksModal = ({ visible, text, onClose }) => {
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 const AllInteractionsScreen = ({ route }) => {
-  const [showRemarks, setShowRemarks] = useState(false);
-  const [remarksText, setRemarksText] = useState('');
   const { id } = route.params;
   const navigation = useNavigation();
 
-  const {
-    data: feedback,
-    isLoading,
-  } = useQuery({
+  const { data: feedback, isLoading } = useQuery({
     queryKey: ['feedback', id],
     queryFn: async () => {
       const res = await api.get(`/api/pm/getAllLeadFeedbacksById/${id}`);
-      console.log('feedback data:', JSON.stringify(res?.data?.data, null, 2));
       return res?.data?.data || [];
-    },
-    onError: err => {
-      // Toast.show({
-      //   type: 'error',
-      //   text1: err?.response?.data?.message || 'Failed to fetch feedback',
-      // });
     },
   });
 
   return (
-    <View  style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor="#0A0F2E" />
-
-      {/* ── Header pinned to top ── */}
-      {/* <Header /> */}
-
-      {/* ── Scrollable content ── */}
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        <SectionHeader navigation={navigation} route={route} />
-
-        {isLoading ? (
-          <Text style={styles.centeredText}>Loading...</Text>
-        ) : feedback?.length > 0 ? (
-          feedback.map(item => (
-            <InteractionCard
-              key={item.id}
-              item={item}
-              setShowRemarks={setShowRemarks}
-              setRemarksText={setRemarksText}
-            />
-          ))
-        ) : (
-          <Text style={styles.centeredText}>No Data Found</Text>
-        )}
-        <View style={{ height: 100 }} />
-      </ScrollView>
-
-      {/* ── Remarks Modal (absolute overlay) ── */}
-      <RemarksModal
-        visible={showRemarks}
-        text={remarksText}
-        onClose={() => setShowRemarks(false)}
+    <View style={styles.container}>
+      <Image
+        source={require('../asset/image/bg-img.png')}
+        style={styles.bgImageFixed}
+        resizeMode="cover"
       />
+      <View style={styles.overlay} />
 
-      {/* ── Bottom Nav pinned to bottom ── */}
-      {/* <BottomNav /> */}
-    </View >
+      <SafeAreaView style={styles.safeArea} edges={['left', 'right']}>
+        <StatusBar
+          translucent
+          backgroundColor="transparent"
+          barStyle="light-content"
+        />
+
+        {/* TOP BAR: [back + icon + title] ............ [add new] */}
+        <View
+          style={[styles.topBarContainer, { paddingTop: verticalScale(10) }]}
+        >
+          <View style={styles.topBar}>
+            <View style={styles.leftHeader}>
+              <TouchableOpacity
+                onPress={() => navigation.goBack()}
+                style={styles.backBtn}
+                activeOpacity={0.7}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Icon1 name="chevron-back" size={20} color="#fff" />
+              </TouchableOpacity>
+              <Icon name="forum" size={20} color="#ffffff" />
+              <Text style={styles.screenTitle} numberOfLines={1}>
+                All Interactions
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              style={styles.addNewBtn}
+              onPress={() => navigation.navigate('AddNewInteraction', { id })}
+              activeOpacity={0.75}
+            >
+              <Icon name="add" size={14} color="#fff" />
+              <Text style={styles.addNewText}>Add New</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* LIST */}
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.listContent}
+        >
+          {/* COUNT */}
+          {!isLoading && (
+            <Text style={styles.countText}>
+              Showing {feedback?.length || 0} Records
+            </Text>
+          )}
+
+          {isLoading ? (
+            <View style={styles.centerLoader}>
+              <ActivityIndicator size="large" color="#fff" />
+            </View>
+          ) : feedback?.length > 0 ? (
+            feedback.map((item, i) => (
+              <InteractionCard
+                key={item?.id != null ? `fb-${item.id}` : `fb-idx-${i}`}
+                item={item}
+              />
+            ))
+          ) : (
+            <View style={styles.emptyWrap}>
+              <Icon name="forum" size={48} color="rgba(255,255,255,0.25)" />
+              <Text style={styles.empty}>No data found</Text>
+            </View>
+          )}
+        </ScrollView>
+      </SafeAreaView>
+    </View>
   );
 };
 
-// ─── Colors ───────────────────────────────────────────────────────────────────
-
-const COLORS = {
-  bg: '#080d5a',
-  cardBg: '#ffffff16',
-  headerBg: '#0D1230',
-  accent: '#1784b7',
-  accentLight: '#7B9FFF',
-  gold: '#F5A623',
-  white: '#FFFFFF',
-  mutedText: '#8A90B4',
-  labelText: '#FFB85D',
-  orange: '#F5A623',
-  green: '#00C48C',
-  red: '#FF6B6B',
-  remarksBg: '#2488B5',
-  addNewBg: '#2488B5',
-  borderColor: '#1E2550',
-};
+export default AllInteractionsScreen;
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#1a2d3e' },
+  bgImageFixed: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: SCREEN_WIDTH,
+    height: Dimensions.get('screen').height,
+  },
+  overlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: SCREEN_WIDTH,
+    height: Dimensions.get('screen').height,
+    backgroundColor: 'rgba(18,32,48,0.72)',
+  },
+  safeArea: { flex: 1, backgroundColor: 'transparent' },
 
-  // ── Layout ──
-  safeArea: {
-    flex: 1,
-    backgroundColor: COLORS.bg,
+  /* ── Header pill ── */
+  topBarContainer: {
+    paddingHorizontal: scale(10),
+    paddingBottom: verticalScale(10),
   },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingBottom: 16,
-  },
-  centeredText: {
-    color: COLORS.white,
-    textAlign: 'center',
-    marginTop: 24,
-    fontSize: 14,
-    opacity: 0.7,
-  },
-  remarksCardText: {
-  fontSize: 13,
-  color: '#ffffff',
-  lineHeight: 20,
-},
-
-readMore: {
-  color: '#00a8ff',
-  fontWeight: '600',
-  marginTop: 3,
-},
-  // ── Section Header ──
-  sectionHeader: {
+  topBar: {
+    height: 42,
+    borderRadius: scale(22),
+    backgroundColor: 'rgba(255,255,255,0.15)',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    borderRadius: 20,
-    marginHorizontal: 12,
-    marginTop: 10,
-    marginBottom: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: scale(14),
   },
-  sectionTitleRow: {
+  leftHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    flex: 1,
+    marginRight: 10,
   },
-  sectionIcon: {
-    fontSize: 15,
-  },
-  sectionTitle: {
-    color: COLORS.white,
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  sectionActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  addNewBtn: {
-    backgroundColor: COLORS.addNewBg,
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderWidth: 1.5,
-    borderColor: COLORS.accent,
-  },
-  addNewText: {
-    color: COLORS.white,
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  closeBtn: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#2488B5',
+  backBtn: {
+    paddingRight: 8,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  closeBtnText: {
-    color: COLORS.white,
-    fontSize: 12,
+  screenTitle: {
+    color: '#ffffff',
+    fontSize: 15,
+    marginLeft: 6,
     fontWeight: '700',
-    lineHeight: 14,
+    flexShrink: 1,
+  },
+  addNewBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1e9ce8',
+    borderRadius: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  addNewText: {
+    color: '#ffffff',
+    fontSize: 11.5,
+    fontWeight: '600',
+    marginLeft: 2,
   },
 
-  // ── Card ──
+  /* ── List ── */
+  listContent: { paddingHorizontal: 14, paddingBottom: 120 },
+  centerLoader: { alignItems: 'center', justifyContent: 'center', marginTop: 40 },
+  emptyWrap: { alignItems: 'center', marginTop: 80, gap: 12 },
+  empty: { color: 'rgba(255,255,255,0.40)', fontSize: 15 },
+  countText: {
+    color: '#ffb300',
+    fontSize: 12,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+
+  /* ── Card ── */
   card: {
-    backgroundColor: COLORS.cardBg,
-    marginHorizontal: 12,
+    backgroundColor: 'rgba(4, 35, 70, 0.62)',
+    borderRadius: 4,
+    padding: 12,
     marginBottom: 10,
-    borderRadius: 12,
-    padding: 14,
-    borderWidth: 0.5,
-    borderColor: 'rgba(255,255,255,0.35)',
   },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 5,
+    alignItems: 'flex-start',
+    marginBottom: 4,
   },
-  cardTitleRow: {
+  nameRow: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
     flexWrap: 'wrap',
+    marginRight: 8,
   },
-  cardName: {
-    color: COLORS.white,
-    fontWeight: '800',
-    fontSize: 14,
-    flexShrink: 1,
+  name: { color: '#ffffff', fontSize: 15, fontWeight: '600', flexShrink: 1 },
+  ratingBadge: {
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    marginLeft: 6,
+    backgroundColor: 'rgba(255,179,0,0.15)',
   },
-  cardTemp: {
-    color: COLORS.mutedText,
-    fontSize: 13,
-  },
-  remarksBtn: {
-    backgroundColor: COLORS.remarksBg,
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 4,
-  },
-  remarksBtnText: {
-    color: COLORS.white,
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  leadQualification: {
-     color: COLORS.labelText,
-    fontSize: 11.5,
-    marginBottom: 5,
-  },
-  leadQualificationValue: {
-     color: COLORS.white,
-    fontWeight: '700',
-  },
-  statusRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 3,
-    gap: 6,
-  },
-  statusLabel: {
-    color: COLORS.labelText,
-    fontSize: 11,
-    flex: 1,
-    flexWrap: 'wrap',
-    marginBottom: 3,
-  },
-  statusValue: {
-    color: COLORS.white,
-    fontWeight: '700',
-  },
-  fieldLabel: {
-    color: COLORS.labelText,
-    fontSize: 11,
-    marginBottom: 3,
-    flexWrap: 'wrap',
-  },
-  fieldValue: {
-    color: COLORS.white,
-    fontWeight: '600',
-  },
-  fieldLabelHighlight: {
-    color: COLORS.orange,
-    fontSize: 11,
-    marginBottom: 3,
-    fontWeight: '600',
-  },
-  fieldValueHighlight: {
-    color: COLORS.white,
-    fontWeight: '700',
-  },
-  closureRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  ratingText: { fontSize: 11, fontWeight: '600', color: '#ffb300' },
+  projectText: {
+    color: COLORS.cyan,
     marginTop: 2,
+    fontSize: 12,
+    flexWrap: 'wrap',
+    lineHeight: 16,
+  },
+  rowBetween: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 5,
     gap: 6,
+    flexWrap: 'wrap',
   },
-  callResult: {
+  label: { fontSize: 11.5, color: COLORS.labelText, lineHeight: 18 },
+  labelHighlight: {
     fontSize: 11.5,
-    fontWeight: '700',
+    color: COLORS.orange,
+    lineHeight: 18,
+    fontWeight: '600',
   },
+  value: { color: '#ffffff', fontSize: 11.5, flexShrink: 1 },
+  callResult: { fontSize: 11.5, fontWeight: '700' },
 
-  // ── Remarks Modal ──
-  modalOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.65)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 999,
+  /* ── Remarks ── */
+  remarksRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginTop: 8,
   },
-  modalCard: {
-    width: '82%',
-    backgroundColor: '#2f2f8f',
-    borderRadius: 16,
-    padding: 24,
-    alignItems: 'center',
+  remarksLabel: {
+    color: COLORS.orange,
+    fontSize: 11.5,
+    fontWeight: '600',
+    marginRight: 5,
+    lineHeight: 18,
   },
-  checkIcon: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: '#e6f7ff',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 12,
+  remarksCardText: {
+    fontSize: 11.5,
+    color: '#ffffff',
+    lineHeight: 18,
   },
-  modalTitle: {
-    color: '#00e5ff',
-    fontSize: 17,
-    fontWeight: '700',
-    marginBottom: 10,
-  },
-  modalText: {
-    color: COLORS.white,
-    textAlign: 'center',
-    fontSize: 13,
-    lineHeight: 20,
-    marginBottom: 18,
-    opacity: 0.9,
-  },
-  modalCloseBtn: {
-    backgroundColor: '#00acc1',
-    paddingHorizontal: 32,
-    paddingVertical: 8,
-    borderRadius: 20,
-  },
-  modalCloseText: {
-    color: COLORS.white,
-    fontWeight: '700',
-    fontSize: 14,
+  readMore: {
+    color: '#4FC3F7',
+    fontWeight: '600',
   },
 });
-
-export default AllInteractionsScreen;

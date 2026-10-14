@@ -1,13 +1,13 @@
 /**
  * NotificationScreen.js
  *
- * React Native CLI screen with a date-range + user "advanced filter" modal.
- * Quick-filter dropdown now shows unread counts (Assign Leads / Follow Up Date /
- * Site Visit Date) from Redux `unreadCounts`.
- *
- * Auth: requests go through the shared `api` instance (../../api/AxiosInstance).
- * Badge/Counts: after read / unread / delete actions, `syncBadge()` refreshes
- * the Redux counts (and the iOS app icon badge).
+ * Design = first Notification page (header pill, left-border cards, round
+ * checkboxes, blue filter pill, bottom-sheet filter).
+ * Header pill is now the same as ChangeRM / Leads List / Assign RM.
+ * Logic / API calls are unchanged:
+ *  - Quick filter dropdown shows unread counts from Redux `unreadCounts`.
+ *  - Advanced filter (From/To date, User, Status) opens as a bottom sheet.
+ *  - After read / unread / delete, `syncBadge()` refreshes counts + iOS badge.
  */
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
@@ -20,7 +20,6 @@ import {
   TextInput,
   FlatList,
   ScrollView,
-  SafeAreaView,
   ActivityIndicator,
   LayoutAnimation,
   UIManager,
@@ -30,7 +29,10 @@ import {
   Dimensions,
   KeyboardAvoidingView,
   Modal,
+  Image,
+  Keyboard,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSelector } from 'react-redux';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import Icon from 'react-native-vector-icons/Ionicons';
@@ -38,19 +40,32 @@ import MaterialIcon from 'react-native-vector-icons/MaterialIcons';
 import api from '../../api/AxiosInstance';
 import { syncBadge } from './syncBadge';
 
-const SCREEN_HEIGHT = Dimensions.get('window').height;
+const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window');
+const scale = size => (SCREEN_WIDTH / 375) * size;
+const verticalScale = size => (SCREEN_HEIGHT / 812) * size;
+
+// ─── COLORS (first page theme) ───────────────────────────────────────────────
 
 const COLORS = {
-  bg: '#070c4d',
-  header: '#241A5C',
-  card: '#2C2166',
-  cardHighlight: '#ffffff57',
-  accent: '#2488B5',
-  accentt: '#B8B0E0',
+  bg: '#1a2d3e',
+  card: 'rgba(4, 35, 70, 0.62)',
+  cardHighlight: 'rgba(255, 255, 255, 0.11)',
+  accent: '#4aa3df',
+  accentt: '#4aa3df',
   text: '#FFFFFF',
-  subText: '#B8B0E0',
-  pill: '#2C2166',
-  border: '#3A2C8C',
+  subText: '#afaea5',
+  pill: '#2b3348',
+  border: 'rgba(255,255,255,0.15)',
+  panel: '#2b3348',
+  panelBorder: '#39415a',
+  // used by the custom alert
+  white: '#FFFFFF',
+  mutedText: '#8A90B4',
+  gold: '#f4c542',
+  green: '#00C48C',
+  red: '#FF6B6B',
+  borderColor: '#ffffff20',
+  modalBg: '#21283a',
 };
 
 if (
@@ -75,7 +90,7 @@ const FILTER_OPTIONS = [
   { label: 'Site Visit Date', value: 'VISITDT' },
 ];
 
-// ✅ dropdown option value -> Redux unreadCounts key
+// dropdown option value -> Redux unreadCounts key
 const COUNT_KEY = {
   ASGLEAD: 'assigned_lead',
   FLOWUPDT: 'follow_up_date',
@@ -109,17 +124,181 @@ const formatDate = date => {
   return `${year}-${month}-${day}`;
 };
 
-// ─── Searchable user picker ───────────────────────────────────────────────
+const parseDate = str => {
+  const [y, m, d] = String(str).split('-').map(Number);
+  return new Date(y, m - 1, d);
+};
+
+// ─── CUSTOM ALERT ────────────────────────────────────────────────────────────
+
+let _alertHandler = null;
+
+const showAlert = (title, message, buttons, options) => {
+  if (_alertHandler) {
+    _alertHandler({ title, message, buttons, options });
+  } else {
+    Alert.alert(title, message, buttons, options);
+  }
+};
+
+const ALERT_TYPES = {
+  success: { icon: 'check-circle', color: COLORS.green },
+  error: { icon: 'error', color: COLORS.red },
+  warning: { icon: 'warning', color: COLORS.gold },
+  danger: { icon: 'delete-forever', color: COLORS.red },
+  contact: { icon: 'contact-phone', color: COLORS.accent },
+  info: { icon: 'info', color: COLORS.accent },
+};
+
+const parseAlert = (title = '', buttons = []) => {
+  const raw = String(title);
+  let type = 'info';
+  if (raw.startsWith('\u2705') || raw.startsWith('\uD83C\uDF89')) type = 'success';
+  else if (raw.startsWith('\u274C')) type = 'error';
+  else if (raw.startsWith('\u26A0')) type = 'warning';
+  else if (/^success$/i.test(raw)) type = 'success';
+  else if (/^(error|permission denied)$/i.test(raw)) type = 'error';
+  else if (/^contact$/i.test(raw)) type = 'contact';
+  else if (buttons.some(b => b.style === 'destructive')) type = 'danger';
+  const cleanTitle = raw.replace(/^(?:[\u2705\u274C\u26A0]\uFE0F?|\uD83C\uDF89)\s*/, '');
+  return { type, cleanTitle };
+};
+
+const CustomAlertHost = () => {
+  const [config, setConfig] = useState(null);
+  const anim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    _alertHandler = cfg => {
+      setConfig(cfg);
+      anim.setValue(0);
+      Animated.spring(anim, {
+        toValue: 1,
+        useNativeDriver: true,
+        damping: 16,
+        stiffness: 190,
+      }).start();
+    };
+    return () => { _alertHandler = null; };
+  }, [anim]);
+
+  const close = cb => {
+    Animated.timing(anim, { toValue: 0, duration: 140, useNativeDriver: true }).start(() => {
+      setConfig(null);
+      cb && cb();
+    });
+  };
+
+  if (!config) return null;
+
+  const buttons = config.buttons?.length ? config.buttons : [{ text: 'OK' }];
+  const { type, cleanTitle } = parseAlert(config.title, buttons);
+  const t = ALERT_TYPES[type];
+  const cancelable = config.options?.cancelable !== false;
+  const stacked = buttons.length > 2;
+  const cancelBtns = buttons.filter(b => b.style === 'cancel');
+  const otherBtns = buttons.filter(b => b.style !== 'cancel');
+  const ordered = stacked ? [...otherBtns, ...cancelBtns] : [...cancelBtns, ...otherBtns];
+  const message = config.message ? String(config.message) : '';
+  const longMessage = message.includes('\n');
+
+  const dismiss = () => {
+    if (!cancelable) return;
+    close(() => config.options?.onDismiss && config.options.onDismiss());
+  };
+
+  const opacity = anim.interpolate({ inputRange: [0, 1], outputRange: [0, 1], extrapolate: 'clamp' });
+  const alertScale = anim.interpolate({ inputRange: [0, 1], outputRange: [0.88, 1] });
+
+  return (
+    <Modal transparent visible animationType="none" statusBarTranslucent onRequestClose={dismiss}>
+      <Animated.View style={[styles.alertOverlay, { opacity }]}>
+        <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={dismiss} />
+
+        <Animated.View style={[styles.alertBox, { opacity, transform: [{ scale: alertScale }] }]}>
+          <View style={[styles.alertTopBar, { backgroundColor: t.color }]} />
+
+          <View style={[styles.alertIconWrap, { backgroundColor: t.color + '1f', borderColor: t.color + '55' }]}>
+            <MaterialIcon name={t.icon} size={26} color={t.color} />
+          </View>
+
+          <Text style={styles.alertTitle}>{cleanTitle}</Text>
+
+          {message ? (
+            <ScrollView
+              style={styles.alertMsgScroll}
+              showsVerticalScrollIndicator={false}
+              bounces={false}
+            >
+              <Text style={[styles.alertMessage, longMessage && { textAlign: 'left' }]}>{message}</Text>
+            </ScrollView>
+          ) : null}
+
+          <View style={[styles.alertBtnRow, stacked && { flexDirection: 'column' }]}>
+            {ordered.map((btn, i) => {
+              const isSolo = buttons.length === 1;
+              const isCancel = btn.style === 'cancel' && !isSolo;
+              const isDestructive = btn.style === 'destructive';
+              const bg = isCancel
+                ? 'rgba(255,255,255,0.08)'
+                : isDestructive || type === 'danger'
+                  ? COLORS.red
+                  : t.color;
+              const txtColor = isCancel ? COLORS.white : isDestructive || type === 'danger' ? '#fff' : '#06104a';
+              return (
+                <TouchableOpacity
+                  key={`${btn.text}-${i}`}
+                  activeOpacity={0.8}
+                  style={[
+                    styles.alertBtn,
+                    !stacked && { flex: 1 },
+                    { backgroundColor: bg },
+                    isCancel && { borderWidth: 1, borderColor: COLORS.borderColor },
+                  ]}
+                  onPress={() => close(() => btn.onPress && btn.onPress())}
+                >
+                  <Text style={[styles.alertBtnText, { color: txtColor }]}>{btn.text}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </Animated.View>
+      </Animated.View>
+    </Modal>
+  );
+};
+
+// ─── Labeled action button (shown on the Select All line) ────────────────────
+
+const ActionBtn = ({ icon, label, color, onPress, disabled }) => (
+  <TouchableOpacity
+    style={[
+      styles.actionBtn,
+      { backgroundColor: color + '22' },
+      disabled && { opacity: 0.5 },
+    ]}
+    onPress={onPress}
+    disabled={disabled}
+    activeOpacity={0.7}
+  >
+    <Icon name={icon} size={18} color={color} />
+    <Text style={[styles.actionBtnText, { color }]}>{label}</Text>
+  </TouchableOpacity>
+);
+
+// ─── Searchable user picker (inline dropdown) ────────────────────────────────
+
 const UserPicker = ({ users, loading, value, onSelect }) => {
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
 
-  const filtered = !query
+  const q = query.toLowerCase();
+  const filtered = !q
     ? users
     : users.filter(
         u =>
-          u.name?.toLowerCase().includes(query.toLowerCase()) ||
-          u.username?.toLowerCase().includes(query.toLowerCase()),
+          String(u.name ?? '').toLowerCase().includes(q) ||
+          String(u.username ?? '').toLowerCase().includes(q),
       );
   const selectedUser = users.find(u => u.id === value);
 
@@ -146,13 +325,13 @@ const UserPicker = ({ users, loading, value, onSelect }) => {
             }}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            <MaterialIcon name="close" size={16} color="#7a8fc4" />
+            <MaterialIcon name="close" size={16} color="#8a9daf" />
           </TouchableOpacity>
         ) : (
           <MaterialIcon
             name={open ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
             size={20}
-            color="#00e5ff"
+            color="#8a9daf"
           />
         )}
       </TouchableOpacity>
@@ -160,10 +339,10 @@ const UserPicker = ({ users, loading, value, onSelect }) => {
       {open && (
         <View style={styles.userDropdownBox}>
           <View style={styles.userSearchRow}>
-            <MaterialIcon name="search" size={16} color="#7a8fc4" />
+            <MaterialIcon name="search" size={16} color="#8a9daf" />
             <TextInput
-              placeholder="Search name or username..."
-              placeholderTextColor="#7a8fc4"
+              placeholder="Search name..."
+              placeholderTextColor="#8a9daf"
               value={query}
               onChangeText={setQuery}
               style={styles.userSearchInput}
@@ -175,7 +354,7 @@ const UserPicker = ({ users, loading, value, onSelect }) => {
           {loading ? (
             <ActivityIndicator
               size="small"
-              color="#00e5ff"
+              color="#4aa3df"
               style={{ marginVertical: 14 }}
             />
           ) : (
@@ -199,9 +378,9 @@ const UserPicker = ({ users, loading, value, onSelect }) => {
                     }}
                   >
                     <Text style={styles.userListItemName}>{u.name}</Text>
-                    <Text style={styles.userListItemUsername}>
-                      @{u.username}
-                    </Text>
+                    {u.username ? (
+                      <Text style={styles.userListItemSub}>@{u.username}</Text>
+                    ) : null}
                   </TouchableOpacity>
                 ))
               )}
@@ -213,7 +392,8 @@ const UserPicker = ({ users, loading, value, onSelect }) => {
   );
 };
 
-// ─── Status dropdown ──────────────────────────────────────────────────────
+// ─── Status dropdown ─────────────────────────────────────────────────────────
+
 const StatusPicker = ({ value, onSelect }) => {
   const [open, setOpen] = useState(false);
   const selected =
@@ -232,7 +412,7 @@ const StatusPicker = ({ value, onSelect }) => {
         <MaterialIcon
           name={open ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
           size={20}
-          color="#00e5ff"
+          color="#8a9daf"
         />
       </TouchableOpacity>
 
@@ -261,7 +441,7 @@ const StatusPicker = ({ value, onSelect }) => {
                   {opt.label}
                 </Text>
                 {active && (
-                  <MaterialIcon name="check" size={16} color="#00e5ff" />
+                  <MaterialIcon name="check" size={16} color="#4aa3df" />
                 )}
               </TouchableOpacity>
             );
@@ -272,6 +452,8 @@ const StatusPicker = ({ value, onSelect }) => {
   );
 };
 
+// ─── INPUT FIELD ─────────────────────────────────────────────────────────────
+
 const InputField = ({ label, placeholder, icon, value, onPress }) => (
   <View style={styles.field}>
     <Text style={styles.filterLabel}>{label}</Text>
@@ -279,19 +461,20 @@ const InputField = ({ label, placeholder, icon, value, onPress }) => (
       <View style={styles.filterInputContainer}>
         <TextInput
           placeholder={placeholder}
-          placeholderTextColor="#7a8fc4"
+          placeholderTextColor="#8a9daf"
           style={styles.filterInput}
-          value={value}
+          value={value || ''}
           editable={false}
           pointerEvents="none"
         />
-        {icon && <MaterialIcon name={icon} size={18} color="#00bcd4" />}
+        {icon && <MaterialIcon name={icon} size={18} color="#1482cc" />}
       </View>
     </TouchableOpacity>
   </View>
 );
 
-// ─── Bottom-sheet advanced-filter modal (date range + user + status) ──────
+// ─── ADVANCED FILTER (bottom sheet) ──────────────────────────────────────────
+
 const AdvancedFilterModal = ({
   visible,
   onClose,
@@ -312,6 +495,46 @@ const AdvancedFilterModal = ({
   const [mounted, setMounted] = useState(false);
   const [showFromPicker, setShowFromPicker] = useState(false);
   const [showToPicker, setShowToPicker] = useState(false);
+  const [kbHeight, setKbHeight] = useState(0);
+
+  // iOS: own spinner panel (one tap). Android keeps its native dialog.
+  const isIOS = Platform.OS === 'ios';
+  const [iosPicker, setIosPicker] = useState(null); // 'from' | 'to' | null
+  const [tempDate, setTempDate] = useState(new Date());
+
+  const openPicker = which => {
+    const current = which === 'from' ? fromDate : toDate;
+    if (isIOS) {
+      setTempDate(current ? parseDate(current) : new Date());
+      setIosPicker(which);
+    } else if (which === 'from') {
+      setShowFromPicker(true);
+    } else {
+      setShowToPicker(true);
+    }
+  };
+
+  const confirmIosPicker = () => {
+    const formatted = formatDate(tempDate);
+    if (iosPicker === 'from') onFromDateChange(formatted);
+    else onToDateChange(formatted);
+    setIosPicker(null);
+  };
+
+  // Android: handle keyboard height manually
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    const showSub = Keyboard.addListener('keyboardDidShow', e =>
+      setKbHeight(e.endCoordinates.height),
+    );
+    const hideSub = Keyboard.addListener('keyboardDidHide', () =>
+      setKbHeight(0),
+    );
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   useEffect(() => {
     if (visible) {
@@ -356,7 +579,8 @@ const AdvancedFilterModal = ({
       onRequestClose={handleClose}
     >
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        enabled={Platform.OS === 'ios'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.bottomSheetOverlay}
       >
         <TouchableOpacity
@@ -368,7 +592,14 @@ const AdvancedFilterModal = ({
         <Animated.View
           style={[
             styles.bottomSheet,
-            { transform: [{ translateY: slideAnim }] },
+            {
+              transform: [{ translateY: slideAnim }],
+              marginBottom: Platform.OS === 'android' ? kbHeight : 0,
+              maxHeight: Math.min(
+                SCREEN_HEIGHT * 0.85,
+                SCREEN_HEIGHT - kbHeight - 60,
+              ),
+            },
           ]}
         >
           <View style={styles.dragHandle} />
@@ -379,7 +610,7 @@ const AdvancedFilterModal = ({
               <Text style={styles.modalTitle}>Filter Notifications</Text>
             </View>
             <TouchableOpacity onPress={handleClose}>
-              <MaterialIcon name="close" size={20} color="#a0b4e8" />
+              <MaterialIcon name="close" size={20} color="#9aa8bd" />
             </TouchableOpacity>
           </View>
 
@@ -404,7 +635,7 @@ const AdvancedFilterModal = ({
                   placeholder="YYYY-MM-DD"
                   icon="calendar-today"
                   value={fromDate}
-                  onPress={() => setShowFromPicker(true)}
+                  onPress={() => openPicker('from')}
                 />
               </View>
               <View style={{ width: '48%' }}>
@@ -413,7 +644,7 @@ const AdvancedFilterModal = ({
                   placeholder="YYYY-MM-DD"
                   icon="calendar-today"
                   value={toDate}
-                  onPress={() => setShowToPicker(true)}
+                  onPress={() => openPicker('to')}
                 />
               </View>
             </View>
@@ -425,11 +656,14 @@ const AdvancedFilterModal = ({
               onSelect={onSelectUser}
             />
 
-            <StatusPicker value={status} onSelect={onStatusChange} />
+            <StatusPicker
+              value={status}
+              onSelect={v => onStatusChange(v ?? '')}
+            />
 
             {showFromPicker && (
               <DateTimePicker
-                value={fromDate ? new Date(fromDate) : new Date()}
+                value={fromDate ? parseDate(fromDate) : new Date()}
                 mode="date"
                 display="default"
                 onChange={(e, d) => {
@@ -440,7 +674,7 @@ const AdvancedFilterModal = ({
             )}
             {showToPicker && (
               <DateTimePicker
-                value={toDate ? new Date(toDate) : new Date()}
+                value={toDate ? parseDate(toDate) : new Date()}
                 mode="date"
                 display="default"
                 onChange={(e, d) => {
@@ -470,14 +704,50 @@ const AdvancedFilterModal = ({
               </TouchableOpacity>
             </View>
           </View>
+
+          {isIOS && iosPicker && (
+            <View style={styles.iosPickerPanel}>
+              <Text style={styles.iosPickerTitle}>
+                {iosPicker === 'from' ? 'From Date' : 'To Date'}
+              </Text>
+              <DateTimePicker
+                value={tempDate}
+                mode="date"
+                display="spinner"
+                themeVariant="dark"
+                textColor="#ffffff"
+                onChange={(e, d) => {
+                  if (d) setTempDate(d);
+                }}
+                style={styles.iosPicker}
+              />
+              <View style={styles.iosPickerBtnRow}>
+                <TouchableOpacity
+                  style={styles.cancelBtn}
+                  onPress={() => setIosPicker(null)}
+                >
+                  <Text style={styles.cancelBtnText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.applyBtn}
+                  onPress={confirmIosPicker}
+                >
+                  <MaterialIcon name="check" size={14} color="#fff" />
+                  <Text style={styles.applyBtnText}>Done</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
         </Animated.View>
       </KeyboardAvoidingView>
     </Modal>
   );
 };
 
-const NotificationScreen = ({ setHideBottomNav }) => {
-  // ✅ NEW: per-type unread counts from Redux
+// ─── MAIN SCREEN ──────────────────────────────────────────────────────────────
+
+const NotificationScreen = ({ setHideBottomNav, navigation }) => {
+  // per-type unread counts from Redux
   const unreadCounts = useSelector(state => state.unreadCounts);
 
   const [selectAll, setSelectAll] = useState(false);
@@ -487,6 +757,7 @@ const NotificationScreen = ({ setHideBottomNav }) => {
 
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
   const [expandedIds, setExpandedIds] = useState([]);
   const [actionLoading, setActionLoading] = useState(false);
@@ -619,7 +890,7 @@ const NotificationScreen = ({ setHideBottomNav }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filter, advancedFilter, fetchNotifications, buildQueryParams]);
 
-  // ✅ Screen khulle count fresh kore nao
+  // Screen khulle count fresh kore nao
   useEffect(() => {
     syncBadge();
   }, []);
@@ -644,7 +915,7 @@ const NotificationScreen = ({ setHideBottomNav }) => {
       setUserList(res?.data?.data || []);
       userListFetchedRef.current = true;
     } catch (e) {
-      // silent — the search box will just show "No users found"
+      // silent — the picker will just show "No users found"
     } finally {
       setUserListLoading(false);
     }
@@ -687,8 +958,8 @@ const NotificationScreen = ({ setHideBottomNav }) => {
   // val: 2 = read, 1 = unread
   const changeStatus = async (ids, val) => {
     if (!ids.length) {
-      Alert.alert(
-        'Select notifications',
+      showAlert(
+        '⚠️ Select notifications',
         'Please select at least one notification first.',
       );
       return;
@@ -701,9 +972,9 @@ const NotificationScreen = ({ setHideBottomNav }) => {
       setCheckedIds([]);
       setSelectAll(false);
       await fetchNotifications(buildQueryParams(), shouldRestrictToKnownTypes);
-      syncBadge(); // ✅ refresh counts + iOS badge
+      syncBadge(); // refresh counts + iOS badge
     } catch (e) {
-      Alert.alert(
+      showAlert(
         'Error',
         e?.response?.data?.message || 'Failed to update status',
       );
@@ -714,59 +985,6 @@ const NotificationScreen = ({ setHideBottomNav }) => {
 
   const handleMarkRead = () => changeStatus(checkedIds, 2);
   const handleMarkUnread = () => changeStatus(checkedIds, 1);
-  // ✅ Shob page theke unread id gulo niye mark read kore (shudhu loaded 20 ta na)
-  const handleMarkAllRead = async () => {
-    setActionLoading(true);
-    try {
-      const BIG_LIMIT = 100;
-      const base = { ...buildQueryParams(), status: '1' };
-      const idSet = new Set();
-      let p = 1;
-      while (p <= 50) {
-        const res = await api.get(API_PATH, {
-          params: { ...base, page: p, limit: BIG_LIMIT },
-        });
-        const raw = res.data?.uarray || [];
-        const before = idSet.size;
-        raw.forEach(n => {
-          if (!shouldRestrictToKnownTypes || ALLOWED_TYPES.includes(n.type)) {
-            idSet.add(n.id);
-          }
-        });
-        // kono notun id na ele (backend limit ignore korle) ba last page hole thamo
-        if (raw.length < BIG_LIMIT || idSet.size === before) break;
-        p += 1;
-      }
-
-      const ids = Array.from(idSet);
-      if (!ids.length) {
-        Alert.alert('No unread notifications', 'Shob notification already read.');
-        return;
-      }
-
-      for (let i = 0; i < ids.length; i += 10) {
-        await Promise.all(
-          ids
-            .slice(i, i + 10)
-            .map(id =>
-              api.post(STATUS_API_PATH, { chanstat: String(id), val: 2 }),
-            ),
-        );
-      }
-
-      setCheckedIds([]);
-      setSelectAll(false);
-      await fetchNotifications(buildQueryParams(), shouldRestrictToKnownTypes, 1);
-      syncBadge();
-    } catch (e) {
-      Alert.alert(
-        'Error',
-        e?.response?.data?.message || 'Failed to mark all as read',
-      );
-    } finally {
-      setActionLoading(false);
-    }
-  };
 
   // Silently mark a single notification as read (local state update only).
   const markReadSilently = async id => {
@@ -775,7 +993,7 @@ const NotificationScreen = ({ setHideBottomNav }) => {
       setNotifications(prev =>
         prev.map(n => (n.id === id ? { ...n, stat: 2 } : n)),
       );
-      syncBadge(); // ✅ refresh counts + iOS badge
+      syncBadge(); // refresh counts + iOS badge
     } catch (e) {
       // fail silently — the item just stays marked unread, user can retry
     }
@@ -791,13 +1009,13 @@ const NotificationScreen = ({ setHideBottomNav }) => {
 
   const handleDeleteSelected = () => {
     if (!checkedIds.length) {
-      Alert.alert(
-        'Select notifications',
+      showAlert(
+        '⚠️ Select notifications',
         'Please select at least one notification first.',
       );
       return;
     }
-    Alert.alert(
+    showAlert(
       'Delete notifications',
       `Delete ${checkedIds.length} selected notification(s)? They will be moved to trash.`,
       [
@@ -819,9 +1037,9 @@ const NotificationScreen = ({ setHideBottomNav }) => {
                 buildQueryParams(),
                 shouldRestrictToKnownTypes,
               );
-              syncBadge(); // ✅ refresh counts + iOS badge
+              syncBadge(); // refresh counts + iOS badge
             } catch (e) {
-              Alert.alert(
+              showAlert(
                 'Error',
                 e?.response?.data?.message || 'Failed to delete',
               );
@@ -831,6 +1049,7 @@ const NotificationScreen = ({ setHideBottomNav }) => {
           },
         },
       ],
+      { cancelable: true },
     );
   };
 
@@ -846,9 +1065,24 @@ const NotificationScreen = ({ setHideBottomNav }) => {
     );
   };
 
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchNotifications(buildQueryParams(), shouldRestrictToKnownTypes, 1);
+    syncBadge();
+    setRefreshing(false);
+  };
+
+  // checkboxes are hidden until a card is long-pressed (selection mode)
+  const selectionMode = checkedIds.length > 0;
+
+  const clearSelection = () => {
+    setCheckedIds([]);
+    setSelectAll(false);
+  };
+
   const renderCheckbox = checked => (
     <View style={[styles.checkbox, checked && styles.checkboxChecked]}>
-      {checked && <Icon name="checkmark" size={14} color="#fff" />}
+      {checked && <MaterialIcon name="check" size={13} color="#fff" />}
     </View>
   );
 
@@ -859,20 +1093,31 @@ const NotificationScreen = ({ setHideBottomNav }) => {
     return (
       <TouchableOpacity
         activeOpacity={0.8}
-        style={[styles.card, unread && styles.cardHighlight]}
-        onPress={() => handleCardPress(item)}
+        style={[styles.card, !unread && styles.cardHighlight]}
+        onPress={() =>
+          selectionMode ? toggleItem(item.id) : handleCardPress(item)
+        }
+        onLongPress={() => {
+          if (!checked) toggleItem(item.id);
+        }}
+        delayLongPress={350}
       >
         <View style={styles.cardRow}>
-          <TouchableOpacity
-            onPress={() => toggleItem(item.id)}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            {renderCheckbox(checked)}
-          </TouchableOpacity>
-
-          <View style={styles.bellCircle}>
-            <Icon name="notifications" size={16} color={COLORS.text} />
-          </View>
+          {/* Circle only shows in selection mode */}
+          {selectionMode && (
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => toggleItem(item.id)}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              style={[
+                styles.leadCircle,
+                styles.leadCircleSelecting,
+                checked && styles.leadCircleChecked,
+              ]}
+            >
+              {checked && <MaterialIcon name="check" size={14} color="#fff" />}
+            </TouchableOpacity>
+          )}
 
           <View style={styles.cardTextWrap}>
             <Text
@@ -900,260 +1145,343 @@ const NotificationScreen = ({ setHideBottomNav }) => {
     );
   };
 
+  const listData = loading && !refreshing ? [] : notifications;
+
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.bg} />
+    <View style={styles.rootWrap}>
+      {/* Fixed background + overlay */}
+      <Image
+        source={require('../../asset/image/bg-img.png')}
+        style={styles.bgImageFixed}
+        resizeMode="cover"
+      />
+      <View style={styles.overlay} />
 
-      {/* Section Title Row */}
-      <View style={styles.topBarContainer}>
-        <View style={styles.topBar}>
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Icon name="notifications" size={18} color="#cfd8dc" />
-            <Text style={styles.sectionTitle}>Notification</Text>
-          </View>
+      <SafeAreaView style={styles.safeArea} edges={['left', 'right']}>
+        <StatusBar
+          translucent
+          backgroundColor="transparent"
+          barStyle="light-content"
+        />
 
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            {actionLoading && (
-              <ActivityIndicator
-                size="small"
-                color="#00e5ff"
-                style={{ marginRight: 10 }}
-              />
-            )}
-
-            <TouchableOpacity
-              style={styles.topBarIconBtn}
-              disabled={actionLoading}
-              onPress={handleDeleteSelected}
-            >
-              <Icon name="trash-outline" size={24} color="#cfd8dc" />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.topBarIconBtn}
-              disabled={actionLoading}
-              onPress={handleMarkRead}
-            >
-              <Icon name="mail-open" size={24} color="#cfd8dc" />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.topBarIconBtn}
-              disabled={actionLoading}
-              onPress={handleMarkUnread}
-            >
-              <Icon name="mail-unread-outline" size={24} color="#cfd8dc" />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.topBarIconBtn}
-              disabled={actionLoading}
-              onPress={handleMarkAllRead}
-            >
-              <MaterialIcon name="mark-email-read" size={24} color="#cfd8dc" />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.filterIconBtn}
-              onPress={openFilterModal}
-            >
-              <MaterialIcon name="filter-alt" size={22} color="#00e5ff" />
-              {isAdvancedFilterActive && (
-                <View style={styles.filterActiveDot} />
+        {/* TOP BAR: [back + icon + title] ............ [filter] (same as ChangeRM) */}
+        <View style={[styles.topBarContainer, { paddingTop: verticalScale(10) }]}>
+          <View style={styles.topBar}>
+            <View style={styles.leftHeader}>
+              {navigation?.goBack && (
+                <TouchableOpacity
+                  onPress={() => navigation.goBack()}
+                  style={styles.backBtn}
+                  activeOpacity={0.7}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Icon
+                    name="chevron-back"
+                    size={20}
+                    color="#fff"
+                    style={styles.backIcon}
+                  />
+                </TouchableOpacity>
               )}
-            </TouchableOpacity>
+              <Icon name="notifications-outline" size={20} color="#ffffff" />
+              <Text style={styles.screenTitle} numberOfLines={1}>
+                Notification
+              </Text>
+            </View>
+
+            <View style={styles.sectionActions}>
+              {actionLoading && (
+                <ActivityIndicator size="small" color={COLORS.accent} />
+              )}
+
+              <TouchableOpacity
+                style={styles.filterIconBtn}
+                onPress={openFilterModal}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <MaterialIcon name="filter-alt" size={20} color="#00e5ff" />
+                {isAdvancedFilterActive && (
+                  <View style={styles.filterActiveDot} />
+                )}
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
-      </View>
 
-      {/* Select All + Filter Dropdown */}
-      <View style={styles.controlsRow}>
-        <TouchableOpacity
-          style={styles.selectAllWrap}
-          onPress={toggleSelectAll}
-        >
-          {renderCheckbox(selectAll)}
-          <Text style={styles.selectAllText}>Select All</Text>
-        </TouchableOpacity>
-
-        <View>
-          <TouchableOpacity
-            style={styles.filterPill}
-            onPress={() => setDropdownOpen(prev => !prev)}
-          >
-            <Text style={styles.filterPillText}>
-              {isAdvancedFilterActive ? 'Filtered' : filter.label}
+        {/* ── Select All + Quick filter ── */}
+        <View style={styles.controlsRow}>
+          <TouchableOpacity style={styles.selectAllWrap} onPress={toggleSelectAll}>
+            {renderCheckbox(selectAll)}
+            <Text
+              style={[
+                styles.selectAllText,
+                checkedIds.length > 0 && styles.selectionCountText,
+              ]}
+            >
+              {checkedIds.length > 0
+                ? `${checkedIds.length} selected`
+                : 'Select All'}
             </Text>
-            <Icon
-              name={dropdownOpen ? 'chevron-up' : 'chevron-down'}
-              size={16}
-              color={COLORS.text}
-            />
           </TouchableOpacity>
 
-          {dropdownOpen && (
-            <View style={styles.dropdown}>
-              {FILTER_OPTIONS.map(option => {
-                const active =
-                  option.label === filter.label && !isAdvancedFilterActive;
-                const count = option.value
-                  ? unreadCounts?.[COUNT_KEY[option.value]] || 0
-                  : 0;
-                return (
-                  <TouchableOpacity
-                    key={option.label}
-                    style={[
-                      styles.dropdownItem,
-                      styles.dropdownItemRow,
-                      active && styles.dropdownItemActive,
-                    ]}
-                    onPress={() => selectFilter(option)}
-                  >
-                    <Text
-                      style={[
-                        styles.dropdownItemText,
-                        active && styles.dropdownItemTextActive,
-                      ]}
-                    >
-                      {option.label}
-                    </Text>
-                    {count > 0 && (
-                      <View style={styles.countBadge}>
-                        <Text style={styles.countBadgeText}>
-                          {count > 99 ? '99+' : count}
-                        </Text>
-                      </View>
-                    )}
-                  </TouchableOpacity>
-                );
-              })}
+          {selectionMode ? (
+            <View style={styles.actionsRow}>
+              <ActionBtn
+                icon="mail-open-outline"
+                label="Read"
+                color="#ffffff"
+                disabled={actionLoading}
+                onPress={handleMarkRead}
+              />
+              <ActionBtn
+                icon="mail-unread-outline"
+                label="Unread"
+                color="#4aa3df"
+                disabled={actionLoading}
+                onPress={handleMarkUnread}
+              />
+              <ActionBtn
+                icon="trash-outline"
+                label="Delete"
+                color="#ff6b6b"
+                disabled={actionLoading}
+                onPress={handleDeleteSelected}
+              />
+              <TouchableOpacity
+                style={styles.cancelSelBtn}
+                onPress={clearSelection}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Icon name="close" size={18} color="#cfd8dc" />
+              </TouchableOpacity>
             </View>
+          ) : (
+          <View>
+            <TouchableOpacity
+              style={styles.filterPill}
+              onPress={() => setDropdownOpen(prev => !prev)}
+            >
+              <Text style={styles.filterPillText}>
+                {isAdvancedFilterActive ? 'Filtered' : filter.label}
+              </Text>
+              <Icon
+                name={dropdownOpen ? 'chevron-up' : 'chevron-down'}
+                size={16}
+                color={COLORS.text}
+              />
+            </TouchableOpacity>
+
+            {dropdownOpen && (
+              <View style={styles.dropdown}>
+                {FILTER_OPTIONS.map(option => {
+                  const active =
+                    option.label === filter.label && !isAdvancedFilterActive;
+                  const count = option.value
+                    ? unreadCounts?.[COUNT_KEY[option.value]] || 0
+                    : 0;
+                  return (
+                    <TouchableOpacity
+                      key={option.label}
+                      style={[
+                        styles.dropdownItem,
+                        active && styles.dropdownItemActive,
+                      ]}
+                      onPress={() => selectFilter(option)}
+                    >
+                      <Text
+                        style={[
+                          styles.dropdownItemText,
+                          active && styles.dropdownItemTextActive,
+                        ]}
+                      >
+                        {option.label}
+                      </Text>
+                      {count > 0 && (
+                        <View style={styles.countBadge}>
+                          <Text style={styles.countBadgeText}>
+                            {count > 99 ? '99+' : count}
+                          </Text>
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
+          </View>
           )}
         </View>
-      </View>
 
-      {/* Tap outside to close dropdown */}
-      {dropdownOpen && (
-        <TouchableOpacity
-          style={styles.dropdownOverlay}
-          activeOpacity={1}
-          onPress={() => setDropdownOpen(false)}
-        />
-      )}
+        {/* Tap outside to close dropdown */}
+        {dropdownOpen && !selectionMode && (
+          <TouchableOpacity
+            style={styles.dropdownOverlay}
+            activeOpacity={1}
+            onPress={() => setDropdownOpen(false)}
+          />
+        )}
 
-      {/* Notification List */}
-      {loading ? (
-        <View style={styles.centerWrap}>
-          <ActivityIndicator size="large" color={COLORS.accent} />
-        </View>
-      ) : error ? (
-        <View style={styles.centerWrap}>
-          <Text style={styles.emptyText}>{error}</Text>
-        </View>
-      ) : notifications.length === 0 ? (
-        <View style={styles.centerWrap}>
-          <Text style={styles.emptyText}>No notifications found</Text>
-        </View>
-      ) : (
+        {/* ── Notification List ── */}
         <FlatList
-          data={notifications}
+          data={listData}
           keyExtractor={item => String(item.id)}
           renderItem={renderItem}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
-          refreshing={loading}
-          onRefresh={() => {
-            fetchNotifications(buildQueryParams(), shouldRestrictToKnownTypes, 1);
-            syncBadge();
-          }}
+          refreshing={refreshing}
+          onRefresh={onRefresh}
           onEndReached={loadMore}
           onEndReachedThreshold={0.4}
+          ListEmptyComponent={
+            loading ? (
+              <View style={styles.centerWrap}>
+                <ActivityIndicator size="large" color="#fff" />
+              </View>
+            ) : (
+              <View style={styles.centerWrap}>
+                <Icon
+                  name="notifications-outline"
+                  size={48}
+                  color="rgba(255,255,255,0.25)"
+                />
+                <Text style={[styles.emptyText, { marginTop: 12 }]}>
+                  {error || 'No notifications found'}
+                </Text>
+              </View>
+            )
+          }
           ListFooterComponent={
             loadingMore ? (
               <ActivityIndicator
                 size="small"
-                color={COLORS.accent}
+                color="#fff"
                 style={{ marginVertical: 16 }}
               />
-            ) : null
+            ) : (
+              <View style={{ height: 20 }} />
+            )
           }
         />
-      )}
 
-      <AdvancedFilterModal
-        visible={filterModalVisible}
-        onClose={closeFilterModal}
-        fromDate={modalFromDate}
-        toDate={modalToDate}
-        onFromDateChange={setModalFromDate}
-        onToDateChange={setModalToDate}
-        status={modalStatus}
-        onStatusChange={setModalStatus}
-        selectedUser={modalUser}
-        onSelectUser={setModalUser}
-        users={userList}
-        usersLoading={userListLoading}
-        onApply={applyAdvancedFilter}
-        onReset={resetAdvancedFilter}
-      />
-    </SafeAreaView>
+        <AdvancedFilterModal
+          visible={filterModalVisible}
+          onClose={closeFilterModal}
+          fromDate={modalFromDate}
+          toDate={modalToDate}
+          onFromDateChange={setModalFromDate}
+          onToDateChange={setModalToDate}
+          status={modalStatus}
+          onStatusChange={setModalStatus}
+          selectedUser={modalUser}
+          onSelectUser={setModalUser}
+          users={userList}
+          usersLoading={userListLoading}
+          onApply={applyAdvancedFilter}
+          onReset={resetAdvancedFilter}
+        />
+
+        {/* ── Custom Alert ── */}
+        <CustomAlertHost />
+      </SafeAreaView>
+    </View>
   );
 };
 
+export default NotificationScreen;
+
+// ─── STYLES (first page design) ──────────────────────────────────────────────
+
 const styles = StyleSheet.create({
-  safeArea: {
+  rootWrap: {
     flex: 1,
     backgroundColor: COLORS.bg,
   },
+  bgImageFixed: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: SCREEN_WIDTH,
+    height: Dimensions.get('screen').height,
+  },
+  overlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: SCREEN_WIDTH,
+    height: Dimensions.get('screen').height,
+    backgroundColor: 'rgba(18,32,48,0.72)',
+  },
+  safeArea: {
+    flex: 1,
+    backgroundColor: 'transparent',
+  },
+
+  /* ── Header pill (same as ChangeRM) ── */
   topBarContainer: {
-    paddingHorizontal: 15,
-    marginTop: 10,
+    paddingHorizontal: scale(10),
+    paddingBottom: verticalScale(10),
   },
   topBar: {
+    height: 42,
+    borderRadius: scale(22),
+    backgroundColor: 'rgba(255,255,255,0.15)',
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#ffffff15',
-    padding: 10,
-    borderRadius: 20,
-    marginBottom: 10,
+    paddingHorizontal: scale(14),
   },
-  sectionTitle: {
-    color: '#cfd8dc',
-    fontSize: 15,
-    fontWeight: '700',
-    marginLeft: 6,
-  },
-  filterIconBtn: {
-    borderWidth: 1,
-    borderColor: '#00e5ff',
-    borderRadius: 20,
-    paddingHorizontal: 8,
-    paddingVertical: 5,
+  leftHeader: {
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
+    marginRight: 10,
+  },
+  backBtn: {
+    paddingRight: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  backIcon: {
+    width: 20,
+    height: 20,
+    tintColor: '#ffffff',
+  },
+  screenTitle: {
+    color: '#ffffff',
+    fontSize: 17,
+    marginLeft: 6,
+    fontWeight: '700',
+    flexShrink: 1,
+  },
+  sectionActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  headerIconBtn: { padding: 2 },
+  filterIconBtn: {
+    paddingHorizontal: 4,
+    paddingVertical: 2,
     position: 'relative',
   },
   filterActiveDot: {
     position: 'absolute',
     top: -2,
     right: -2,
-    width: 8,
-    height: 8,
+    width: 7,
+    height: 7,
     borderRadius: 4,
-    backgroundColor: '#FF5C5C',
-    borderWidth: 1,
-    borderColor: COLORS.bg,
+    backgroundColor: '#ff4d4d',
   },
-  topBarIconBtn: {
-    marginRight: 10,
-  },
+
+  /* ── Select All + filter pill ── */
   controlsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    height: 46,
     paddingHorizontal: 16,
-    marginBottom: 10,
+    marginBottom: 6,
     zIndex: 30,
   },
   selectAllWrap: {
@@ -1164,6 +1492,34 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     marginLeft: 8,
     fontSize: 14,
+    minWidth: 84,
+  },
+  selectionCountText: {
+    fontWeight: '700',
+    color: '#7cc4f2',
+  },
+  actionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  actionBtn: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 5,
+    paddingHorizontal: 6,
+    minWidth: 50,
+    height: 38,
+    borderRadius: 10,
+  },
+  actionBtnText: { fontSize: 11, fontWeight: '600', marginTop: 1 },
+  cancelSelBtn: {
+    marginLeft: 8,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   filterPill: {
     flexDirection: 'row',
@@ -1183,8 +1539,10 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 36,
     right: 0,
-    minWidth: 160,
-    backgroundColor: COLORS.card,
+    minWidth: 170,
+    backgroundColor: COLORS.panel,
+    borderWidth: 1,
+    borderColor: COLORS.panelBorder,
     borderRadius: 10,
     paddingVertical: 6,
     zIndex: 20,
@@ -1195,19 +1553,17 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
   },
   dropdownItem: {
-    paddingVertical: 9,
-    paddingHorizontal: 14,
-  },
-  dropdownItemRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    paddingVertical: 9,
+    paddingHorizontal: 14,
   },
   dropdownItemActive: {
     backgroundColor: COLORS.accent,
   },
   dropdownItemText: {
-    color: COLORS.subText,
+    color: '#c3cbdb',
     fontSize: 13,
   },
   dropdownItemTextActive: {
@@ -1215,7 +1571,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   countBadge: {
-    backgroundColor: '#FF5C5C',
+    backgroundColor: COLORS.red,
     borderRadius: 9,
     minWidth: 18,
     height: 18,
@@ -1224,11 +1580,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  countBadgeText: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: '700',
-  },
+  countBadgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
   dropdownOverlay: {
     position: 'absolute',
     top: 0,
@@ -1237,10 +1589,12 @@ const styles = StyleSheet.create({
     bottom: 0,
     zIndex: 10,
   },
+
+  /* ── Checkbox ── */
   checkbox: {
-    width: 18,
-    height: 18,
-    borderRadius: 4,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
     borderWidth: 1.5,
     borderColor: COLORS.subText,
     alignItems: 'center',
@@ -1250,26 +1604,54 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.accentt,
     borderColor: COLORS.accentt,
   },
+  leadCircle: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: COLORS.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  leadCircleSelecting: {
+    backgroundColor: 'transparent',
+    borderWidth: 1.5,
+    borderColor: COLORS.subText,
+  },
+  leadCircleChecked: {
+    backgroundColor: COLORS.accentt,
+    borderColor: COLORS.accentt,
+  },
+
+  /* ── List / empty ── */
   listContent: {
-    paddingHorizontal: 16,
-    paddingBottom: 10,
+    paddingHorizontal: 14,
+    paddingBottom: 100,
+    flexGrow: 1,
   },
   centerWrap: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingTop: 80,
     paddingHorizontal: 20,
   },
   emptyText: {
-    color: COLORS.subText,
-    fontSize: 14,
+    color: 'rgba(255,255,255,0.40)',
+    fontSize: 15,
     textAlign: 'center',
   },
+
+  /* ── Cards ── */
   card: {
     backgroundColor: COLORS.card,
-    borderRadius: 12,
+    borderRadius: 4,
     padding: 12,
     marginBottom: 10,
+    borderLeftWidth: 4,
+    borderLeftColor: '#4aa3df',
+    minHeight: 66,
+    justifyContent: 'center',
   },
   cardRow: {
     flexDirection: 'row',
@@ -1285,20 +1667,9 @@ const styles = StyleSheet.create({
     borderTopColor: 'rgba(255,255,255,0.12)',
   },
   bodyText: {
-    color: COLORS.subText,
+    color: '#c3cbdb',
     fontSize: 13,
     lineHeight: 19,
-  },
-  bellCircle: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: COLORS.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: 10,
-    marginRight: 10,
-    position: 'relative',
   },
   cardTextWrap: {
     flex: 1,
@@ -1306,21 +1677,25 @@ const styles = StyleSheet.create({
   cardTitle: {
     color: COLORS.text,
     fontSize: 13,
+    lineHeight: 18,
     fontWeight: '600',
+    includeFontPadding: false,
   },
   cardTitleUnread: {
-    fontWeight: '800',
+    fontWeight: '700',
   },
   cardSubtitle: {
     color: COLORS.subText,
     fontSize: 12,
+    lineHeight: 16,
     marginTop: 2,
+    includeFontPadding: false,
   },
 
   /* ── Advanced filter modal (bottom sheet) ── */
   bottomSheetOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.65)',
+    backgroundColor: 'rgba(0,0,0,0.45)',
     justifyContent: 'flex-end',
     zIndex: 99999,
     elevation: 99999,
@@ -1328,11 +1703,11 @@ const styles = StyleSheet.create({
   bottomSheet: {
     width: '100%',
     maxHeight: SCREEN_HEIGHT * 0.85,
-    backgroundColor: '#1a1f6b',
-    borderTopLeftRadius: 22,
-    borderTopRightRadius: 22,
+    backgroundColor: '#21283a',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
     borderWidth: 1,
-    borderColor: '#3d45b0',
+    borderColor: COLORS.panelBorder,
     borderBottomWidth: 0,
     paddingHorizontal: 20,
     paddingTop: 14,
@@ -1355,9 +1730,9 @@ const styles = StyleSheet.create({
     flexGrow: 0,
   },
   dragHandle: {
-    width: 40,
+    width: 38,
     height: 4,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: '#b0bec5',
     borderRadius: 2,
     alignSelf: 'center',
     marginBottom: 14,
@@ -1365,11 +1740,11 @@ const styles = StyleSheet.create({
   modalDivider: {
     width: '100%',
     height: 1,
-    backgroundColor: '#3d45b033',
+    backgroundColor: 'rgba(255,255,255,0.08)',
     marginVertical: 10,
   },
   modalTitle: {
-    color: '#00e5ff',
+    color: '#e6ebf2',
     fontSize: 15,
     marginLeft: 8,
     fontWeight: 'bold',
@@ -1387,19 +1762,19 @@ const styles = StyleSheet.create({
   },
   resetBtnText: { color: '#ff6b6b', fontSize: 13, fontWeight: '500' },
   cancelBtn: {
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: COLORS.panel,
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#ffffff20',
+    borderColor: COLORS.panelBorder,
   },
-  cancelBtnText: { color: '#fff', fontWeight: '500', fontSize: 13 },
+  cancelBtnText: { color: '#c3cbdb', fontWeight: '500', fontSize: 13 },
   applyBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    backgroundColor: '#00acc1',
+    backgroundColor: '#1e9ce8',
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
@@ -1408,40 +1783,70 @@ const styles = StyleSheet.create({
   },
   applyBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
 
+  /* ── iOS date picker panel ── */
+  iosPickerPanel: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#21283a',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 30,
+    justifyContent: 'center',
+  },
+  iosPickerTitle: {
+    color: '#e6ebf2',
+    fontSize: 15,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 6,
+  },
+  iosPicker: {
+    height: 180,
+    width: '100%',
+  },
+  iosPickerBtnRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 10,
+    marginTop: 10,
+  },
+
+  /* ── Filter fields ── */
   field: { marginBottom: 12, width: '100%' },
   filterLabel: {
-    color: '#a0b4e8',
+    color: '#9aa8bd',
     fontSize: 12,
     marginBottom: 5,
-    fontWeight: '500',
+    fontWeight: '600',
   },
   filterInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#ffffff12',
+    backgroundColor: COLORS.panel,
     borderWidth: 1,
-    borderColor: '#3d55cc',
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    height: 40,
+    borderColor: COLORS.panelBorder,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    height: 42,
   },
-  filterInput: { flex: 1, color: '#fff', fontSize: 13, paddingVertical: 0 },
+  filterInput: { flex: 1, color: '#e6ebf2', fontSize: 13, paddingVertical: 0 },
 
-  userPlaceholderText: { color: '#7a8fc4', fontSize: 13, flex: 1 },
-  userValueText: { color: '#fff', fontSize: 13, flex: 1, marginRight: 8 },
+  userPlaceholderText: { color: '#8a9daf', fontSize: 13, flex: 1 },
+  userValueText: { color: '#e6ebf2', fontSize: 13, flex: 1, marginRight: 8 },
   userDropdownBox: {
     marginTop: 6,
-    backgroundColor: '#151a54',
+    backgroundColor: COLORS.panel,
     borderWidth: 1,
-    borderColor: '#3d55cc',
-    borderRadius: 8,
+    borderColor: COLORS.panelBorder,
+    borderRadius: 12,
     padding: 8,
   },
   userSearchRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#ffffff12',
+    backgroundColor: '#28304a',
     borderRadius: 8,
     paddingHorizontal: 8,
     height: 34,
@@ -1449,7 +1854,7 @@ const styles = StyleSheet.create({
   },
   userSearchInput: {
     flex: 1,
-    color: '#fff',
+    color: '#e6ebf2',
     fontSize: 13,
     marginLeft: 6,
     paddingVertical: 0,
@@ -1461,18 +1866,17 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 6,
     borderBottomWidth: 1,
-    borderBottomColor: '#ffffff10',
+    borderBottomColor: '#323a52',
   },
-  userListItemName: { color: '#fff', fontSize: 13, fontWeight: '600' },
-  userListItemUsername: { color: '#7a8fc4', fontSize: 11, marginTop: 1 },
+  userListItemName: { color: '#c3cbdb', fontSize: 13, fontWeight: '600' },
+  userListItemSub: { color: '#6b7690', fontSize: 11, marginTop: 1 },
   userEmptyText: {
-    color: '#7a8fc4',
+    color: '#6b7690',
     fontSize: 12,
     textAlign: 'center',
     paddingVertical: 12,
   },
 
-  /* ── Status dropdown items ── */
   statusDropdownItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1482,17 +1886,84 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   statusDropdownItemActive: {
-    backgroundColor: '#ffffff12',
+    backgroundColor: 'rgba(74,163,223,0.15)',
   },
   statusDropdownItemText: {
-    color: '#a0b4e8',
+    color: '#c3cbdb',
     fontSize: 13,
     fontWeight: '500',
   },
   statusDropdownItemTextActive: {
-    color: '#fff',
+    color: '#7cc4f2',
     fontWeight: '700',
   },
-});
 
-export default NotificationScreen;
+  /* ── Custom Alert ── */
+  alertOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+  },
+  alertBox: {
+    width: '100%',
+    maxWidth: 340,
+    backgroundColor: COLORS.modalBg,
+    borderRadius: 22,
+    paddingHorizontal: 20,
+    paddingTop: 28,
+    paddingBottom: 20,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#39415a',
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.45,
+    shadowRadius: 20,
+    elevation: 14,
+  },
+  alertTopBar: { position: 'absolute', top: 0, left: 0, right: 0, height: 3 },
+  alertIconWrap: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  alertTitle: {
+    color: COLORS.white,
+    fontSize: 16,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginTop: 14,
+  },
+  alertMsgScroll: {
+    alignSelf: 'stretch',
+    maxHeight: SCREEN_HEIGHT * 0.32,
+    marginTop: 8,
+  },
+  alertMessage: {
+    color: COLORS.mutedText,
+    fontSize: 13,
+    lineHeight: 19,
+    textAlign: 'center',
+  },
+  alertBtnRow: {
+    alignSelf: 'stretch',
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 20,
+  },
+  alertBtn: {
+    paddingVertical: 11,
+    paddingHorizontal: 14,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 42,
+  },
+  alertBtnText: { fontSize: 13, fontWeight: '700' },
+});

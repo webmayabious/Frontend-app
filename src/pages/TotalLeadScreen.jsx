@@ -1264,7 +1264,7 @@ useFocusEffect(
   return (
     <View style={styles.container}>
       <Image
-        source={require('../asset/image/logo/bg-img.png')}
+        source={require('../asset/image/bg-img.png')}
         style={styles.bgImageFixed}
         resizeMode="cover"
       />
@@ -1571,7 +1571,7 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 10,
     borderLeftWidth: 4,
-    borderLeftColor: '#1e9ce8',
+    borderLeftColor: '#f472b6',
   },
   cardHeader: {
     flexDirection: 'row',

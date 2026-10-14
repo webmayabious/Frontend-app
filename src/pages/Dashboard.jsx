@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import {
   View,
   Text,
+  Image,
   StyleSheet,
   ScrollView,
   RefreshControl,
@@ -23,15 +24,14 @@ const { width } = Dimensions.get('window');
    Card data config
 ───────────────────────────────────────── */
 const CARDS = (d, nav) => [
-{
-  icon: 'phone-callback',
-  label: 'Remaining Followups / Total Followups',
-  period: 'Today',
-  accent: '#4ade80',
-  value: ` ${d?.today_remaining_callbacks ?? 0}  / ${d?.todays_callbacks ?? 0} `,
-  route: 'FollowUpsScreen',
-},
-
+  {
+    icon: 'phone-callback',
+    label: 'Remaining Followups / Total Followups',
+    period: 'Today',
+    accent: '#4ade80',
+    value: ` ${d?.today_remaining_callbacks ?? 0}  / ${d?.todays_callbacks ?? 0} `,
+    route: 'FollowUpsScreen',
+  },
   {
     icon: 'upload',
     label: 'Uploaded Leads',
@@ -49,13 +49,13 @@ const CARDS = (d, nav) => [
     route: 'LeadsassignedScreen',
   },
   {
-  icon: 'place',
-  label: 'Site Visit',
-  period: 'Monthly / Till Date',
-  accent: '#f472b6',
-  value: `${d?.monthly_site_visits ?? 0}  /  ${d?.site_visits_till_date ?? 0} `,
-  route: 'SiteVisitsScreen',
-},
+    icon: 'place',
+    label: 'Site Visit',
+    period: 'Monthly / Till Date',
+    accent: '#f472b6',
+    value: `${d?.monthly_site_visits ?? 0}  /  ${d?.site_visits_till_date ?? 0} `,
+    route: 'SiteVisitsScreen',
+  },
   {
     icon: 'people',
     label: 'Active Leads / Total Leads',
@@ -132,7 +132,7 @@ const Card = ({ icon, label, period, accent, value, onPress }) => (
 );
 
 /* ─────────────────────────────────────────
-   Main Screen 
+   Main Screen
 ───────────────────────────────────────── */
 const Dashboard = () => {
   const navigation = useNavigation();
@@ -153,17 +153,25 @@ const Dashboard = () => {
     setRefreshing(false);
   };
 
-const paddingTop = Platform.OS === 'ios' ? 14 : 14;
+  const paddingTop = Platform.OS === 'ios' ? 14 : 14;
   const bottomNavHeight = 60 + insets.bottom;
 
   return (
     <View style={styles.root}>
+      {/* Same background as Meeting screen */}
+      <Image
+        source={require('../asset/image/bg-img.png')}
+        style={styles.bgImageFixed}
+        resizeMode="cover"
+      />
+      <View style={styles.overlay} />
+
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
       <ScrollView
-      contentInsetAdjustmentBehavior="never"
-  automaticallyAdjustContentInsets={false}
-  showsVerticalScrollIndicator={false}
+        contentInsetAdjustmentBehavior="never"
+        automaticallyAdjustContentInsets={false}
+        showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           styles.scroll,
           {
@@ -204,8 +212,6 @@ const paddingTop = Platform.OS === 'ios' ? 14 : 14;
             <Text style={styles.summaryVal}>{dashboardCards?.total_missed_callback ?? '—'}</Text>
             <Text style={styles.summaryLbl}>Missed</Text>
           </View>
-          
-         
         </View>
 
         {/* Cards */}
@@ -216,7 +222,7 @@ const paddingTop = Platform.OS === 'ios' ? 14 : 14;
             onPress={() => navigation.navigate(card.route)}
           />
         ))}
-        <View style={{paddingBottom:10}}/>
+        <View style={{ paddingBottom: 10 }} />
       </ScrollView>
 
       {/* ✅ BottomNav fixed at bottom — no glitch */}
@@ -235,7 +241,24 @@ export default Dashboard;
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#080d5a',
+    backgroundColor: '#1a2d3e',
+  },
+
+  bgImageFixed: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: width,
+    height: Dimensions.get('screen').height,
+  },
+
+  overlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: width,
+    height: Dimensions.get('screen').height,
+    backgroundColor: 'rgba(18,32,48,0.72)',
   },
 
   scroll: {
@@ -263,7 +286,7 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#4ade80',
+    backgroundColor: '#07a6f6',
     marginRight: 8,
   },
   sectionTitle: {

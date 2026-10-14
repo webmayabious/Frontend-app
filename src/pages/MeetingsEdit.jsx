@@ -10,19 +10,43 @@ import {
   Platform,
   Image,
   KeyboardAvoidingView,
+  Dimensions,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import Icon1 from 'react-native-vector-icons/Ionicons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Dropdown } from 'react-native-element-dropdown';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '../api/AxiosInstance';
 import { useNavigation } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
+
+const SCREEN_WIDTH = Dimensions.get('window').width;
+const screenHeight = Dimensions.get('window').height;
+const scale = size => (SCREEN_WIDTH / 375) * size;
+const verticalScale = size => (screenHeight / 812) * size;
+
+// ─── COLORS (Leads List / ChangeRM theme) ────────────────────────────────────
+
+const COLORS = {
+  accent: '#00cfff',
+  white: '#FFFFFF',
+  mutedText: '#8A90B4',
+  gold: '#f4c542',
+  red: '#FF6B6B',
+  cardBg: '#ffffff0e',
+  modalBg: '#21283a',
+  fieldBg: '#2b3348',
+  fieldBorder: '#39415a',
+  sectionBg: 'rgba(255,255,255,0.13)',
+};
+
 const LeadStatus = [
   { label: 'Active', value: '1' },
   { label: 'Inactive', value: '2' },
   { label: 'Booking Done', value: '5' },
 ];
+
 const DropdownField = ({ label, data, placeholder, value, onChange }) => {
   const [isFocus, setIsFocus] = React.useState(false);
   return (
@@ -31,13 +55,13 @@ const DropdownField = ({ label, data, placeholder, value, onChange }) => {
       <Dropdown
         style={[
           styles.dropdown,
-          isFocus && { borderColor: '#00e5ff', borderWidth: 1.5 },
+          isFocus && { borderColor: '#4aa3df' },
         ]}
         containerStyle={styles.dropdownContainer}
         placeholderStyle={styles.placeholderStyle}
         selectedTextStyle={styles.selectedTextStyle}
-        itemTextStyle={{ color: '#0b0b0b', fontWeight: '500' }}
-        activeColor="#e6f7ff"
+        itemTextStyle={styles.itemTextStyle}
+        activeColor="rgba(74,163,223,0.15)"
         data={data}
         labelField="label"
         valueField="value"
@@ -54,7 +78,7 @@ const DropdownField = ({ label, data, placeholder, value, onChange }) => {
           <Icon
             name={isFocus ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
             size={20}
-            color="#00e5ff"
+            color={COLORS.accent}
           />
         )}
       />
@@ -92,12 +116,33 @@ const DobGenderRow = ({ form, onChange }) => {
 
   return (
     <View style={styles.row}>
-      {/* <View style={{ flex: 1, marginRight: 10 }}>
-        <Text style={styles.label}>Date of Birth *</Text>
-        <TouchableOpacity style={styles.inputWithIcon} onPress={() => setShow(true)}>
-          <Text style={{ color: '#fff' }}>{displayDate}</Text>
-          <Icon name="calendar-today" size={18} color="#00e5ff" />
+      <View style={{ flex: 1, marginRight: 10 }}>
+        <Text style={styles.label}>Date of Birth</Text>
+
+        <TouchableOpacity
+          style={styles.inputWithIcon}
+          onPress={() => setShow(true)}
+        >
+          <Text style={{ color: date ? '#e6ebf2' : COLORS.mutedText, fontSize: 13 }}>
+            {displayDate}
+          </Text>
+
+          {date ? (
+            <TouchableOpacity
+              onPress={e => {
+                e.stopPropagation(); // Prevent opening the date picker
+                setDate(null);
+                onChange('date_of_birth', null);
+              }}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Icon name="close" size={20} color="#ff5252" />
+            </TouchableOpacity>
+          ) : (
+            <Icon name="calendar-today" size={18} color={COLORS.accent} />
+          )}
         </TouchableOpacity>
+
         {show && (
           <DateTimePicker
             value={date || new Date()}
@@ -107,44 +152,8 @@ const DobGenderRow = ({ form, onChange }) => {
             maximumDate={new Date()}
           />
         )}
-      </View> */}
-<View style={{ flex: 1, marginRight: 10 }}>
-  <Text style={styles.label}>Date of Birth</Text>
+      </View>
 
- <TouchableOpacity
-  style={styles.inputWithIcon}
-  onPress={() => setShow(true)}
->
-  <Text style={{ color: date ? '#fff' : '#aaa' }}>
-    {displayDate}
-  </Text>
-
-  {date ? (
-    <TouchableOpacity
-      onPress={(e) => {
-        e.stopPropagation(); // Prevent opening the date picker
-        setDate(null);
-        onChange('date_of_birth', null);
-      }}
-      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-    >
-      <Icon name="close" size={20} color="#ff5252" />
-    </TouchableOpacity>
-  ) : (
-    <Icon name="calendar-today" size={18} color="#00e5ff" />
-  )}
-</TouchableOpacity>
-
-  {show && (
-    <DateTimePicker
-      value={date || new Date()}
-      mode="date"
-      display="default"
-      onChange={handleDateChange}
-      maximumDate={new Date()}
-    />
-  )}
-</View>
       <View style={{ flex: 1 }}>
         <Text style={styles.label}>Gender *</Text>
         <View style={styles.genderRow}>
@@ -167,7 +176,7 @@ const InputField = ({ label, placeholder, value, onChangeText }) => (
     <Text style={styles.label}>{label}</Text>
     <TextInput
       placeholder={placeholder}
-      placeholderTextColor="#aaa"
+      placeholderTextColor={COLORS.mutedText}
       style={styles.input}
       value={value}
       onChangeText={onChangeText}
@@ -175,9 +184,13 @@ const InputField = ({ label, placeholder, value, onChangeText }) => (
   </View>
 );
 
-const Section = ({ title, children }) => (
+const Section = ({ title, icon, children }) => (
   <View style={styles.section}>
-    <Text style={styles.sectionTitle}>{title}</Text>
+    <View style={styles.sectionTitleRow}>
+      <Icon name={icon || 'info'} size={14} color={COLORS.accent} />
+      <Text style={styles.sectionTitle}>{title}</Text>
+    </View>
+    <View style={styles.sectionDivider} />
     {children}
   </View>
 );
@@ -329,6 +342,7 @@ export default function MeetingsEdit({ route }) {
               'Uploadleads',
               'Leads Assigned',
               'AssignRm',
+              
             ].includes(query.queryKey[0]),
         });
         navigation.goBack();
@@ -344,30 +358,43 @@ export default function MeetingsEdit({ route }) {
 
   return (
     <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: '#1e2140' }}
+      style={{ flex: 1, backgroundColor: '#1a2d3e' }}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 120 : 0}
     >
       <View style={styles.container}>
-        <StatusBar barStyle="light-content" backgroundColor="#2B2E81" />
+        {/* Same background as Leads List / ChangeRM / Meeting / Dashboard screens */}
+        <Image
+          source={require('../asset/image/bg-img.png')}
+          style={styles.bgImageFixed}
+          resizeMode="cover"
+        />
+        <View style={styles.overlay} />
 
-        {/* Top Bar */}
-        <View style={styles.topBarContainer}>
+        <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
+
+        {/* TOP BAR: [back + icon + title] (same as ChangeRM) */}
+        <View style={[styles.topBarContainer, { paddingTop: verticalScale(10) }]}>
           <View style={styles.topBar}>
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Icon name="event-note" size={18} color="#cfd8dc" />
-              <Text style={styles.screenTitle}>Follow-ups / Meetings Edit</Text>
+            <View style={styles.leftHeader}>
+              <TouchableOpacity
+                onPress={() => navigation.goBack()}
+                style={styles.backBtn}
+                activeOpacity={0.7}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Icon1
+                  name="chevron-back"
+                  size={20}
+                  color="#fff"
+                  style={styles.backIcon}
+                />
+              </TouchableOpacity>
+              <Icon name="event-note" size={20} color="#ffffff" />
+              <Text style={styles.screenTitle} numberOfLines={1}>
+                Follow-ups / Meetings Edit
+              </Text>
             </View>
-            <TouchableOpacity
-              style={styles.backBtn}
-              onPress={() => navigation.goBack()}
-            >
-              <Image
-                source={require('../asset/image/icon/Arrow.png')}
-                style={{ width: 11, height: 11, marginRight: 4 }}
-              />
-              <Text style={styles.backText}>Back</Text>
-            </TouchableOpacity>
           </View>
         </View>
 
@@ -377,7 +404,7 @@ export default function MeetingsEdit({ route }) {
           contentContainerStyle={{ paddingBottom: 120 }}
         >
           {/* Personal Details */}
-          <Section title="Personal Details">
+          <Section title="Personal Details" icon="person">
             <DropdownField
               label="Reference *"
               data={References || []}
@@ -463,7 +490,7 @@ export default function MeetingsEdit({ route }) {
           </Section>
 
           {/* Lead Profile */}
-          <Section title="Lead Profile">
+          <Section title="Lead Profile" icon="leaderboard">
             <DropdownField
               label="Lead Status"
               data={LeadStatus}
@@ -523,10 +550,12 @@ export default function MeetingsEdit({ route }) {
           </Section>
 
           <TouchableOpacity
-            style={styles.button}
+            style={[styles.button, saving && styles.buttonDisabled]}
             onPress={onSave}
             disabled={saving}
+            activeOpacity={0.8}
           >
+            <Icon name={saving ? 'hourglass-top' : 'check-circle'} size={16} color="#fff" />
             <Text style={styles.buttonText}>
               {saving ? 'Updating...' : 'Update'}
             </Text>
@@ -537,77 +566,150 @@ export default function MeetingsEdit({ route }) {
   );
 }
 
+// ─── STYLES (Leads List / ChangeRM theme) ────────────────────────────────────
+
 const styles = StyleSheet.create({
-  container: { flex: 1 },
+  container: { flex: 1, backgroundColor: '#1a2d3e' },
+  bgImageFixed: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: SCREEN_WIDTH,
+    height: Dimensions.get('screen').height,
+  },
+  overlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: SCREEN_WIDTH,
+    height: Dimensions.get('screen').height,
+    backgroundColor: 'rgba(18,32,48,0.72)',
+  },
 
-  topBarContainer: { paddingHorizontal: 12, marginTop: 10 },
+  /* ── Header pill (same as ChangeRM) ── */
+  topBarContainer: {
+    paddingHorizontal: scale(10),
+    paddingBottom: verticalScale(10),
+  },
   topBar: {
+    height: 42,
+    borderRadius: scale(22),
+    backgroundColor: 'rgba(255,255,255,0.15)',
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#3b3f6b',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 20,
-    marginBottom: 10,
+    paddingHorizontal: scale(14),
   },
-  screenTitle: { color: '#cfd8dc', fontSize: 13, marginLeft: 6, fontWeight: '500' },
-  backBtn: {
+  leftHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#888',
-    borderRadius: 20,
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-    marginLeft: 10,
+    flex: 1,
+    marginRight: 10,
   },
-  backText: { color: '#fff', fontSize: 12 },
+  backBtn: {
+    paddingRight: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  backIcon: {
+    width: 20,
+    height: 20,
+    tintColor: '#ffffff',
+  },
+  screenTitle: {
+    color: '#ffffff',
+    fontSize: 17,
+    marginLeft: 6,
+    fontWeight: '700',
+    flexShrink: 1,
+  },
 
+  // ── Section card ──
   section: {
-    backgroundColor: '#3b3f6b',
-    margin: 12,
-    padding: 12,
-    borderRadius: 12,
+    backgroundColor: COLORS.cardBg,
+    marginHorizontal: 12,
+    marginBottom: 12,
     marginTop: 0,
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 0.5,
+    borderColor: 'rgba(255,255,255,0.2)',
   },
-  sectionTitle: { color: '#ffb84d', fontWeight: '600', marginBottom: 10 },
+  sectionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8,
+  },
+  sectionTitle: { color: COLORS.gold, fontWeight: '700', fontSize: 13 },
+  sectionDivider: {
+    height: 0.5,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    marginBottom: 12,
+  },
 
+  // ── Fields ──
   inputWrapper: { marginBottom: 10 },
-  label: { color: '#ccc', fontSize: 12, marginBottom: 3 },
+  label: {
+    color: '#8a9daf',
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+    marginBottom: 6,
+  },
 
   input: {
-    backgroundColor: '#5a5e85',
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    height: 38,
-    color: '#fff',
+    backgroundColor: COLORS.fieldBg,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    height: 44,
+    color: '#e6ebf2',
+    fontSize: 13,
+    borderWidth: 1,
+    borderColor: COLORS.fieldBorder,
   },
 
   inputWithIcon: {
-    backgroundColor: '#5a5e85',
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    height: 38,
+    backgroundColor: COLORS.fieldBg,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    height: 44,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: COLORS.fieldBorder,
   },
 
+  // ── Dropdown (react-native-element-dropdown) ──
   dropdown: {
-    backgroundColor: '#5a5e85',
-    borderRadius: 10,
+    backgroundColor: COLORS.fieldBg,
+    borderRadius: 12,
     paddingHorizontal: 12,
-    height: 42,
+    height: 44,
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'transparent',
+    borderColor: COLORS.fieldBorder,
   },
-  dropdownContainer: { backgroundColor: '#FFFF', borderRadius: 10, elevation: 8 },
-  placeholderStyle: { color: '#bbb', fontSize: 13 },
-  selectedTextStyle: { color: '#fff', fontSize: 14, fontWeight: '500' },
-  itemContainer: { paddingVertical: 0 },
+  dropdownContainer: {
+    backgroundColor: COLORS.modalBg,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COLORS.fieldBorder,
+    elevation: 8,
+    overflow: 'hidden',
+  },
+  placeholderStyle: { color: COLORS.mutedText, fontSize: 13 },
+  selectedTextStyle: { color: '#e6ebf2', fontSize: 13, fontWeight: '600' },
+  itemTextStyle: { color: '#c3cbdb', fontSize: 13, fontWeight: '500' },
+  itemContainer: {
+    paddingVertical: 0,
+    borderBottomWidth: 1,
+    borderBottomColor: '#323a52',
+  },
 
+  // ── DOB / gender ──
   row: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
   genderRow: { flexDirection: 'row', alignItems: 'center', marginTop: 5 },
   radioContainer: { flexDirection: 'row', alignItems: 'center', marginRight: 15 },
@@ -616,20 +718,26 @@ const styles = StyleSheet.create({
     height: 16,
     borderRadius: 8,
     borderWidth: 2,
-    borderColor: '#00e5ff',
+    borderColor: COLORS.accent,
     marginRight: 6,
   },
-  radioActive: { backgroundColor: '#00e5ff' },
-  radioText: { color: '#fff', fontSize: 13 },
+  radioActive: { backgroundColor: COLORS.accent },
+  radioText: { color: '#e6ebf2', fontSize: 13 },
 
+  // ── Submit ──
   button: {
-    backgroundColor: '#2bb3c0',
-    margin: 15,
-    paddingVertical: 12,
-    borderRadius: 20,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#1e9ce8',
+    marginHorizontal: 12,
+    marginTop: 4,
+    paddingVertical: 13,
+    borderRadius: 24,
   },
-  buttonText: { color: '#fff', fontWeight: '600' },
+  buttonDisabled: { opacity: 0.6 },
+  buttonText: { color: '#fff', fontWeight: '700', fontSize: 14 },
 
-  error: { color: '#ff6b6b', fontSize: 11, marginBottom: 6 },
+  error: { color: '#ff6b6b', fontSize: 11, marginBottom: 6, marginTop: -4 },
 });

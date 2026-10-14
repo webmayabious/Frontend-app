@@ -9,6 +9,7 @@ import {
   Modal,
   Alert,
   Text,
+  Dimensions,
 } from "react-native";
 import { useSelector, useDispatch } from "react-redux";
 import Entypo from 'react-native-vector-icons/Entypo';
@@ -18,6 +19,9 @@ import messaging from '@react-native-firebase/messaging';
 import notifee from '@notifee/react-native';
 import api from '../api/AxiosInstance';
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const SCREEN_FULL_HEIGHT = Dimensions.get('screen').height;
 
 const Header = ({ routeName }) => {
   const insets = useSafeAreaInsets();
@@ -73,6 +77,14 @@ const Header = ({ routeName }) => {
 
   return (
     <View style={[styles.header, { paddingTop: statusBarHeight + 10 }]}>
+      {/* Same background as Meeting / Dashboard screens */}
+      <Image
+        source={require('../asset/image/bg-img.png')}
+        style={styles.bgImageFixed}
+        resizeMode="cover"
+      />
+      <View style={styles.overlay} />
+
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
       {/* Left Section */}
@@ -156,13 +168,23 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 15,
     paddingBottom: 20,
-    backgroundColor: "#2B2E81",
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
-    elevation: 8,
-    shadowColor: "#000",
-    shadowOpacity: 0.2,
-    shadowRadius: 5,
+    backgroundColor: "#1a2d3e",
+    overflow: "hidden",
+  },
+  bgImageFixed: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: SCREEN_WIDTH,
+    height: SCREEN_FULL_HEIGHT,
+  },
+  overlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: SCREEN_WIDTH,
+    height: SCREEN_FULL_HEIGHT,
+    backgroundColor: 'rgba(18,32,48,0.72)',
   },
   leftSection: {
     flexDirection: "row",
