@@ -1,3 +1,4 @@
+// TotalBookingsAgreementsTillDateScreen.js
 import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
@@ -22,12 +23,13 @@ import {
   Easing,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import Icon1 from 'react-native-vector-icons/Ionicons';
 import { useNavigation } from '@react-navigation/native';
 import { useQuery } from '@tanstack/react-query';
 import api from '../api/AxiosInstance';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import Icon1 from 'react-native-vector-icons/Ionicons';
+
 const COLORS = {
   white: '#FFFFFF',
   mutedText: '#8A90B4',
@@ -35,6 +37,14 @@ const COLORS = {
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window');
 const scale = size => (SCREEN_WIDTH / 375) * size;
 const verticalScale = size => (SCREEN_HEIGHT / 812) * size;
+
+/* ================= DATE FORMAT (local timezone, no UTC shift) ================= */
+const formatDate = date => {
+  const d = new Date(date);
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  return `${d.getFullYear()}-${month}-${day}`;
+};
 
 /* ================= CALL ================= */
 const makeCall = phoneNumber => {
@@ -405,70 +415,70 @@ const FilterBottomSheet = ({
   const [iosPickerTarget, setIosPickerTarget] = useState(null);
   const [iosTempDate, setIosTempDate] = useState(new Date());
 
-const animateOpen = () => {
-  // Reset animation values before opening
-  translateY.stopAnimation();
-  backdropAnim.stopAnimation();
+  const animateOpen = () => {
+    // Reset animation values before opening
+    translateY.stopAnimation();
+    backdropAnim.stopAnimation();
 
-  translateY.setValue(SCREEN_HEIGHT);
-  backdropAnim.setValue(0);
+    translateY.setValue(SCREEN_HEIGHT);
+    backdropAnim.setValue(0);
 
-  Animated.parallel([
-    Animated.spring(translateY, {
-      toValue: 0,
-      damping: 32,
-      stiffness: 180,
-      mass: 1,
-      overshootClamping: true,
-      useNativeDriver: true,
-    }),
+    Animated.parallel([
+      Animated.spring(translateY, {
+        toValue: 0,
+        damping: 32,
+        stiffness: 180,
+        mass: 1,
+        overshootClamping: true,
+        useNativeDriver: true,
+      }),
 
-    Animated.timing(backdropAnim, {
-      toValue: 1,
-      duration: 280,
-      useNativeDriver: true,
-    }),
-  ]).start();
-};
+      Animated.timing(backdropAnim, {
+        toValue: 1,
+        duration: 280,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
 
-const animateClose = (vy = 0) => {
-  if (isClosing.current) return;
+  const animateClose = (vy = 0) => {
+    if (isClosing.current) return;
 
-  isClosing.current = true;
+    isClosing.current = true;
 
-  Keyboard.dismiss();
+    Keyboard.dismiss();
 
-  translateY.stopAnimation();
-  backdropAnim.stopAnimation();
+    translateY.stopAnimation();
+    backdropAnim.stopAnimation();
 
-  const duration = vy > 1.2 ? 180 : 250;
+    const duration = vy > 1.2 ? 180 : 250;
 
-  Animated.parallel([
-    Animated.timing(translateY, {
-      toValue: SCREEN_HEIGHT,
-      duration,
-      easing: Easing.inOut(Easing.cubic),
-      useNativeDriver: true,
-    }),
+    Animated.parallel([
+      Animated.timing(translateY, {
+        toValue: SCREEN_HEIGHT,
+        duration,
+        easing: Easing.inOut(Easing.cubic),
+        useNativeDriver: true,
+      }),
 
-    Animated.timing(backdropAnim, {
-      toValue: 0,
-      duration: 220,
-      easing: Easing.out(Easing.quad),
-      useNativeDriver: true,
-    }),
-  ]).start(({ finished }) => {
-    isClosing.current = false;
+      Animated.timing(backdropAnim, {
+        toValue: 0,
+        duration: 220,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }),
+    ]).start(({ finished }) => {
+      isClosing.current = false;
 
-    if (finished) {
-      setModalMounted(false);
-      setShowFromPicker(false);
-      setShowToPicker(false);
-      setIosPickerTarget(null);
-      onClose();
-    }
-  });
-};
+      if (finished) {
+        setModalMounted(false);
+        setShowFromPicker(false);
+        setShowToPicker(false);
+        setIosPickerTarget(null);
+        onClose();
+      }
+    });
+  };
 
   const snapBack = () => {
     Animated.spring(translateY, {
@@ -543,14 +553,14 @@ const animateClose = (vy = 0) => {
     }
   }, [visible]);
 
-  /* ---- date handling (same logic as before) ---- */
+  /* ---- date handling ---- */
   const onDateChange = (event, selectedDate, key) => {
     if (key === 'fromDate') setShowFromPicker(false);
     else setShowToPicker(false);
 
     if (event.type === 'dismissed' || !selectedDate) return;
 
-    onChange(key, selectedDate.toISOString().split('T')[0]);
+    onChange(key, formatDate(selectedDate));
   };
 
   const openDatePicker = key => {
@@ -565,7 +575,7 @@ const animateClose = (vy = 0) => {
   };
 
   const handleIosDone = () => {
-    onChange(iosPickerTarget, iosTempDate.toISOString().split('T')[0]);
+    onChange(iosPickerTarget, formatDate(iosTempDate));
     setIosPickerTarget(null);
   };
   const handleIosCancel = () => setIosPickerTarget(null);
@@ -726,7 +736,7 @@ const animateClose = (vy = 0) => {
 };
 
 /* ================= CARD ================= */
-const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
+const SiteCard = ({ data, navigation }) => (
   <View style={styles.card}>
     {/* Header */}
     <View style={styles.cardHeader}>
@@ -741,8 +751,8 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
                 data?.active === '1'
                   ? 'rgba(45,168,94,0.15)'
                   : data?.active === '5'
-                  ? 'rgba(107,119,133,0.25)'
-                  : 'rgba(224,90,43,0.15)',
+                    ? 'rgba(107,119,133,0.25)'
+                    : 'rgba(224,90,43,0.15)',
             },
           ]}
         >
@@ -754,16 +764,16 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
                   data?.active === '1'
                     ? '#2da85e'
                     : data?.active === '5'
-                    ? '#aab8c4'
-                    : '#e05a2b',
+                      ? '#aab8c4'
+                      : '#e05a2b',
               },
             ]}
           >
             {data?.active === '1'
               ? 'Active'
               : data?.active === '5'
-              ? 'Booking Done'
-              : 'Inactive'}
+                ? 'Booking Done'
+                : 'Inactive'}
           </Text>
         </View>
       </View>
@@ -869,8 +879,6 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => (
 const TotalBookingsAgreementsTillDateScreen = () => {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
-  const [showRemarks, setShowRemarks] = useState(false);
-  const [remarksText, setRemarksText] = useState('');
   const [searchText, setSearchText] = useState('');
   const [showFilterModal, setShowFilterModal] = useState(false);
 
@@ -895,28 +903,30 @@ const TotalBookingsAgreementsTillDateScreen = () => {
   /* ================= API ================= */
   const { data: Lead, isLoading } = useQuery({
     queryKey: ['totalBookingAndAgreementTillDate', appliedFilters],
-    queryFn: async ({ pageParam = 1 }) => {
+    queryFn: async () => {
+      // Sudhu "Apply" kora filter use hobe (unapplied edit nay)
+      const f = appliedFilters || {};
       const res = await api.get('/api/pm/totalBookingAndAgreementTillDate', {
         params: {
-          page: pageParam,
+          page: 1,
           limit: 'all',
-          company_id: filters.company_id || undefined,
-          rm: filters.rm || undefined,
-          fromDate: filters.fromDate || undefined,
-          toDate: filters.toDate || undefined,
-          project: filters.project || undefined,
-          location: filters.location || undefined,
-          booking_approval_status: filters.booking_approval_status || undefined,
-          lead_status: filters.lead_status || undefined,
-          lead_sub_status: filters.lead_sub_status || undefined,
-          lead_qualification: filters.lead_qualification || undefined,
-          call_status: filters.call_status || undefined,
-          siteVisitFromDate: filters.siteVisitFromDate || undefined,
-          siteVisitToDate: filters.siteVisitToDate || undefined,
-          reference: filters.lead_source || undefined,
+          company_id: f.company_id || undefined,
+          rm: f.rm || undefined,
+          fromDate: f.fromDate || undefined,
+          toDate: f.toDate || undefined,
+          project: f.project || undefined,
+          location: f.location || undefined,
+          booking_approval_status: f.booking_approval_status || undefined,
+          lead_status: f.lead_status || undefined,
+          lead_sub_status: f.lead_sub_status || undefined,
+          lead_qualification: f.lead_qualification || undefined,
+          call_status: f.call_status || undefined,
+          siteVisitFromDate: f.siteVisitFromDate || undefined,
+          siteVisitToDate: f.siteVisitToDate || undefined,
+          reference: f.lead_source || undefined,
         },
       });
-      return res?.data?.data?.Bookings;
+      return res?.data?.data?.Bookings || [];
     },
   });
 
@@ -1027,11 +1037,7 @@ const TotalBookingsAgreementsTillDateScreen = () => {
 
         {/* TOP BAR: [back + icon + title] ............ [filter] */}
         <View
-          style={[
-            styles.topBarContainer,
-            { paddingTop: verticalScale(10) },
-            // insets.top +
-          ]}
+          style={[styles.topBarContainer, { paddingTop: verticalScale(10) }]}
         >
           <View style={styles.topBar}>
             <View style={styles.leftHeader}>
@@ -1041,12 +1047,7 @@ const TotalBookingsAgreementsTillDateScreen = () => {
                 activeOpacity={0.7}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
-                  <Icon1
-                                    name="chevron-back"
-                                    size={23}
-                                    color="#fff"
-                                    // style={styles.backIcon}
-                                  />
+                <Icon1 name="chevron-back" size={23} color="#fff" />
               </TouchableOpacity>
               <Icon name="history" size={20} color="#ffffff" />
               <Text style={styles.screenTitle} numberOfLines={1}>
@@ -1068,7 +1069,10 @@ const TotalBookingsAgreementsTillDateScreen = () => {
         <ScrollView
           ref={scrollRef}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={[
+            styles.listContent,
+            { paddingBottom: 90 + insets.bottom },
+          ]}
           onScroll={event => {
             const y = event.nativeEvent.contentOffset.y;
             setShowTopBtn(y > 200);
@@ -1107,40 +1111,16 @@ const TotalBookingsAgreementsTillDateScreen = () => {
                   visit?.id != null ? `booking-${visit.id}` : `booking-idx-${i}`
                 }
                 data={visit}
-                setShowRemarks={setShowRemarks}
-                setRemarksText={setRemarksText}
                 navigation={navigation}
               />
             ))
           ) : (
             <View style={styles.emptyWrap}>
-              <Icon
-                name="history"
-                size={48}
-                color="rgba(255,255,255,0.25)"
-              />
+              <Icon name="history" size={48} color="rgba(255,255,255,0.25)" />
               <Text style={styles.empty}>No data found</Text>
             </View>
           )}
         </ScrollView>
-
-        {/* REMARKS MODAL */}
-        {showRemarks && (
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalCard}>
-              <Icon name="check-circle" size={32} color="#4aa3df" />
-              <Text style={styles.modalTitle}>Latest Remarks</Text>
-              <Text style={styles.modalText}>{remarksText}</Text>
-
-              <TouchableOpacity
-                style={styles.modalCloseBtn}
-                onPress={() => setShowRemarks(false)}
-              >
-                <Text style={styles.modalCloseText}>OK</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
 
         {/* FILTER BOTTOM SHEET (animated Modal) */}
         <FilterBottomSheet
@@ -1214,11 +1194,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  backIcon: {
-    width: 20,
-    height: 20,
-    tintColor: '#ffffff',
-  },
   screenTitle: {
     color: '#ffffff',
     fontSize: 15,
@@ -1228,7 +1203,7 @@ const styles = StyleSheet.create({
   },
 
   /* ── List ── */
-  listContent: { paddingHorizontal: scale(10), paddingBottom: verticalScale(10) },
+  listContent: { paddingHorizontal: scale(10), paddingBottom: 10 },
   centerLoader: { alignItems: 'center', justifyContent: 'center', marginTop: 40 },
   emptyWrap: { alignItems: 'center', marginTop: 80, gap: 12 },
   empty: { color: 'rgba(255,255,255,0.40)', fontSize: 15 },
@@ -1263,7 +1238,7 @@ const styles = StyleSheet.create({
 
   /* ── Card ── */
   card: {
-    backgroundColor: '#rgba(4, 35, 70, 0.62)',
+    backgroundColor: 'rgba(4, 35, 70, 0.62)',
     borderRadius: 4,
     padding: 12,
     marginBottom: 10,
@@ -1341,46 +1316,6 @@ const styles = StyleSheet.create({
     elevation: 12,
     zIndex: 999,
   },
-
-  /* ── Remarks modal ── */
-  modalOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalCard: {
-    width: '88%',
-    maxHeight: SCREEN_HEIGHT * 0.72,
-    backgroundColor: '#21283a',
-    borderWidth: 1,
-    borderColor: '#39415a',
-    borderRadius: 24,
-    paddingHorizontal: 20,
-    paddingTop: 18,
-    paddingBottom: 18,
-    alignItems: 'center',
-  },
-  modalTitle: {
-    color: '#e6ebf2',
-    fontSize: 18,
-    marginBottom: 10,
-    fontWeight: '700',
-  },
-  modalText: { color: '#c3cbdb', textAlign: 'center', marginBottom: 15 },
-  modalCloseBtn: {
-    backgroundColor: '#1e9ce8',
-    height: 48,
-    borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
-    width: '100%',
-  },
-  modalCloseText: { color: '#ffffff', fontWeight: '600', fontSize: 15 },
 
   /* ── Filter bottom sheet ── */
   backdrop: {

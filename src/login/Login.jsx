@@ -9,6 +9,8 @@ import {
   ImageBackground,
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
+  ScrollView,
   Platform
 } from 'react-native';
 import { CommonActions } from '@react-navigation/native';
@@ -23,7 +25,9 @@ import DeviceInfo from 'react-native-device-info';
 import SplashScreen from '../Layout/SplashScreen';
 // import socket from '../../socket'
 // import AnimatedSplash from "../../AnimatedSplash";
-const bgImage = require("../asset/image/mulyambg.png");
+
+// Second page-er moto same background + white logo
+const bgImage = require("../asset/image/bg-img.png");
 const mayaLogo = require('../asset/image/logo/mokhsLogo.png');
 
 const LoginUI = () => {
@@ -39,10 +43,10 @@ const LoginUI = () => {
   useEffect(() => {
     const checkToken = async () => {
 
-       await new Promise(resolve => setTimeout(resolve, 2000));
+      await new Promise(resolve => setTimeout(resolve, 2000));
       const token = await AsyncStorage.getItem('PM_TOKEN');
       const user = await AsyncStorage.getItem('PM_USER');
-      const roles = await AsyncStorage.getItem('PM_ROLES'); 
+      const roles = await AsyncStorage.getItem('PM_ROLES');
 
       if (token && user) {
         dispatch({ type: 'setToken', payload: token });
@@ -150,73 +154,90 @@ const LoginUI = () => {
 
   return (
     <ImageBackground source={bgImage} style={styles.container}>
-      <View style={styles.card}>
-        <Image source={mayaLogo} style={styles.logo} />
-
-        {/* User ID */}
-        <View style={styles.inputBox}>
-    <TextInput
-  placeholder="User Id"
-  placeholderTextColor="#888"
-  style={styles.input}
-  value={loginData.userid}
- onChangeText={text =>
-  setLoginData(prev => ({
-    ...prev,
-    userid: text,
-  }))
-}
-  textContentType="username"
-  autoComplete="username"
-  importantForAutofill="yes"
-  autoCapitalize="none"
-  autoCorrect={false}
-/>
-          <Image
-            source={require('../asset/image/icon/face-scanner.png')}
-            style={styles.icon}
-          />
-        </View>
-
-        {/* Password */}
-        <View style={styles.inputBox}>
-          <TextInput
-            placeholder="Password"
-            placeholderTextColor="#888"
-            secureTextEntry={!showPassword}
-            style={styles.input}
-            value={loginData.password}
-          onChangeText={text =>
-  setLoginData(prev => ({
-    ...prev,
-    password: text,
-  }))
-}
-              textContentType="password"
-  autoComplete="password"
-  importantForAutofill="yes"
-          />
-          <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
-            <Image
-              source={require('../asset/image/icon/visual.png')}
-              style={styles.icon}
-            />
-          </TouchableOpacity>
-        </View>
-
-        {/* Button */}
-        <TouchableOpacity
-          style={styles.button}
-          onPress={handleLogin}
-          disabled={loading}
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+      >
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
         >
-          {loading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.buttonText}>Sign In</Text>
-          )}
-        </TouchableOpacity>
-      </View>
+          <View style={styles.card}>
+            <Image source={mayaLogo} style={styles.logo} />
+
+            {/* User ID */}
+            <View style={styles.inputBox}>
+              <TextInput
+                placeholder="User Id"
+                placeholderTextColor="#888"
+                style={styles.input}
+                value={loginData.userid}
+                onChangeText={text =>
+                  setLoginData(prev => ({
+                    ...prev,
+                    userid: text,
+                  }))
+                }
+                textContentType="username"
+                autoComplete="username"
+                importantForAutofill="yes"
+                autoCapitalize="none"
+                autoCorrect={false}
+                returnKeyType="next"
+              />
+              <Image
+                source={require('../asset/image/icon/face-scanner.png')}
+                style={styles.icon}
+              />
+            </View>
+
+            {/* Password */}
+            <View style={styles.inputBox}>
+              <TextInput
+                placeholder="Password"
+                placeholderTextColor="#888"
+                secureTextEntry={!showPassword}
+                style={styles.input}
+                value={loginData.password}
+                onChangeText={text =>
+                  setLoginData(prev => ({
+                    ...prev,
+                    password: text,
+                  }))
+                }
+                textContentType="password"
+                autoComplete="password"
+                importantForAutofill="yes"
+                autoCapitalize="none"
+                autoCorrect={false}
+                returnKeyType="done"
+                onSubmitEditing={handleLogin}
+              />
+              <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+                <Image
+                  source={require('../asset/image/icon/visual.png')}
+                  style={styles.icon}
+                />
+              </TouchableOpacity>
+            </View>
+
+            {/* Button */}
+            <TouchableOpacity
+              style={styles.button}
+              onPress={handleLogin}
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.buttonText}>Sign In</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </ImageBackground>
   );
 };
@@ -224,10 +245,19 @@ const LoginUI = () => {
 export default LoginUI;
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  container: { flex: 1 },
+  flex: { flex: 1 },
+  // flexGrow: 1 + justifyContent: 'center' → keyboard এলে content scroll হবে
+  scrollContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  // Second page-er card same to same
   card: {
     width: '83%',
-    backgroundColor: 'rgba(250, 248, 248, 0.21)',
+    backgroundColor: 'rgba(47,46,46,0.45)',
     borderRadius: 20,
     padding: 20,
   },

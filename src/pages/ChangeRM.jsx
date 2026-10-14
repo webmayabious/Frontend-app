@@ -824,7 +824,7 @@ const ChangeRM = ({ setHideBottomNav }) => {
                 name="chevron-back"
                 size={23}
                 color="#fff"
-                style={styles.backIcon}
+                // style={styles.backIcon}
               />
             </TouchableOpacity>
             <MaterialCommunityIcons

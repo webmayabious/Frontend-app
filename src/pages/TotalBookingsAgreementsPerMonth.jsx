@@ -38,6 +38,14 @@ const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window');
 const scale = size => (SCREEN_WIDTH / 375) * size;
 const verticalScale = size => (SCREEN_HEIGHT / 812) * size;
 
+/* ================= DATE FORMAT (local timezone, no UTC shift) ================= */
+const formatDate = date => {
+  const d = new Date(date);
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  return `${d.getFullYear()}-${month}-${day}`;
+};
+
 /* ================= CALL ================= */
 const makeCall = phoneNumber => {
   if (!phoneNumber) return;
@@ -552,7 +560,7 @@ const FilterBottomSheet = ({
 
     if (event.type === 'dismissed' || !selectedDate) return;
 
-    onChange(key, selectedDate.toISOString().split('T')[0]);
+    onChange(key, formatDate(selectedDate));
   };
 
   const openDatePicker = key => {
@@ -567,7 +575,7 @@ const FilterBottomSheet = ({
   };
 
   const handleIosDone = () => {
-    onChange(iosPickerTarget, iosTempDate.toISOString().split('T')[0]);
+    onChange(iosPickerTarget, formatDate(iosTempDate));
     setIosPickerTarget(null);
   };
   const handleIosCancel = () => setIosPickerTarget(null);
@@ -743,8 +751,8 @@ const SiteCard = ({ data, navigation }) => (
                 data?.active === '1'
                   ? 'rgba(45,168,94,0.15)'
                   : data?.active === '5'
-                  ? 'rgba(107,119,133,0.25)'
-                  : 'rgba(224,90,43,0.15)',
+                    ? 'rgba(107,119,133,0.25)'
+                    : 'rgba(224,90,43,0.15)',
             },
           ]}
         >
@@ -756,16 +764,16 @@ const SiteCard = ({ data, navigation }) => (
                   data?.active === '1'
                     ? '#2da85e'
                     : data?.active === '5'
-                    ? '#aab8c4'
-                    : '#e05a2b',
+                      ? '#aab8c4'
+                      : '#e05a2b',
               },
             ]}
           >
             {data?.active === '1'
               ? 'Active'
               : data?.active === '5'
-              ? 'Booking Done'
-              : 'Inactive'}
+                ? 'Booking Done'
+                : 'Inactive'}
           </Text>
         </View>
       </View>
@@ -870,6 +878,7 @@ const SiteCard = ({ data, navigation }) => (
 /* ================= MAIN ================= */
 const TotalBookingsAgreementsPerMonth = () => {
   const navigation = useNavigation();
+  const insets = useSafeAreaInsets();
   const [searchText, setSearchText] = useState('');
   const [showFilterModal, setShowFilterModal] = useState(false);
 
@@ -894,28 +903,29 @@ const TotalBookingsAgreementsPerMonth = () => {
   /* ================= API ================= */
   const { data: Lead, isLoading } = useQuery({
     queryKey: ['TotalBookingAndAgreementDataPerMonth', appliedFilters],
-    queryFn: async ({ pageParam = 1 }) => {
+    queryFn: async () => {
+      // Sudhu "Apply" kora filter use hobe (unapplied edit nay)
+      const f = appliedFilters || {};
       const res = await api.get(
         '/api/pm/totalBookingAndAgreementDataPerMonth',
         {
           params: {
-            page: pageParam,
+            page: 1,
             limit: 'all',
-            company_id: filters.company_id || undefined,
-            rm: filters.rm || undefined,
-            fromDate: filters.fromDate || undefined,
-            toDate: filters.toDate || undefined,
-            project: filters.project || undefined,
-            location: filters.location || undefined,
-            booking_approval_status:
-              filters.booking_approval_status || undefined,
-            lead_status: filters.lead_status || undefined,
-            lead_sub_status: filters.lead_sub_status || undefined,
-            lead_qualification: filters.lead_qualification || undefined,
-            call_status: filters.call_status || undefined,
-            siteVisitFromDate: filters.siteVisitFromDate || undefined,
-            siteVisitToDate: filters.siteVisitToDate || undefined,
-            reference: filters.lead_source || undefined,
+            company_id: f.company_id || undefined,
+            rm: f.rm || undefined,
+            fromDate: f.fromDate || undefined,
+            toDate: f.toDate || undefined,
+            project: f.project || undefined,
+            location: f.location || undefined,
+            booking_approval_status: f.booking_approval_status || undefined,
+            lead_status: f.lead_status || undefined,
+            lead_sub_status: f.lead_sub_status || undefined,
+            lead_qualification: f.lead_qualification || undefined,
+            call_status: f.call_status || undefined,
+            siteVisitFromDate: f.siteVisitFromDate || undefined,
+            siteVisitToDate: f.siteVisitToDate || undefined,
+            reference: f.lead_source || undefined,
           },
         },
       );
@@ -1066,7 +1076,10 @@ const TotalBookingsAgreementsPerMonth = () => {
         <ScrollView
           ref={scrollRef}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={[
+            styles.listContent,
+            { paddingBottom: 90 + insets.bottom },
+          ]}
           onScroll={event => {
             const y = event.nativeEvent.contentOffset.y;
             setShowTopBtn(y > 200);
@@ -1197,7 +1210,7 @@ const styles = StyleSheet.create({
   },
 
   /* ── List ── */
-  listContent: { paddingHorizontal: scale(10), paddingBottom: verticalScale(10) },
+  listContent: { paddingHorizontal: scale(10), paddingBottom: 10 },
   centerLoader: { alignItems: 'center', justifyContent: 'center', marginTop: 40 },
   emptyWrap: { alignItems: 'center', marginTop: 80, gap: 12 },
   empty: { color: 'rgba(255,255,255,0.40)', fontSize: 15 },

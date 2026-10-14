@@ -274,7 +274,7 @@ console.log(errors)
   return (
     <View style={styles.row}>
       <View style={{ flex: 1, marginRight: 10 }}>
-        <Text style={styles.label}>Date of Birth</Text>
+        <Text style={styles.label}>Date of Birth *</Text>
 
         <TouchableOpacity
           style={styles.inputWithIcon}
@@ -664,7 +664,7 @@ const validateForm = () => {
             <ErrorText msg={errors.name} />
 
             <InputField
-              label="Residence Address"
+              label="Residence Address *"
               placeholder="City / Area"
               value={form.address}
               onChangeText={v => onChange('address', v)}

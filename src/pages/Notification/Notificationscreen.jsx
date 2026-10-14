@@ -1179,7 +1179,7 @@ const NotificationScreen = ({ setHideBottomNav, navigation }) => {
                     name="chevron-back"
                     size={23}
                     color="#fff"
-                    style={styles.backIcon}
+                    // style={styles.backIcon}
                   />
                 </TouchableOpacity>
               )}

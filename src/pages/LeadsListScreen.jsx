@@ -1036,7 +1036,7 @@ const LeadsListScreen = () => {
                 name="chevron-back"
                 size={23}
                 color="#fff"
-                style={styles.backIcon}
+                // style={styles.backIcon}
               />
             </TouchableOpacity>
             <Icon name="list-alt" size={20} color="#ffffff" />

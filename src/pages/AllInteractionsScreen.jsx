@@ -214,7 +214,7 @@ const AllInteractionsScreen = ({ route }) => {
                 activeOpacity={0.7}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
-                <Icon1 name="chevron-back" size={20} color="#fff" />
+                <Icon1 name="chevron-back" size={23} color="#fff" />
               </TouchableOpacity>
               <Icon name="forum" size={20} color="#ffffff" />
               <Text style={styles.screenTitle} numberOfLines={1}>
@@ -326,7 +326,7 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   backBtn: {
-    paddingRight: 8,
+    paddingRight: 12,
     justifyContent: 'center',
     alignItems: 'center',
   },

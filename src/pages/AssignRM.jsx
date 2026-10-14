@@ -1020,7 +1020,7 @@ const AssignRM = ({ setHideBottomNav }) => {
             </View>
             <View style={styles.infoRow}>
               <Text style={styles.refLabel}>Reference: </Text>
-              <Text style={styles.refValue} numberOfLines={1}>
+              <Text style={styles.refValue} numberOfLines={2}>
                 {item?.mrreference?.mrf_name || 'N/A'}
               </Text>
             </View>
@@ -1062,7 +1062,7 @@ const AssignRM = ({ setHideBottomNav }) => {
                   name="chevron-back"
                   size={23}
                   color="#fff"
-                  style={styles.backIcon}
+                  // style={styles.backIcon}
                 />
               </TouchableOpacity>
               <MaterialCommunityIcons

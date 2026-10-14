@@ -24,7 +24,7 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import { useNavigation } from '@react-navigation/native';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import api from '../api/AxiosInstance';
-
+import Icon1 from 'react-native-vector-icons/Ionicons';
 const screenHeight = Dimensions.get('window').height;
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
@@ -797,6 +797,20 @@ const Totalleadscreen1 = () => {
       {/* ── Section Header ── */}
       <View style={styles.sectionHeader}>
         <View style={styles.sectionTitleRow}>
+            <TouchableOpacity
+                     onPress={() => navigation.navigate('LeadsListScreen')}
+                    style={styles.backBtn}
+                    activeOpacity={0.7}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                
+            <Icon1
+                              name="chevron-back"
+                              size={23}
+                              color="#fff"
+                              // style={styles.backIcon}
+                            />
+                  </TouchableOpacity>
           <Icon name="list-alt" size={16} color={COLORS.accent} />
           <Text style={styles.sectionTitle}>Total Leads</Text>
         </View>
@@ -813,7 +827,7 @@ const Totalleadscreen1 = () => {
             <Text style={styles.changeBtnText}>Assign Leads</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
+          {/* <TouchableOpacity
             style={styles.closeBtn}
             onPress={() => navigation.navigate('LeadsListScreen')}
             activeOpacity={0.75}
@@ -825,7 +839,7 @@ const Totalleadscreen1 = () => {
               />
               <Text style={styles.closeBtnText}>Back</Text>
             </View>
-          </TouchableOpacity>
+          </TouchableOpacity> */}
         </View>
       </View>
 
@@ -1179,6 +1193,11 @@ const styles = StyleSheet.create({
     flex: 1, flexDirection: 'row', alignItems: 'center', borderWidth: 1,
     borderColor: COLORS.borderColor, borderRadius: 20, paddingHorizontal: 12,
     height: 40, backgroundColor: 'rgba(255,255,255,0.06)',
+  },
+    backBtn: {
+    paddingRight: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   searchInput: { color: COLORS.white, marginLeft: 8, fontSize: 13, flex: 1, paddingVertical: 0 },
   addLeadBtn: {

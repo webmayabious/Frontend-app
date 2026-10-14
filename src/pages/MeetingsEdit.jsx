@@ -385,9 +385,9 @@ export default function MeetingsEdit({ route }) {
               >
                 <Icon1
                   name="chevron-back"
-                  size={20}
+                  size={23}
                   color="#fff"
-                  style={styles.backIcon}
+                  // style={styles.backIcon}
                 />
               </TouchableOpacity>
               <Icon name="event-note" size={20} color="#ffffff" />
@@ -607,7 +607,7 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   backBtn: {
-    paddingRight: 8,
+    paddingRight: 12,
     justifyContent: 'center',
     alignItems: 'center',
   },
