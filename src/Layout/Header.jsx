@@ -37,18 +37,29 @@ const Header = ({ routeName }) => {
   const navigation = useNavigation();
   const dispatch = useDispatch();
   const [menuAnchor, setMenuAnchor] = useState({ x: 0, y: 0 });
-  const handleLogout = async () => {
-    try {
-      const fcmToken = await messaging().getToken();
+const handleLogout = async () => {
+  try {
+    setProfileModalVisible(false);
 
-      // 1. ALWAYS clear app state first
-      await AsyncStorage.removeItem('PM_TOKEN');
-      await AsyncStorage.removeItem('PM_USER');
-      await AsyncStorage.removeItem('PM_ROLES');
+    // token fetch shuru koro, kintu wait korbe na
+    const tokenPromise = messaging()
+      .getToken()
+      .catch(e => {
+        console.log('FCM token error:', e);
+        return null;
+      });
 
-      dispatch({ type: 'LOGOUT' });
+    await AsyncStorage.multiRemove(['PM_TOKEN', 'PM_USER', 'PM_ROLES']);
 
-      // Badge reset + tray clear
+    // state clear + navigate ekshathe
+    dispatch({ type: 'LOGOUT' });
+    navigation.reset({
+      index: 0,
+      routes: [{ name: 'Login' }],
+    });
+
+    // baki shob background-e
+    (async () => {
       try {
         await notifee.cancelAllNotifications();
         if (Platform.OS === 'ios') {
@@ -58,24 +69,24 @@ const Header = ({ routeName }) => {
         console.log('Badge reset error:', e);
       }
 
-      // 2. navigate immediately
-      navigation.reset({
-        index: 0,
-        routes: [{ name: 'Login' }],
-      });
+      const fcmToken = await tokenPromise;
+      if (fcmToken) {
+        api
+          .post('/api/pm/auth/logout', { fcm_token: fcmToken })
+          .catch(err => console.log('logout API failed (ignored)', err));
+      }
 
-      // 3. then call API in background (non-blocking)
-      api.post('/api/pm/auth/logout', { fcm_token: fcmToken })
-        .catch(err => console.log('logout API failed (ignored)', err));
-
-      await messaging().deleteToken();
-
-      setProfileModalVisible(false);
-    } catch (error) {
-      console.log('Logout error:', error);
-      Alert.alert('Error', 'Logout failed');
-    }
-  };
+      try {
+        await messaging().deleteToken();
+      } catch (e) {
+        console.log('deleteToken error:', e);
+      }
+    })();
+  } catch (error) {
+    console.log('Logout error:', error);
+    Alert.alert('Error', 'Logout failed');
+  }
+};
 const avatarRef = useRef(null);
 
 const openProfileMenu = () => {
@@ -338,10 +349,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   logoImage: {
-    width: 120,
-    height: 33,
+    width: 180,
+    height: 37,
     resizeMode: "contain",
-    marginLeft: 10,
+    marginLeft: 0,
   },
   avatar: {
     width: 38,

@@ -29,6 +29,8 @@ import SplashScreen from '../Layout/SplashScreen';
 // Second page-er moto same background + white logo
 const bgImage = require("../asset/image/bg-img.png");
 const mayaLogo = require('../asset/image/logo/mokhsLogo.png');
+// Login korar pore ei image dekhabe
+const postLoginImage = require('../asset/image/splashscreen2.jpg');
 
 const LoginUI = () => {
   const [showPassword, setShowPassword] = useState(false);
@@ -36,6 +38,7 @@ const LoginUI = () => {
   const [loading, setLoading] = useState(false);
   const [showSplash, setShowSplash] = useState(true);
   const [checkingLogin, setCheckingLogin] = useState(true);
+  const [showPostLoginSplash, setShowPostLoginSplash] = useState(false);
   const dispatch = useDispatch();
   const navigation = useNavigation();
 
@@ -73,9 +76,17 @@ const LoginUI = () => {
 
     checkToken();
   }, []);
+
+  // App open hole prothom splash image
   if (checkingLogin) {
     return <SplashScreen />;
   }
+
+  // Login successful hole dwitiyo splash image
+  if (showPostLoginSplash) {
+    return <SplashScreen image={postLoginImage} />;
+  }
+
   const handleLogin = async () => {
     if (!loginData.userid.trim() || !loginData.password.trim()) {
       Alert.alert('Error', 'Please enter User ID and Password');
@@ -132,6 +143,10 @@ const LoginUI = () => {
       //   socket.auth = { token: data.token };
       //   socket.connect();
       // }
+
+      // Login-er pore image dekhao, 2 second pore Dashboard e jao
+      setShowPostLoginSplash(true);
+      await new Promise(resolve => setTimeout(resolve, 2000));
 
       navigation.replace('Dashboard', {
         screen: 'Dashboard',
@@ -262,7 +277,7 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   logo: {
-    width: 150,
+    width: 190,
     height: 40,
     resizeMode: 'contain',
     alignSelf: 'center',
