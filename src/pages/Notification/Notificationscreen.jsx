@@ -354,7 +354,7 @@ const UserPicker = ({ users, loading, value, onSelect }) => {
           {loading ? (
             <ActivityIndicator
               size="small"
-              color="#4aa3df"
+              color="#fff"
               style={{ marginVertical: 14 }}
             />
           ) : (
@@ -1177,7 +1177,7 @@ const NotificationScreen = ({ setHideBottomNav, navigation }) => {
                 >
                   <Icon
                     name="chevron-back"
-                    size={20}
+                    size={23}
                     color="#fff"
                     style={styles.backIcon}
                   />
@@ -1191,7 +1191,7 @@ const NotificationScreen = ({ setHideBottomNav, navigation }) => {
 
             <View style={styles.sectionActions}>
               {actionLoading && (
-                <ActivityIndicator size="small" color={COLORS.accent} />
+                <ActivityIndicator size="small" color='#fff' />
               )}
 
               <TouchableOpacity
@@ -1437,7 +1437,7 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   backBtn: {
-    paddingRight: 8,
+    paddingRight: 12,
     justifyContent: 'center',
     alignItems: 'center',
   },

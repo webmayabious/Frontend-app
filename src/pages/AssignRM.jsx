@@ -1060,7 +1060,7 @@ const AssignRM = ({ setHideBottomNav }) => {
               >
                 <Icon1
                   name="chevron-back"
-                  size={20}
+                  size={23}
                   color="#fff"
                   style={styles.backIcon}
                 />
@@ -1170,7 +1170,7 @@ const AssignRM = ({ setHideBottomNav }) => {
 
               {isLoading && (
                 <View style={styles.initialLoader}>
-                  <ActivityIndicator size="large" color={COLORS.accent} />
+                  <ActivityIndicator size="large" color='#fff' />
                 </View>
               )}
 
@@ -1182,7 +1182,7 @@ const AssignRM = ({ setHideBottomNav }) => {
           ListFooterComponent={
             isFetchingNextPage ? (
               <View style={styles.footerLoader}>
-                <ActivityIndicator size="small" color={COLORS.accent} />
+                <ActivityIndicator size="small" color='#fff' />
                 <Text style={styles.footerText}>Loading more...</Text>
               </View>
             ) : !hasNextPage && allLeads.length > 0 ? (
@@ -1212,7 +1212,7 @@ const AssignRM = ({ setHideBottomNav }) => {
               <Text style={styles.rmLabel}>Select RM</Text>
 
               {rmLoading ? (
-                <ActivityIndicator color={COLORS.accent} style={{ marginVertical: 20 }} />
+                <ActivityIndicator color='#fff' style={{ marginVertical: 20 }} />
               ) : (
                 <ScrollView style={styles.dropdownList} nestedScrollEnabled showsVerticalScrollIndicator>
                   {rmList.length === 0 ? (
@@ -1566,7 +1566,7 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   backBtn: {
-    paddingRight: 8,
+    paddingRight: 12,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1644,8 +1644,10 @@ const styles = StyleSheet.create({
 
   // ── Lead Card ──
   card: {
-    backgroundColor: 'rgba(4, 35, 70, 0.62)', borderRadius: 12, padding: 12, marginBottom: 10,
+    backgroundColor: 'rgba(4, 35, 70, 0.62)',
+     borderRadius: 12, padding: 12, marginBottom: 10,
     borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.2)',
+    minHeight:120
   },
   cardSelected: { borderColor: 'rgba(0,207,255,0.45)' },
   cardTop: { marginBottom: 8 },

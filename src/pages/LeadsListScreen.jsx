@@ -1034,7 +1034,7 @@ const LeadsListScreen = () => {
             >
               <Icon1
                 name="chevron-back"
-                size={20}
+                size={23}
                 color="#fff"
                 style={styles.backIcon}
               />
@@ -1061,7 +1061,7 @@ const LeadsListScreen = () => {
               disabled={isTotalLeadsLoading}
             >
               {isTotalLeadsLoading ? (
-                <ActivityIndicator size="small" color="#FFFFFF" />
+                <ActivityIndicator size="small" color="#fff" />
               ) : (
                 <Text style={styles.changeBtnText}>Total Leads</Text>
               )}
@@ -1129,14 +1129,14 @@ const LeadsListScreen = () => {
                   Showing {leads.length ? 1 : 0} to {leads.length} of {totalRecords} entries
                 </Text>
                 {isFetching && !isFetchingNextPage && !isLoading && (
-                  <ActivityIndicator size="small" color={COLORS.accent} />
+                  <ActivityIndicator size="small" color='#fff' />
                 )}
               </View>
             )}
 
             {isLoading && (
               <View style={styles.initialLoader}>
-                <ActivityIndicator size="large" color={COLORS.accent} />
+                <ActivityIndicator size="large" color='#fff' />
               </View>
             )}
 
@@ -1148,7 +1148,7 @@ const LeadsListScreen = () => {
         ListFooterComponent={
           isFetchingNextPage ? (
             <View style={styles.footerLoader}>
-              <ActivityIndicator size="small" color={COLORS.accent} />
+              <ActivityIndicator size="small" color='#fff' />
               <Text style={styles.footerText}>Loading more...</Text>
             </View>
           ) : null
@@ -1624,7 +1624,7 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   backBtn: {
-    paddingRight: 8,
+    paddingRight: 12,
     justifyContent: 'center',
     alignItems: 'center',
   },

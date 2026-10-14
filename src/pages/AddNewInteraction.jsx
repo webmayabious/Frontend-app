@@ -12,11 +12,14 @@ import {
   Platform,
   Dimensions,
   StatusBar,
+  DeviceEventEmitter,
+  Keyboard,
+  Animated,
+  Easing,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import Icon1 from 'react-native-vector-icons/Ionicons';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Dropdown } from 'react-native-element-dropdown';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigation } from '@react-navigation/native';
@@ -41,70 +44,231 @@ const COLORS = {
   sectionBg: 'rgba(255,255,255,0.13)',
 };
 
-// ─── DROPDOWN ────────────────────────────────────────────────────────────────
+/* ================= INLINE DROPDOWN ================= */
+const ITEM_H = 42;
+const SEARCH_H = 44;
+const MAX_LIST_H = 220;
+const FIELD_TOP_OFFSET = Platform.OS === 'ios' ? 280 : 200;
 
 const DropdownField = ({
   label,
   data,
-  placeholder,
   value,
   onChange,
   error,
+  scrollRef,
+  scrollYRef,
+  placeholder,
 }) => {
-  const [isFocus, setIsFocus] = React.useState(false);
+  const [open, setOpen] = useState(false); // what the user wants
+  const [mounted, setMounted] = useState(false); // keeps list alive while closing
+  const [search, setSearch] = useState('');
+  const heightAnim = useRef(new Animated.Value(0)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const wrapRef = useRef(null);
+  const justOpened = useRef(false);
+
+  const options = data || [];
+  const selected = options.find(o => o.value === value);
+
+  const filtered = options.filter(o =>
+    String(o.label ?? '')
+      .toLowerCase()
+      .includes(search.toLowerCase()),
+  );
+
+  // list height follows the real content, capped at MAX_LIST_H
+  const contentH = filtered.length === 0 ? 48 : filtered.length * ITEM_H;
+  const targetH = Math.min(SEARCH_H + contentH, MAX_LIST_H);
+
+  const scrollFieldIntoView = () => {
+    if (!wrapRef.current || !scrollRef?.current) return;
+    wrapRef.current.measureInWindow((x, y) => {
+      const delta = y - FIELD_TOP_OFFSET;
+      if (delta > 0) {
+        scrollRef.current.scrollTo({
+          y: (scrollYRef?.current || 0) + delta,
+          animated: true,
+        });
+      }
+    });
+  };
+
+  // single place that runs every animation
+  useEffect(() => {
+    if (!open && !mounted) return;
+
+    Animated.parallel([
+      Animated.timing(heightAnim, {
+        toValue: open ? targetH : 0,
+        duration: open ? 220 : 180,
+        easing: open ? Easing.out(Easing.cubic) : Easing.in(Easing.cubic),
+        useNativeDriver: false,
+      }),
+      Animated.timing(fadeAnim, {
+        toValue: open ? 1 : 0,
+        duration: open ? 220 : 160,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: false,
+      }),
+    ]).start(({ finished }) => {
+      if (!finished) return;
+      if (open) {
+        if (justOpened.current) {
+          justOpened.current = false;
+          scrollFieldIntoView();
+        }
+      } else {
+        setMounted(false);
+        setSearch('');
+        DeviceEventEmitter.emit('toggleBottomNav', true);
+      }
+    });
+  }, [open, targetH]);
+
+  useEffect(() => {
+    return () => DeviceEventEmitter.emit('toggleBottomNav', true);
+  }, []);
+
+  const toggle = () => {
+    if (open) {
+      Keyboard.dismiss();
+      setOpen(false);
+    } else {
+      DeviceEventEmitter.emit('toggleBottomNav', false);
+      justOpened.current = true;
+      setMounted(true);
+      setOpen(true);
+    }
+  };
+
+  const handleSelect = item => {
+    onChange && onChange(item.value);
+    Keyboard.dismiss();
+    setOpen(false);
+  };
+
+  const arrowRotate = fadeAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '180deg'],
+  });
+
   return (
-    <View style={styles.inputWrapper}>
-      <Text style={styles.label}>{label}</Text>
-      <Dropdown
+    <View ref={wrapRef} collapsable={false} style={styles.field}>
+      {label ? <Text style={styles.label}>{label}</Text> : null}
+
+      {/* Trigger */}
+      <TouchableOpacity
         style={[
           styles.dropdown,
-          isFocus && { borderColor: '#4aa3df' },
-          error && { borderColor: COLORS.red },
+          open && styles.dropdownOpen,
+          error && styles.inputError,
         ]}
-        containerStyle={styles.dropdownContainer}
-        placeholderStyle={styles.placeholderStyle}
-        selectedTextStyle={styles.selectedTextStyle}
-        itemTextStyle={styles.itemTextStyle}
-        inputSearchStyle={styles.inputSearchStyle}
-        activeColor="rgba(74,163,223,0.15)"
-        data={data || []}
-        labelField="label"
-        valueField="value"
-        placeholder={placeholder || 'Select'}
-        searchPlaceholder="Search..."
-        search={(data || []).length > 6}
-        maxHeight={240}
-        dropdownPosition="auto"
-        statusBarIsTranslucent
-        showsVerticalScrollIndicator={false}
-        value={value}
-        itemContainerStyle={styles.itemContainer}
-        onFocus={() => setIsFocus(true)}
-        onBlur={() => setIsFocus(false)}
-        onChange={item => {
-          setIsFocus(false);
-          onChange && onChange(item.value);
-        }}
-        renderItem={(item, selected) => (
-          <View style={[styles.itemRow, selected && styles.itemRowActive]}>
-            <Text
-              style={[styles.itemTextStyle, selected && styles.itemTextActive]}
-              numberOfLines={1}
-            >
-              {item.label}
-            </Text>
-            {selected && <Icon name="check" size={16} color="#4aa3df" />}
+        onPress={toggle}
+        activeOpacity={0.8}
+      >
+        <View style={styles.ddTriggerLeft}>
+          <Text
+            style={selected ? styles.selectedText : styles.placeholder}
+            numberOfLines={1}
+          >
+            {selected ? selected.label : placeholder || 'Select...'}
+          </Text>
+        </View>
+        <Animated.View style={{ transform: [{ rotate: arrowRotate }] }}>
+          <Icon name="keyboard-arrow-down" size={20} color="#8a9daf" />
+        </Animated.View>
+      </TouchableOpacity>
+
+      {/* Animated list */}
+      {mounted && (
+        <Animated.View
+          style={[
+            styles.dropdownMenu,
+            {
+              height: heightAnim,
+              opacity: fadeAnim,
+              overflow: 'hidden',
+              transform: [
+                {
+                  translateY: fadeAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [-6, 0],
+                  }),
+                },
+              ],
+            },
+          ]}
+        >
+          <View style={[styles.ddSearchWrap, { height: SEARCH_H }]}>
+            <Icon
+              name="search"
+              size={16}
+              color="#aaa"
+              style={{ marginRight: 6 }}
+            />
+            <TextInput
+              style={styles.ddSearchInput}
+              placeholder="Search..."
+              placeholderTextColor="#bbb"
+              value={search}
+              onChangeText={setSearch}
+              autoCorrect={false}
+              autoCapitalize="none"
+              returnKeyType="search"
+            />
+            {search.length > 0 && (
+              <TouchableOpacity
+                onPress={() => setSearch('')}
+                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+              >
+                <Icon name="close" size={14} color="#ccc" />
+              </TouchableOpacity>
+            )}
           </View>
-        )}
-        renderRightIcon={() => (
-          <Icon
-            name={isFocus ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
-            size={20}
-            color={COLORS.accent}
-          />
-        )}
-      />
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="always"
+            nestedScrollEnabled
+          >
+            {filtered.length === 0 ? (
+              <Text style={styles.ddNoResult}>No results found</Text>
+            ) : (
+              filtered.map(item => {
+                const isActive = item.value === value;
+                return (
+                  <TouchableOpacity
+                    key={String(item.value)}
+                    style={[
+                      styles.dropdownItem,
+                      { height: ITEM_H },
+                      isActive && styles.dropdownItemActive,
+                    ]}
+                    onPress={() => handleSelect(item)}
+                    activeOpacity={0.7}
+                  >
+                    <Text
+                      style={[
+                        styles.dropdownItemText,
+                        isActive && styles.dropdownItemTextActive,
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {item.label}
+                    </Text>
+                    {isActive && (
+                      <Icon name="check" size={16} color="#1482cc" />
+                    )}
+                  </TouchableOpacity>
+                );
+              })
+            )}
+          </ScrollView>
+        </Animated.View>
+      )}
+
+      {error ? <Text style={styles.errorText}>{error}</Text> : null}
     </View>
   );
 };
@@ -161,8 +325,11 @@ const Section = ({ title, icon, children }) => (
 export default function AddNewInteraction({ route }) {
   const { id } = route.params;
   const navigation = useNavigation();
+  const insets = useSafeAreaInsets();
 
+  // one ScrollView ref + its scroll position, shared with every dropdown
   const scrollRef = useRef(null);
+  const scrollYRef = useRef(0);
 
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
@@ -349,7 +516,7 @@ export default function AddNewInteraction({ route }) {
   return (
     <KeyboardAvoidingView
       style={{ flex: 1, backgroundColor: '#1a2d3e' }}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 120 : 0}
     >
       <View style={styles.container}>
@@ -362,221 +529,243 @@ export default function AddNewInteraction({ route }) {
         <View style={styles.overlay} />
 
         <SafeAreaView style={styles.safeArea} edges={['left', 'right']}>
-        <StatusBar
-          translucent
-          backgroundColor="transparent"
-          barStyle="light-content"
-        />
+          <StatusBar
+            translucent
+            backgroundColor="transparent"
+            barStyle="light-content"
+          />
 
-        {/* TOP BAR: [back + icon + title] */}
-        <View
-          style={[styles.topBarContainer, { paddingTop: verticalScale(10) }]}
-        >
-          <View style={styles.topBar}>
-            <View style={styles.leftHeader}>
+          {/* TOP BAR: [back + icon + title] */}
+          <View
+            style={[styles.topBarContainer, { paddingTop: verticalScale(10) }]}
+          >
+            <View style={styles.topBar}>
+              <View style={styles.leftHeader}>
+                <TouchableOpacity
+                  onPress={() => navigation.goBack()}
+                  style={styles.backBtn}
+                  activeOpacity={0.7}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Icon1 name="chevron-back" size={23} color="#fff" />
+                </TouchableOpacity>
+                <Icon name="event-note" size={20} color="#ffffff" />
+                <Text style={styles.screenTitle} numberOfLines={1}>
+                  Add Interaction
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          <ScrollView
+            ref={scrollRef}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            scrollEventThrottle={16}
+            nestedScrollEnabled
+            onScroll={e => {
+              scrollYRef.current = e.nativeEvent.contentOffset.y;
+            }}
+            contentContainerStyle={{
+              flexGrow: 1,
+              paddingBottom: Math.max(insets.bottom, 0) + 140,
+            }}
+          >
+            {/* Interaction Details */}
+            <Section title="Interaction Details" icon="call">
+              <DropdownField
+                label="Call Status *"
+                data={toOptions(AllCallStatus)}
+                placeholder="Select"
+                value={interaction.call_status_id}
+                onChange={val => updateField('call_status_id', val)}
+                error={errors.call_status_id}
+                scrollRef={scrollRef}
+                scrollYRef={scrollYRef}
+              />
+              <DropdownField
+                label="Lead Qualification *"
+                data={toOptions(AllLeadQualification)}
+                placeholder="Select"
+                value={interaction.lead_qualification_id}
+                onChange={val => updateField('lead_qualification_id', val)}
+                error={errors.lead_qualification_id}
+                scrollRef={scrollRef}
+                scrollYRef={scrollYRef}
+              />
+              <DropdownField
+                label="Lead Status *"
+                data={toOptions(AllLeadStatus)}
+                placeholder="Select"
+                value={interaction.lead_status_id}
+                onChange={val => updateField('lead_status_id', val)}
+                error={errors.lead_status_id}
+                scrollRef={scrollRef}
+                scrollYRef={scrollYRef}
+              />
+              <DropdownField
+                label="Lead Sub Status *"
+                data={toOptions(AllLeadSubStatus)}
+                placeholder="Select"
+                value={interaction.lead_sub_status_id}
+                onChange={val => updateField('lead_sub_status_id', val)}
+                error={errors.lead_sub_status_id}
+                scrollRef={scrollRef}
+                scrollYRef={scrollYRef}
+              />
+              <DropdownField
+                label="Rating *"
+                data={toOptions(AllRating)}
+                placeholder="Select"
+                value={interaction.rating_id}
+                onChange={val => updateField('rating_id', val)}
+                error={errors.rating_id}
+                scrollRef={scrollRef}
+                scrollYRef={scrollYRef}
+              />
+              <DropdownField
+                label="Project *"
+                data={projectOptions}
+                placeholder="Select Project"
+                value={interaction.project_id}
+                onChange={val => updateField('project_id', val)}
+                error={errors.project_id}
+                scrollRef={scrollRef}
+                scrollYRef={scrollYRef}
+              />
+            </Section>
+
+            {/* Follow-up & Remarks */}
+            <Section title="Follow-up & Remarks" icon="event">
+              <PickerField
+                label="Site Visit Date"
+                placeholder="yyyy-mm-dd"
+                icon="calendar-today"
+                value={interaction.site_visit_date}
+                onPress={() => setShowSiteVisitPicker(true)}
+                onClear={() => {
+                  setSiteVisitDate(new Date());
+                  updateField('site_visit_date', '');
+                }}
+              />
+              {showSiteVisitPicker && (
+                <DateTimePicker
+                  value={siteVisitDate}
+                  mode="date"
+                  display="default"
+                  onChange={(e, d) => onChangeDate(e, d, 'site_visit_date')}
+                />
+              )}
+
+              <PickerField
+                label="Call Back Date"
+                placeholder="yyyy-mm-dd"
+                icon="calendar-today"
+                value={interaction.call_back_date}
+                onPress={() => setShowCallBackPicker(true)}
+                onClear={() => {
+                  setCallBackDate(new Date());
+                  updateField('call_back_date', '');
+                }}
+              />
+              {showCallBackPicker && (
+                <DateTimePicker
+                  value={callBackDate}
+                  mode="date"
+                  display="default"
+                  onChange={(e, d) => onChangeDate(e, d, 'call_back_date')}
+                />
+              )}
+
+              <PickerField
+                label="Call Back Time"
+                placeholder="--:--"
+                icon="access-time"
+                value={interaction.call_back_time}
+                onPress={() => setShowTimePicker(true)}
+                onClear={() => {
+                  setCallBackTime(new Date());
+                  updateField('call_back_time', '');
+                }}
+              />
+              {showTimePicker && (
+                <DateTimePicker
+                  value={callBackTime}
+                  mode="time"
+                  display="default"
+                  is24Hour={true}
+                  onChange={onChangeTime}
+                />
+              )}
+
+              <PickerField
+                label="Expected Closure Date"
+                placeholder="yyyy-mm-dd"
+                icon="calendar-today"
+                value={interaction.expected_closure_date}
+                onPress={() => setShowExpectedClosurePicker(true)}
+                onClear={() => {
+                  setExpectedClosureDate(new Date());
+                  updateField('expected_closure_date', '');
+                }}
+              />
+              {showExpectedClosurePicker && (
+                <DateTimePicker
+                  value={expectedClosureDate}
+                  mode="date"
+                  display="default"
+                  onChange={(e, d) =>
+                    onChangeDate(e, d, 'expected_closure_date')
+                  }
+                />
+              )}
+
+              <View style={styles.inputWrapper}>
+                <Text style={styles.label}>Remarks *</Text>
+                <TextInput
+                  placeholder="Remarks"
+                  placeholderTextColor={COLORS.mutedText}
+                  style={[
+                    styles.textArea,
+                    errors.remarks && { borderColor: COLORS.red },
+                  ]}
+                  multiline
+                  value={interaction.remarks}
+                  onChangeText={text => updateField('remarks', text)}
+                  onFocus={handleRemarksFocus}
+                />
+                {errors.remarks ? (
+                  <Text style={styles.error}>{errors.remarks}</Text>
+                ) : null}
+              </View>
+            </Section>
+
+            {/* Buttons */}
+            <View style={styles.buttonRow}>
               <TouchableOpacity
+                style={styles.cancelBtn}
                 onPress={() => navigation.goBack()}
-                style={styles.backBtn}
-                activeOpacity={0.7}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                activeOpacity={0.8}
               >
-                <Icon1 name="chevron-back" size={20} color="#fff" />
+                <Text style={styles.cancelText}>Cancel</Text>
               </TouchableOpacity>
-              <Icon name="event-note" size={20} color="#ffffff" />
-              <Text style={styles.screenTitle} numberOfLines={1}>
-                Add Interaction
-              </Text>
+              <TouchableOpacity
+                style={[styles.button, loading && styles.buttonDisabled]}
+                onPress={handleCreate}
+                disabled={loading}
+                activeOpacity={0.8}
+              >
+                <Icon
+                  name={loading ? 'hourglass-top' : 'check-circle'}
+                  size={16}
+                  color="#fff"
+                />
+                <Text style={styles.buttonText}>
+                  {loading ? 'Submitting...' : 'Add'}
+                </Text>
+              </TouchableOpacity>
             </View>
-          </View>
-        </View>
-
-        <ScrollView
-          ref={scrollRef}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-          contentContainerStyle={{ paddingBottom: 120 }}
-        >
-          {/* Interaction Details */}
-          <Section title="Interaction Details" icon="call">
-            <DropdownField
-              label="Call Status *"
-              data={toOptions(AllCallStatus)}
-              placeholder="Select"
-              value={interaction.call_status_id}
-              onChange={val => updateField('call_status_id', val)}
-              error={errors.call_status_id}
-            />
-            <DropdownField
-              label="Lead Qualification *"
-              data={toOptions(AllLeadQualification)}
-              placeholder="Select"
-              value={interaction.lead_qualification_id}
-              onChange={val => updateField('lead_qualification_id', val)}
-              error={errors.lead_qualification_id}
-            />
-            <DropdownField
-              label="Lead Status *"
-              data={toOptions(AllLeadStatus)}
-              placeholder="Select"
-              value={interaction.lead_status_id}
-              onChange={val => updateField('lead_status_id', val)}
-              error={errors.lead_status_id}
-            />
-            <DropdownField
-              label="Lead Sub Status *"
-              data={toOptions(AllLeadSubStatus)}
-              placeholder="Select"
-              value={interaction.lead_sub_status_id}
-              onChange={val => updateField('lead_sub_status_id', val)}
-              error={errors.lead_sub_status_id}
-            />
-            <DropdownField
-              label="Rating *"
-              data={toOptions(AllRating)}
-              placeholder="Select"
-              value={interaction.rating_id}
-              onChange={val => updateField('rating_id', val)}
-              error={errors.rating_id}
-            />
-            <DropdownField
-              label="Project *"
-              data={projectOptions}
-              placeholder="Select Project"
-              value={interaction.project_id}
-              onChange={val => updateField('project_id', val)}
-              error={errors.project_id}
-            />
-          </Section>
-
-          {/* Follow-up & Remarks */}
-          <Section title="Follow-up & Remarks" icon="event">
-            <PickerField
-              label="Site Visit Date"
-              placeholder="yyyy-mm-dd"
-              icon="calendar-today"
-              value={interaction.site_visit_date}
-              onPress={() => setShowSiteVisitPicker(true)}
-              onClear={() => {
-                setSiteVisitDate(new Date());
-                updateField('site_visit_date', '');
-              }}
-            />
-            {showSiteVisitPicker && (
-              <DateTimePicker
-                value={siteVisitDate}
-                mode="date"
-                display="default"
-                onChange={(e, d) => onChangeDate(e, d, 'site_visit_date')}
-              />
-            )}
-
-            <PickerField
-              label="Call Back Date"
-              placeholder="yyyy-mm-dd"
-              icon="calendar-today"
-              value={interaction.call_back_date}
-              onPress={() => setShowCallBackPicker(true)}
-              onClear={() => {
-                setCallBackDate(new Date());
-                updateField('call_back_date', '');
-              }}
-            />
-            {showCallBackPicker && (
-              <DateTimePicker
-                value={callBackDate}
-                mode="date"
-                display="default"
-                onChange={(e, d) => onChangeDate(e, d, 'call_back_date')}
-              />
-            )}
-
-            <PickerField
-              label="Call Back Time"
-              placeholder="--:--"
-              icon="access-time"
-              value={interaction.call_back_time}
-              onPress={() => setShowTimePicker(true)}
-              onClear={() => {
-                setCallBackTime(new Date());
-                updateField('call_back_time', '');
-              }}
-            />
-            {showTimePicker && (
-              <DateTimePicker
-                value={callBackTime}
-                mode="time"
-                display="default"
-                is24Hour={true}
-                onChange={onChangeTime}
-              />
-            )}
-
-            <PickerField
-              label="Expected Closure Date"
-              placeholder="yyyy-mm-dd"
-              icon="calendar-today"
-              value={interaction.expected_closure_date}
-              onPress={() => setShowExpectedClosurePicker(true)}
-              onClear={() => {
-                setExpectedClosureDate(new Date());
-                updateField('expected_closure_date', '');
-              }}
-            />
-            {showExpectedClosurePicker && (
-              <DateTimePicker
-                value={expectedClosureDate}
-                mode="date"
-                display="default"
-                onChange={(e, d) => onChangeDate(e, d, 'expected_closure_date')}
-              />
-            )}
-
-            <View style={styles.inputWrapper}>
-              <Text style={styles.label}>Remarks *</Text>
-              <TextInput
-                placeholder="Remarks"
-                placeholderTextColor={COLORS.mutedText}
-                style={[
-                  styles.textArea,
-                  errors.remarks && { borderColor: COLORS.red },
-                ]}
-                multiline
-                value={interaction.remarks}
-                onChangeText={text => updateField('remarks', text)}
-                onFocus={handleRemarksFocus}
-              />
-              {errors.remarks ? (
-                <Text style={styles.error}>{errors.remarks}</Text>
-              ) : null}
-            </View>
-          </Section>
-
-          {/* Buttons */}
-          <View style={styles.buttonRow}>
-            <TouchableOpacity
-              style={styles.cancelBtn}
-              onPress={() => navigation.goBack()}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.cancelText}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.button, loading && styles.buttonDisabled]}
-              onPress={handleCreate}
-              disabled={loading}
-              activeOpacity={0.8}
-            >
-              <Icon
-                name={loading ? 'hourglass-top' : 'check-circle'}
-                size={16}
-                color="#fff"
-              />
-              <Text style={styles.buttonText}>
-                {loading ? 'Submitting...' : 'Add'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </ScrollView>
+          </ScrollView>
         </SafeAreaView>
       </View>
     </KeyboardAvoidingView>
@@ -626,7 +815,7 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   backBtn: {
-    paddingRight: 8,
+    paddingRight: 12,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -664,13 +853,14 @@ const styles = StyleSheet.create({
 
   // ── Fields ──
   inputWrapper: { marginBottom: 10 },
+  field: { marginBottom: 5, width: '100%' },
   label: {
     color: '#8a9daf',
     fontSize: 11,
     fontWeight: '600',
     letterSpacing: 0.6,
     textTransform: 'uppercase',
-    marginBottom: 6,
+    marginBottom: 4,
   },
   inputWithIcon: {
     backgroundColor: COLORS.fieldBg,
@@ -696,58 +886,77 @@ const styles = StyleSheet.create({
     borderColor: COLORS.fieldBorder,
   },
 
-  // ── Dropdown (react-native-element-dropdown) ──
+  // ── Inline dropdown ──
   dropdown: {
-    backgroundColor: COLORS.fieldBg,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    height: 44,
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: COLORS.fieldBorder,
-  },
-  dropdownContainer: {
-    backgroundColor: COLORS.modalBg,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: COLORS.fieldBorder,
-    marginTop: 4,
-    elevation: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    overflow: 'hidden',
-  },
-  placeholderStyle: { color: COLORS.mutedText, fontSize: 13 },
-  selectedTextStyle: { color: '#e6ebf2', fontSize: 13, fontWeight: '600' },
-  inputSearchStyle: {
-    height: 42,
-    fontSize: 13,
-    color: '#e6ebf2',
-    backgroundColor: '#28304a',
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.fieldBorder,
-    borderRadius: 0,
-    margin: 0,
-    paddingHorizontal: 12,
-  },
-  itemContainer: {
-    borderBottomWidth: 1,
-    borderBottomColor: '#323a52',
-  },
-  itemRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    minHeight: 42,
+    backgroundColor: '#2b3348',
+    borderWidth: 1,
+    borderColor: '#39415a',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+  },
+  dropdownOpen: { borderColor: '#4aa3df', backgroundColor: '#28304a' },
+  inputError: { borderColor: '#e05a2b' },
+  errorText: { color: '#e05a2b', fontSize: 11, marginTop: 4 },
+  dropdownMenu: {
+    marginTop: 4,
+    backgroundColor: '#2b3348',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#39415a',
+    overflow: Platform.OS === 'ios' ? 'visible' : 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  dropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
     paddingHorizontal: 14,
     paddingVertical: 10,
-    gap: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#323a52',
   },
-  itemRowActive: { backgroundColor: 'rgba(74,163,223,0.15)' },
-  itemTextStyle: { flex: 1, color: '#c3cbdb', fontSize: 13, fontWeight: '500' },
-  itemTextActive: { color: '#7cc4f2', fontWeight: '700' },
+  dropdownItemActive: { backgroundColor: 'rgba(74,163,223,0.15)' },
+  dropdownItemText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#c3cbdb',
+    fontWeight: '500',
+  },
+  dropdownItemTextActive: { color: '#7cc4f2', fontWeight: '700' },
+  placeholder: { color: '#8a9daf', fontSize: 13 },
+  selectedText: { color: '#e6ebf2', fontSize: 13, fontWeight: '600' },
+  ddTriggerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+  },
+  ddSearchWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#39415a',
+    backgroundColor: '#28304a',
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
+  },
+  ddSearchInput: { flex: 1, fontSize: 13, color: '#e6ebf2', padding: 0 },
+  ddNoResult: {
+    textAlign: 'center',
+    color: '#6b7690',
+    fontSize: 12,
+    paddingVertical: 16,
+  },
 
   // ── Buttons ──
   buttonRow: {

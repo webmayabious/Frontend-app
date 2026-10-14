@@ -781,7 +781,7 @@ const ChangeRM = ({ setHideBottomNav }) => {
     if (isFetchingMore) {
       return (
         <View style={styles.footerLoader}>
-          <ActivityIndicator size="small" color={COLORS.accent} />
+          <ActivityIndicator size="small" color='#fff'/>
           <Text style={styles.footerText}>Loading more...</Text>
         </View>
       );
@@ -822,7 +822,7 @@ const ChangeRM = ({ setHideBottomNav }) => {
             >
               <Icon1
                 name="chevron-back"
-                size={20}
+                size={23}
                 color="#fff"
                 style={styles.backIcon}
               />
@@ -914,7 +914,7 @@ const ChangeRM = ({ setHideBottomNav }) => {
 
             {isInitialLoading && (
               <View style={styles.initialLoader}>
-                <ActivityIndicator size="large" color={COLORS.accent} />
+                <ActivityIndicator size="large" color='#fff' />
               </View>
             )}
 
@@ -1169,7 +1169,7 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   backBtn: {
-    paddingRight: 8,
+    paddingRight: 12,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1233,7 +1233,8 @@ const styles = StyleSheet.create({
 
   // ── Lead Card ──
   card: {
-    backgroundColor: 'rgba(4, 35, 70, 0.62)', borderRadius: 12, padding: 12, marginBottom: 10,
+    backgroundColor: 'rgba(4, 35, 70, 0.62)',
+     borderRadius: 12, padding: 12, marginBottom: 10,
     borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.2)',
   },
   cardSelected: { borderColor: 'rgba(0,207,255,0.45)' },

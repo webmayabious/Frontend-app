@@ -184,8 +184,10 @@ const Dashboard = () => {
             refreshing={refreshing}
             onRefresh={onRefresh}
             tintColor="#e3e5e4"
-            colors={['#e3e5e4', '#f472b6', '#a78bfa']}
-            progressBackgroundColor="#1a2080"
+            // colors={['#e3e5e4', '#f472b6', '#a78bfa']}
+            // progressBackgroundColor="#1a2080"
+               colors={['#000000']}
+                        progressBackgroundColor="#ffffff"
           />
         }
       >

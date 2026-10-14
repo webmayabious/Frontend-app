@@ -22,7 +22,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '../api/AxiosInstance';
 import { useNavigation } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
-
+import Icon1 from 'react-native-vector-icons/Ionicons';
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
 // ─── COLORS (Leads List / ChangeRM theme) ────────────────────────────────────
@@ -236,7 +236,7 @@ const DropdownField = ({
 
 // ─── DOB + GENDER ROW ─────────────────────────────────────────────────────────
 
-const DobGenderRow = ({ form, onChange }) => {
+const DobGenderRow = ({ form, onChange,errors }) => {
   const [date, setDate] = React.useState(null);
   const [show, setShow] = React.useState(false);
 
@@ -249,21 +249,28 @@ const DobGenderRow = ({ form, onChange }) => {
     }
   }, [form.date_of_birth]);
 
-  const handleDateChange = (event, selectedDate) => {
-    setShow(false);
-    if (selectedDate) {
-      setDate(selectedDate);
-      onChange('date_of_birth', selectedDate.toISOString().split('T')[0]);
-    } else {
-      setDate(null);
-      onChange('date_of_birth', null);
-    }
-  };
-
+  // const handleDateChange = (event, selectedDate) => {
+  //   setShow(false);
+  //   if (selectedDate) {
+  //     setDate(selectedDate);
+  //     onChange('date_of_birth', selectedDate.toISOString().split('T')[0]);
+  //   } else {
+  //     setDate(null);
+  //     onChange('date_of_birth', null);
+  //   }
+  // };
+const handleDateChange = (event, selectedDate) => {
+  setShow(false);
+  if (event?.type === 'dismissed') return; // user cancelled, keep existing value
+  if (selectedDate) {
+    setDate(selectedDate);
+    onChange('date_of_birth', selectedDate.toISOString().split('T')[0]);
+  }
+};
   const displayDate = date
     ? `${String(date.getDate()).padStart(2, '0')}-${String(date.getMonth() + 1).padStart(2, '0')}-${date.getFullYear()}`
     : 'dd-mm-yyyy';
-
+console.log(errors)
   return (
     <View style={styles.row}>
       <View style={{ flex: 1, marginRight: 10 }}>
@@ -292,7 +299,7 @@ const DobGenderRow = ({ form, onChange }) => {
             <Icon name="calendar-today" size={18} color={COLORS.accent} />
           )}
         </TouchableOpacity>
-
+<ErrorText msg={errors.date_of_birth} />
         {show && (
           <DateTimePicker
             value={date || new Date()}
@@ -323,20 +330,32 @@ const DobGenderRow = ({ form, onChange }) => {
 
 // ─── INPUT FIELD ──────────────────────────────────────────────────────────────
 
-const InputField = ({ label, placeholder, value, onChangeText, keyboardType }) => (
+// const InputField = ({ label, placeholder, value, onChangeText, keyboardType }) => (
+//   <View style={styles.inputWrapper}>
+//     <Text style={styles.label}>{label}</Text>
+//     <TextInput
+//       placeholder={placeholder}
+//       placeholderTextColor={COLORS.mutedText}
+//       style={styles.input}
+//       value={value}
+//       onChangeText={onChangeText}
+//       keyboardType={keyboardType || 'default'}
+//     />
+//   </View>
+// );
+const InputField = ({ label, placeholder, value, onChangeText, keyboardType, error }) => (
   <View style={styles.inputWrapper}>
     <Text style={styles.label}>{label}</Text>
     <TextInput
       placeholder={placeholder}
       placeholderTextColor={COLORS.mutedText}
-      style={styles.input}
+      style={[styles.input, error && styles.inputError]}
       value={value}
       onChangeText={onChangeText}
       keyboardType={keyboardType || 'default'}
     />
   </View>
 );
-
 // ─── SECTION ──────────────────────────────────────────────────────────────────
 
 const Section = ({ title, icon, children }) => (
@@ -438,19 +457,62 @@ export default function Rmform() {
   });
   const Company = allOwnCompany?.data?.data?.map(item => ({ label: item.com_name, value: item.id }));
 
-  const validateForm = () => {
-    let e = {};
-    if (!form.reference) e.reference = 'Reference is required';
-    if (!form.name?.trim()) e.name = 'Name is required';
-    if (!form.phone?.trim()) e.phone = 'Phone number is required';
-    else if (!/^[0-9]{10}$/.test(form.phone.trim())) e.phone = 'Enter a valid 10-digit phone number';
-    if (!form.email?.trim()) e.email = 'Email is required';
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) e.email = 'Enter a valid email address';
-    if (!form.project_id) e.project_id = 'Project is required';
-    if (!form.location_of_property) e.location_of_property = 'Location of property is required';
-    return e;
-  };
+  // const validateForm = () => {
+  //   let e = {};
+  //   if (!form.reference) e.reference = 'Reference is required';
+  //   if (!form.name?.trim()) e.name = 'Name is required';
+  //   if (!form.phone?.trim()) e.phone = 'Phone number is required';
+  //   else if (!/^[0-9]{10}$/.test(form.phone.trim())) e.phone = 'Enter a valid 10-digit phone number';
+  //   if (!form.email?.trim()) e.email = 'Email is required';
+  //   else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) e.email = 'Enter a valid email address';
+  //   if (!form.project_id) e.project_id = 'Project is required';
+  //   if (!form.location_of_property) e.location_of_property = 'Location of property is required';
+  //     if (!form.date_of_birth) e.date_of_birth = 'date of birth  is required';
+  //   return e;
+  // };
+const validateForm = () => {
+  let e = {};
 
+  if (!form.reference) e.reference = 'Reference is required';
+  if (!form.name?.trim()) e.name = 'Name is required';
+
+  // Residential address
+  const address = form.address?.trim();
+  if (!address) e.address = 'Residence address is required';
+  else if (address.length < 5) e.address = 'Address must be at least 5 characters';
+  else if (address.length > 200) e.address = 'Address must be under 200 characters';
+
+  if (!form.phone?.trim()) e.phone = 'Phone number is required';
+  else if (!/^[0-9]{10}$/.test(form.phone.trim())) e.phone = 'Enter a valid 10-digit phone number';
+
+  if (!form.email?.trim()) e.email = 'Email is required';
+  else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) e.email = 'Enter a valid email address';
+
+  // Date of birth
+  if (!form.date_of_birth) {
+    e.date_of_birth = 'Date of birth is required';
+  } else {
+    const dob = new Date(form.date_of_birth);
+    const today = new Date();
+    if (isNaN(dob.getTime())) {
+      e.date_of_birth = 'Enter a valid date of birth';
+    } else if (dob > today) {
+      e.date_of_birth = 'Date of birth cannot be in the future';
+    } else {
+      let age = today.getFullYear() - dob.getFullYear();
+      const m = today.getMonth() - dob.getMonth();
+      if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) age--;
+      if (age < 18) e.date_of_birth = 'Lead must be at least 18 years old';
+      else if (age > 100) e.date_of_birth = 'Enter a valid date of birth';
+    }
+  }
+
+  if (!form.project_id) e.project_id = 'Project is required';
+    if (!form.com_id) e.com_id = 'Company is required';
+  if (!form.location_of_property) e.location_of_property = 'Location of property is required';
+
+  return e;
+};
   const onSave = async () => {
     const err = validateForm();
     setErrors(err);
@@ -538,11 +600,24 @@ export default function Rmform() {
         {/* ── Section Header ── */}
         <View style={styles.sectionHeader}>
           <View style={styles.sectionTitleRowHeader}>
-            <Icon name="person-add" size={16} color={COLORS.accent} />
+             <TouchableOpacity
+                            onPress={() => navigation.goBack()}
+                            style={styles.backBtn}
+                            activeOpacity={0.7}
+                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                          >
+                            <Icon1
+                              name="chevron-back"
+                              size={23}
+                              color="#fff"
+                              style={styles.backIcon}
+                            />
+                          </TouchableOpacity>
+            <Icon name="person-add" size={20} color='#ffffff' />
             <Text style={styles.headerTitle}>Add New Lead</Text>
           </View>
 
-          <TouchableOpacity
+          {/* <TouchableOpacity
             style={styles.closeBtn}
             onPress={() => navigation.goBack()}
             activeOpacity={0.75}
@@ -554,7 +629,7 @@ export default function Rmform() {
               />
               <Text style={styles.closeBtnText}>Back</Text>
             </View>
-          </TouchableOpacity>
+          </TouchableOpacity> */}
         </View>
 
         <ScrollView
@@ -594,7 +669,7 @@ export default function Rmform() {
               value={form.address}
               onChangeText={v => onChange('address', v)}
             />
-
+<ErrorText msg={errors.address} />
             <InputField
               label="Mobile No. *"
               placeholder="Enter 10-digit mobile number"
@@ -613,7 +688,7 @@ export default function Rmform() {
             />
             <ErrorText msg={errors.email} />
 
-            <DobGenderRow form={form} onChange={onChange} />
+            <DobGenderRow form={form} onChange={onChange} errors={errors}/>
 
             <DropdownField
               label="Marital Status"
@@ -657,7 +732,7 @@ export default function Rmform() {
                 scrollYRef={scrollYRef}
               />
             )}
-
+   <ErrorText msg={errors.com_id} />
             <DropdownField
               label="Project *"
               data={projectOptions}
@@ -803,6 +878,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.25)',
   },
+    backBtn: {
+    paddingRight: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  backIcon: {
+    width: 20,
+    height: 20,
+    tintColor: '#ffffff',
+  },
   closeBtnText: { color: COLORS.white, fontSize: 11, fontWeight: '600' },
   backButton: { flexDirection: 'row', alignItems: 'center' },
 
@@ -832,14 +917,14 @@ const styles = StyleSheet.create({
 
   // ── Fields ──
   inputWrapper: { marginBottom: 10 },
-  field: { marginBottom: 10 },
+  field: { marginBottom: 5 },
   label: {
     color: '#8a9daf',
     fontSize: 11,
     fontWeight: '600',
     letterSpacing: 0.6,
     textTransform: 'uppercase',
-    marginBottom: 6,
+    marginBottom: 4,
   },
 
   input: {
