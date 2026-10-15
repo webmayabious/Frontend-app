@@ -28,6 +28,7 @@ const BottomNav = ({ routeName }) => {
   const insets = useSafeAreaInsets();
   const userRole = useSelector(state => state.userRole);
   const isAdmin = userRole?.includes('ADMIN');
+  const inTest = userRole?.includes('TEST ROLE');
   const isRM = userRole?.includes('RM');
   const isBusinessHead = userRole?.includes('BUSINESS HEAD');
   const isCITYHEAD = userRole?.includes('CITY HEAD');
@@ -48,11 +49,12 @@ const BottomNav = ({ routeName }) => {
       ]}
     >
       <NavItem icon="view-dashboard" label="Dashboard" screen="Dashboard" routeName={routeName} />
+      {(isAdmin || isBusinessHead || isCITYHEAD || inTest) && (
+        <NavItem icon="account-switch" label="Change RM" screen="ChangeRM" routeName={routeName} />
+      )}
+      {/* Assign RM: hidden for TEST ROLE */}
       {(isAdmin || isBusinessHead || isCITYHEAD) && (
-        <>
-          <NavItem icon="account-switch" label="Change RM" screen="ChangeRM" routeName={routeName} />
-          <NavItem icon="account-details" label="Assign RM" screen="AssignRM" routeName={routeName} />
-        </>
+        <NavItem icon="account-details" label="Assign RM" screen="AssignRM" routeName={routeName} />
       )}
 
       <NavItem icon1="list-alt" label="Leads List" screen="LeadsListScreen" routeName={routeName} />
