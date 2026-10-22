@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,9 @@ import {
   Image,
   KeyboardAvoidingView,
   Dimensions,
+  Animated,
+  Easing,
+  Keyboard,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import Icon1 from 'react-native-vector-icons/Ionicons';
@@ -47,41 +50,213 @@ const LeadStatus = [
   { label: 'Booking Done', value: '5' },
 ];
 
-const DropdownField = ({ label, data, placeholder, value, onChange }) => {
-  const [isFocus, setIsFocus] = React.useState(false);
+/* ================= INLINE DROPDOWN ================= */
+const ITEM_H = 42;
+const SEARCH_H = 44;
+const MAX_LIST_H = 220;
+const FIELD_TOP_OFFSET = Platform.OS === 'ios' ? 280 : 200;
+
+// gives every DropdownField access to the page ScrollView
+const ScrollCtx = createContext({ scrollRef: null, scrollYRef: null });
+
+const DropdownField = ({ label, data, value, onChange, error, placeholder }) => {
+  const { scrollRef, scrollYRef } = useContext(ScrollCtx);
+
+  const [open, setOpen] = useState(false); // what the user wants
+  const [mounted, setMounted] = useState(false); // keeps list alive while closing
+  const [search, setSearch] = useState('');
+  const heightAnim = useRef(new Animated.Value(0)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const wrapRef = useRef(null);
+  const justOpened = useRef(false);
+
+  const options = data || [];
+
+  // String() compare so "1" and 1 both match
+  const isSame = (a, b) =>
+    a !== null && a !== undefined && b !== null && b !== undefined && String(a) === String(b);
+
+  const selected = options.find(o => isSame(o.value, value));
+
+  const filtered = options.filter(o =>
+    String(o.label ?? '').toLowerCase().includes(search.toLowerCase()),
+  );
+
+  // list height follows the real content, capped at MAX_LIST_H
+  const contentH = filtered.length === 0 ? 48 : filtered.length * ITEM_H;
+  const targetH = Math.min(SEARCH_H + contentH, MAX_LIST_H);
+
+  const scrollFieldIntoView = () => {
+    if (!wrapRef.current || !scrollRef?.current) return;
+    wrapRef.current.measureInWindow((x, y) => {
+      const delta = y - FIELD_TOP_OFFSET;
+      if (delta > 0) {
+        scrollRef.current.scrollTo({
+          y: (scrollYRef?.current || 0) + delta,
+          animated: true,
+        });
+      }
+    });
+  };
+
+  // single place that runs every animation
+  useEffect(() => {
+    if (!open && !mounted) return;
+
+    Animated.parallel([
+      Animated.timing(heightAnim, {
+        toValue: open ? targetH : 0,
+        duration: open ? 220 : 180,
+        easing: open ? Easing.out(Easing.cubic) : Easing.in(Easing.cubic),
+        useNativeDriver: false,
+      }),
+      Animated.timing(fadeAnim, {
+        toValue: open ? 1 : 0,
+        duration: open ? 220 : 160,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: false,
+      }),
+    ]).start(({ finished }) => {
+      if (!finished) return;
+      if (open) {
+        if (justOpened.current) {
+          justOpened.current = false;
+          scrollFieldIntoView();
+        }
+      } else {
+        setMounted(false);
+        setSearch('');
+      }
+    });
+  }, [open, targetH]);
+
+  const toggle = () => {
+    if (open) {
+      Keyboard.dismiss();
+      setOpen(false);
+    } else {
+      justOpened.current = true;
+      setMounted(true);
+      setOpen(true);
+    }
+  };
+
+  const handleSelect = item => {
+    onChange && onChange(item.value);
+    Keyboard.dismiss();
+    setOpen(false);
+  };
+
+  const arrowRotate = fadeAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '180deg'],
+  });
+
   return (
-    <View style={styles.inputWrapper}>
-      <Text style={styles.label}>{label}</Text>
-      <Dropdown
-        style={[
-          styles.dropdown,
-          isFocus && { borderColor: '#4aa3df' },
-        ]}
-        containerStyle={styles.dropdownContainer}
-        placeholderStyle={styles.placeholderStyle}
-        selectedTextStyle={styles.selectedTextStyle}
-        itemTextStyle={styles.itemTextStyle}
-        activeColor="rgba(74,163,223,0.15)"
-        data={data}
-        labelField="label"
-        valueField="value"
-        placeholder={placeholder}
-        value={value}
-        itemContainerStyle={styles.itemContainer}
-        onFocus={() => setIsFocus(true)}
-        onBlur={() => setIsFocus(false)}
-        onChange={item => {
-          setIsFocus(false);
-          onChange && onChange(item.value);
-        }}
-        renderRightIcon={() => (
-          <Icon
-            name={isFocus ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
-            size={20}
-            color={COLORS.accent}
-          />
-        )}
-      />
+    <View ref={wrapRef} collapsable={false} style={styles.inputWrapper}>
+      {label ? <Text style={styles.label}>{label}</Text> : null}
+
+      {/* Trigger */}
+      <TouchableOpacity
+        style={[styles.dropdown, open && styles.dropdownOpen, error && styles.inputError]}
+        onPress={toggle}
+        activeOpacity={0.8}
+      >
+        <View style={styles.ddTriggerLeft}>
+          <Text
+            style={selected ? styles.selectedText : styles.placeholder}
+            numberOfLines={1}
+          >
+            {selected ? selected.label : placeholder || 'Select...'}
+          </Text>
+        </View>
+        <Animated.View style={{ transform: [{ rotate: arrowRotate }] }}>
+          <Icon name="keyboard-arrow-down" size={20} color="#8a9daf" />
+        </Animated.View>
+      </TouchableOpacity>
+
+      {/* Animated list */}
+      {mounted && (
+        <Animated.View
+          style={[
+            styles.dropdownMenu,
+            {
+              height: heightAnim,
+              opacity: fadeAnim,
+              overflow: 'hidden',
+              transform: [
+                {
+                  translateY: fadeAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [-6, 0],
+                  }),
+                },
+              ],
+            },
+          ]}
+        >
+          <View style={[styles.ddSearchWrap, { height: SEARCH_H }]}>
+            <Icon name="search" size={16} color="#aaa" style={{ marginRight: 6 }} />
+            <TextInput
+              style={styles.ddSearchInput}
+              placeholder="Search..."
+              placeholderTextColor="#bbb"
+              value={search}
+              onChangeText={setSearch}
+              autoCorrect={false}
+              autoCapitalize="none"
+              returnKeyType="search"
+            />
+            {search.length > 0 && (
+              <TouchableOpacity
+                onPress={() => setSearch('')}
+                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+              >
+                <Icon name="close" size={14} color="#ccc" />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="always"
+            nestedScrollEnabled
+          >
+            {filtered.length === 0 ? (
+              <Text style={styles.ddNoResult}>No results found</Text>
+            ) : (
+              filtered.map(item => {
+                const isActive = isSame(item.value, value);
+                return (
+                  <TouchableOpacity
+                    key={String(item.value)}
+                    style={[
+                      styles.dropdownItem,
+                      { height: ITEM_H },
+                      isActive && styles.dropdownItemActive,
+                    ]}
+                    onPress={() => handleSelect(item)}
+                    activeOpacity={0.7}
+                  >
+                    <Text
+                      style={[
+                        styles.dropdownItemText,
+                        isActive && styles.dropdownItemTextActive,
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {item.label}
+                    </Text>
+                    {isActive && <Icon name="check" size={16} color="#1482cc" />}
+                  </TouchableOpacity>
+                );
+              })
+            )}
+          </ScrollView>
+        </Animated.View>
+      )}
+
+      {error ? <Text style={styles.errorText}>{error}</Text> : null}
     </View>
   );
 };
@@ -237,7 +412,8 @@ export default function MeetingsEdit({ route }) {
 
   const navigation = useNavigation();
   const queryClient = useQueryClient();
-
+const scrollRef = useRef(null);
+const scrollYRef = useRef(0);
   const onChange = (key, value) => setForm(prev => ({ ...prev, [key]: value }));
 
   useEffect(() => {
@@ -398,11 +574,15 @@ export default function MeetingsEdit({ route }) {
           </View>
         </View>
 
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-          contentContainerStyle={{ paddingBottom: 120 }}
-        >
+   <ScrollCtx.Provider value={{ scrollRef, scrollYRef }}>
+  <ScrollView
+    ref={scrollRef}
+    onScroll={e => { scrollYRef.current = e.nativeEvent.contentOffset.y; }}
+    scrollEventThrottle={16}
+    showsVerticalScrollIndicator={false}
+    keyboardShouldPersistTaps="handled"
+    contentContainerStyle={{ paddingBottom: 120 }}
+  >
           {/* Personal Details */}
           <Section title="Personal Details" icon="person">
             <DropdownField
@@ -561,7 +741,9 @@ export default function MeetingsEdit({ route }) {
             </Text>
           </TouchableOpacity>
         </ScrollView>
+        </ScrollCtx.Provider>
       </View>
+      
     </KeyboardAvoidingView>
   );
 }
@@ -683,23 +865,61 @@ const styles = StyleSheet.create({
   },
 
   // ── Dropdown (react-native-element-dropdown) ──
+  // ── Inline Dropdown ──
   dropdown: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: COLORS.fieldBg,
+    borderWidth: 1,
+    borderColor: COLORS.fieldBorder,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    height: 44,
+  },
+  dropdownOpen: { borderColor: '#4aa3df', backgroundColor: '#28304a' },
+  inputError: { borderColor: '#e05a2b' },
+  errorText: { color: '#e05a2b', fontSize: 11, marginTop: 4 },
+  dropdownMenu: {
+    marginTop: 4,
     backgroundColor: COLORS.fieldBg,
     borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COLORS.fieldBorder,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  dropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#323a52',
+  },
+  dropdownItemActive: { backgroundColor: 'rgba(74,163,223,0.15)' },
+  dropdownItemText: { flex: 1, fontSize: 13, color: '#c3cbdb', fontWeight: '500' },
+  dropdownItemTextActive: { color: '#7cc4f2', fontWeight: '700' },
+  placeholder: { color: '#8a9daf', fontSize: 13 },
+  selectedText: { color: '#e6ebf2', fontSize: 13, fontWeight: '600' },
+  ddTriggerLeft: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 },
+  ddSearchWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 12,
-    height: 44,
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: COLORS.fieldBorder,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.fieldBorder,
+    backgroundColor: '#28304a',
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
   },
-  dropdownContainer: {
-    backgroundColor: COLORS.modalBg,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: COLORS.fieldBorder,
-    elevation: 8,
-    overflow: 'hidden',
-  },
+  ddSearchInput: { flex: 1, fontSize: 13, color: '#e6ebf2', padding: 0 },
+  ddNoResult: { textAlign: 'center', color: '#6b7690', fontSize: 12, paddingVertical: 16 },
   placeholderStyle: { color: COLORS.mutedText, fontSize: 13 },
   selectedTextStyle: { color: '#e6ebf2', fontSize: 13, fontWeight: '600' },
   itemTextStyle: { color: '#c3cbdb', fontSize: 13, fontWeight: '500' },
