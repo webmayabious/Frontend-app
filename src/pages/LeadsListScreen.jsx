@@ -722,7 +722,7 @@ const EMPTY_FILTERS = {
   siteVisitToDate: null,
 };
 
-const LeadsListScreen = () => {
+const LeadsListScreen = ({setHideBottomNav} ) => {
   const navigation = useNavigation();
   const listRef = useRef(null);
   const [searchText, setSearchText] = useState('');
@@ -802,6 +802,7 @@ const LeadsListScreen = () => {
   const filterAnim = useRef(new Animated.Value(screenHeight)).current;
 
   const openFilterModal = () => {
+    setHideBottomNav && setHideBottomNav(true);
     DeviceEventEmitter.emit('toggleBottomNav', false);
     setShowFilterModal(true);
     filterAnim.setValue(screenHeight);
@@ -821,12 +822,19 @@ const LeadsListScreen = () => {
       useNativeDriver: true,
     }).start(() => {
       setShowFilterModal(false);
+      setHideBottomNav && setHideBottomNav(false);
       DeviceEventEmitter.emit('toggleBottomNav', true);
     });
   };
 
   useEffect(() => {
-    return () => DeviceEventEmitter.emit('toggleBottomNav', true);
+    navigation.setParams({ hideBottomNav: showFilterModal });
+  }, [showFilterModal]);
+
+  useEffect(() => {
+    return () => 
+      setHideBottomNav && setHideBottomNav(false),
+      DeviceEventEmitter.emit('toggleBottomNav', true);
   }, []);
 
   const formatDate = date => {
@@ -1361,7 +1369,13 @@ const LeadsListScreen = () => {
       </Modal>
 
       {/* ── Filter Bottom Sheet ── */}
-      {showFilterModal && (
+      <Modal
+        visible={showFilterModal}
+        transparent
+        animationType="none"
+        statusBarTranslucent
+        onRequestClose={closeFilterModal}
+      >
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.bottomSheetOverlay}
@@ -1566,7 +1580,7 @@ const LeadsListScreen = () => {
             </View>
           </Animated.View>
         </KeyboardAvoidingView>
-      )}
+      </Modal>
 
       {/* ── Custom Alert ── */}
       <CustomAlertHost />

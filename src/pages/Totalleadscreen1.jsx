@@ -575,7 +575,7 @@ const EMPTY_FILTERS = {
   siteVisitToDate: null,
 };
 
-const Totalleadscreen1 = () => {
+const Totalleadscreen1 = ({setHideBottomNav}) => {
   const navigation = useNavigation();
   const listRef = useRef(null);
   const [searchText, setSearchText] = useState('');
@@ -593,6 +593,7 @@ const Totalleadscreen1 = () => {
   const filterAnim = useRef(new Animated.Value(screenHeight)).current;
 
   const openFilterModal = () => {
+    setHideBottomNav && setHideBottomNav(true);
     DeviceEventEmitter.emit('toggleBottomNav', false);
     setShowFilterModal(true);
     filterAnim.setValue(screenHeight);
@@ -612,12 +613,19 @@ const Totalleadscreen1 = () => {
       useNativeDriver: true,
     }).start(() => {
       setShowFilterModal(false);
+      setHideBottomNav && setHideBottomNav(false);
       DeviceEventEmitter.emit('toggleBottomNav', true);
     });
   };
 
   useEffect(() => {
-    return () => DeviceEventEmitter.emit('toggleBottomNav', true);
+      navigation.setParams({ hideBottomNav: showFilterModal });
+    }, [showFilterModal]);
+
+  useEffect(() => {
+    return () => 
+      setHideBottomNav && setHideBottomNav(false),
+      DeviceEventEmitter.emit('toggleBottomNav', true);
   }, []);
 
   const formatDate = date => {
@@ -811,7 +819,7 @@ const Totalleadscreen1 = () => {
                               // style={styles.backIcon}
                             />
                   </TouchableOpacity>
-          <Icon name="list-alt" size={16} color={COLORS.accent} />
+          <Icon name="list-alt" size={20} color='#ffffff' />
           <Text style={styles.sectionTitle}>Total Leads</Text>
         </View>
         <View style={styles.sectionActions}>
@@ -917,7 +925,13 @@ const Totalleadscreen1 = () => {
       )}
 
       {/* ── Filter Bottom Sheet ── */}
-      {showFilterModal && (
+      <Modal
+              visible={showFilterModal}
+              transparent
+              animationType="none"
+              statusBarTranslucent
+              onRequestClose={closeFilterModal}
+            >
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.bottomSheetOverlay}
@@ -1122,7 +1136,7 @@ const Totalleadscreen1 = () => {
             </View>
           </Animated.View>
         </KeyboardAvoidingView>
-      )}
+      </Modal>
 
       {/* ── Custom Alert ── */}
       <CustomAlertHost />
@@ -1166,8 +1180,8 @@ const styles = StyleSheet.create({
     marginTop: 10, marginBottom: 10, paddingHorizontal: 14, paddingVertical: 8,
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)',
   },
-  sectionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
-  sectionTitle: { color: COLORS.white, fontSize: 14, fontWeight: '700' },
+  sectionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  sectionTitle: { color: '#ffffff', fontSize: 17, fontWeight: '700'},
   sectionActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   iconBtn: {
     width: 30, height: 28, alignItems: 'center', justifyContent: 'center',
@@ -1195,7 +1209,7 @@ const styles = StyleSheet.create({
     height: 40, backgroundColor: 'rgba(255,255,255,0.06)',
   },
     backBtn: {
-    paddingRight: 12,
+    paddingRight: 2,
     justifyContent: 'center',
     alignItems: 'center',
   },
