@@ -1209,7 +1209,7 @@ const styles = StyleSheet.create({
     height: 40, backgroundColor: 'rgba(255,255,255,0.06)',
   },
     backBtn: {
-    paddingRight: 2,
+       paddingRight: 8,
     justifyContent: 'center',
     alignItems: 'center',
   },
