@@ -1180,8 +1180,8 @@ const styles = StyleSheet.create({
     marginTop: 10, marginBottom: 10, paddingHorizontal: 14, paddingVertical: 8,
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)',
   },
-  sectionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  sectionTitle: { color: '#ffffff', fontSize: 17, fontWeight: '700'},
+  sectionTitleRow: { flexDirection: 'row', alignItems: 'center'},
+  sectionTitle: { color: '#ffffff', fontSize: 17, fontWeight: '700', marginLeft:6},
   sectionActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   iconBtn: {
     width: 30, height: 28, alignItems: 'center', justifyContent: 'center',
@@ -1209,7 +1209,7 @@ const styles = StyleSheet.create({
     height: 40, backgroundColor: 'rgba(255,255,255,0.06)',
   },
     backBtn: {
-       paddingRight: 8,
+       paddingRight: 12,
     justifyContent: 'center',
     alignItems: 'center',
   },
