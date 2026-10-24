@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
@@ -19,7 +18,6 @@ import {
   DeviceEventEmitter,
   Modal,
   PanResponder,
-  KeyboardAvoidingView,
   Easing,
 } from 'react-native';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
@@ -579,6 +577,8 @@ const FilterBottomSheet = ({
   const scrollAtTop = useRef(true);
   const isClosing = useRef(false);
 
+  const [kbHeight, setKbHeight] = useState(0);
+
   const scrollRef1 = useRef(null);
   const scrollYRef = useRef(0);
 
@@ -586,6 +586,25 @@ const FilterBottomSheet = ({
   const [showToPicker, setShowToPicker] = useState(false);
   const [iosPickerTarget, setIosPickerTarget] = useState(null);
   const [iosTempDate, setIosTempDate] = useState(new Date());
+
+  // Track keyboard height ourselves so the sheet always returns to the
+  // bottom once the keyboard is hidden.
+  useEffect(() => {
+    const showEvt =
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvt =
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const showSub = Keyboard.addListener(showEvt, e =>
+      setKbHeight(e.endCoordinates.height),
+    );
+    const hideSub = Keyboard.addListener(hideEvt, () => setKbHeight(0));
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   const animateOpen = () => {
     translateY.setValue(SCREEN_HEIGHT);
@@ -624,6 +643,7 @@ const FilterBottomSheet = ({
       }),
     ]).start(() => {
       isClosing.current = false;
+      setKbHeight(0);
       setModalMounted(false);
       setShowFromPicker(false);
       setShowToPicker(false);
@@ -751,12 +771,19 @@ const FilterBottomSheet = ({
         />
       </Animated.View>
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.kavWrapper}
+      <View
+        style={[styles.kavWrapper, { paddingBottom: kbHeight }]}
         pointerEvents="box-none"
       >
-        <Animated.View style={[styles.sheet, { transform: [{ translateY }] }]}>
+        <Animated.View
+          style={[
+            styles.sheet,
+            {
+              maxHeight: Math.max(SCREEN_HEIGHT * 0.9 - kbHeight, 320),
+              transform: [{ translateY }],
+            },
+          ]}
+        >
           <View {...handlePan.panHandlers} style={styles.dragHandleWrap}>
             <View style={styles.dragHandleLight} />
           </View>
@@ -890,7 +917,7 @@ const FilterBottomSheet = ({
             />
           )}
         </Animated.View>
-      </KeyboardAvoidingView>
+      </View>
     </Modal>
   );
 };

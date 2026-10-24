@@ -19,7 +19,6 @@ import {
   Easing,
   Modal,
   PanResponder,
-  KeyboardAvoidingView,
   ActivityIndicator,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
@@ -466,8 +465,29 @@ const FilterBottomSheet = ({
   const scrollAtTop = useRef(true);
   const isClosing = useRef(false);
 
+  const [kbHeight, setKbHeight] = useState(0);
+
   const scrollRef1 = useRef(null);
   const scrollYRef = useRef(0);
+
+  // Track keyboard height ourselves so the sheet always returns to the
+  // bottom once the keyboard is hidden.
+  useEffect(() => {
+    const showEvt =
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvt =
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const showSub = Keyboard.addListener(showEvt, e =>
+      setKbHeight(e.endCoordinates.height),
+    );
+    const hideSub = Keyboard.addListener(hideEvt, () => setKbHeight(0));
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   const animateOpen = () => {
     translateY.stopAnimation();
@@ -520,6 +540,7 @@ const FilterBottomSheet = ({
       }),
     ]).start(({ finished }) => {
       isClosing.current = false;
+      setKbHeight(0);
 
       if (finished) {
         setModalMounted(false);
@@ -620,12 +641,19 @@ const FilterBottomSheet = ({
         />
       </Animated.View>
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.kavWrapper}
+      <View
+        style={[styles.kavWrapper, { paddingBottom: kbHeight }]}
         pointerEvents="box-none"
       >
-        <Animated.View style={[styles.sheet, { transform: [{ translateY }] }]}>
+        <Animated.View
+          style={[
+            styles.sheet,
+            {
+              maxHeight: Math.max(SCREEN_HEIGHT * 0.9 - kbHeight, 320),
+              transform: [{ translateY }],
+            },
+          ]}
+        >
           <View {...handlePan.panHandlers} style={styles.dragHandleWrap}>
             <View style={styles.dragHandleLight} />
           </View>
@@ -668,7 +696,7 @@ const FilterBottomSheet = ({
             </View>
           </ScrollView>
         </Animated.View>
-      </KeyboardAvoidingView>
+      </View>
     </Modal>
   );
 };
