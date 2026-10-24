@@ -1301,7 +1301,7 @@ const styles = StyleSheet.create({
   },
 
   /* ── List ── */
-  listContent: { paddingHorizontal: scale(10), paddingBottom: verticalScale(10) },
+  listContent: { paddingHorizontal: scale(10), paddingBottom: verticalScale(120) },
   centerLoader: { alignItems: 'center', justifyContent: 'center', marginTop: 40 },
   footerLoader: {
     flexDirection: 'row',
@@ -1338,7 +1338,7 @@ const styles = StyleSheet.create({
 
   /* ── Card ── */
   card: {
-    backgroundColor: '#rgba(4, 35, 70, 0.62)',
+    backgroundColor: 'rgba(4, 35, 70, 0.62)',
     borderRadius: 4,
     padding: 12,
     marginBottom: 10,
