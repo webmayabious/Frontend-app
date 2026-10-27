@@ -491,6 +491,7 @@ const AdvancedFilterModal = ({
   usersLoading,
   onApply,
   onReset,
+  showUserFilter = false,
 }) => {
   const slideAnim = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
   const [mounted, setMounted] = useState(false);
@@ -649,14 +650,14 @@ const AdvancedFilterModal = ({
                 />
               </View>
             </View>
-
+          {showUserFilter && (
             <UserPicker
               users={users}
               loading={usersLoading}
               value={selectedUser}
               onSelect={onSelectUser}
             />
-
+          )}
             <StatusPicker
               value={status}
               onSelect={v => onStatusChange(v ?? '')}
@@ -750,6 +751,8 @@ const AdvancedFilterModal = ({
 const NotificationScreen = ({ setHideBottomNav, navigation }) => {
   // per-type unread counts from Redux
   const unreadCounts = useSelector(state => state.unreadCounts);
+  const userRole = useSelector(state => state.userRole);
+  const isAdmin = userRole?.includes('ADMIN');
  const insets = useSafeAreaInsets();
   const [selectAll, setSelectAll] = useState(false);
   const [checkedIds, setCheckedIds] = useState([]);
@@ -927,7 +930,9 @@ const NotificationScreen = ({ setHideBottomNav, navigation }) => {
     setModalToDate(advancedFilter.toDate);
     setModalUser(advancedFilter.user);
     setModalStatus(advancedFilter.status || '');
-    fetchUserList();
+    if (isAdmin) {
+      fetchUserList();
+    }
     setHideBottomNav && setHideBottomNav(true);
     setFilterModalVisible(true);
   };
@@ -941,7 +946,7 @@ const NotificationScreen = ({ setHideBottomNav, navigation }) => {
     setAdvancedFilter({
       fromDate: modalFromDate,
       toDate: modalToDate,
-      user: modalUser,
+      user: isAdmin ? modalUser : null,
       status: modalStatus,
     });
     closeFilterModal();
@@ -1379,6 +1384,7 @@ const NotificationScreen = ({ setHideBottomNav, navigation }) => {
           usersLoading={userListLoading}
           onApply={applyAdvancedFilter}
           onReset={resetAdvancedFilter}
+          showUserFilter={isAdmin}
         />
 
         {/* ── Custom Alert ── */}
