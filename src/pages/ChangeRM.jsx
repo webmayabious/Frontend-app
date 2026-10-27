@@ -14,8 +14,11 @@ import {
   Platform,
   Image,
   ActivityIndicator,
-  KeyboardAvoidingView,
   Modal,
+  Keyboard,
+  Easing,
+  PanResponder,
+  DeviceEventEmitter,
 } from 'react-native';
 import { ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -28,10 +31,15 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
 const screenHeight = Dimensions.get('window').height;
+const SCREEN_HEIGHT = screenHeight;
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const PAGE_SIZE = 20;
 const scale = size => (SCREEN_WIDTH / 375) * size;
 const verticalScale = size => (screenHeight / 812) * size;
+
+// keyboard events (iOS "Will" = smoother, Android only has "Did")
+const KB_SHOW = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+const KB_HIDE = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
 
 // ─── COLORS ──────────────────────────────────────────────────────────────────
 
@@ -196,185 +204,579 @@ const CustomAlertHost = () => {
   );
 };
 
+// ─── INLINE DROPDOWN FIELD (filter sheet — same as Totalleadscreen1) ─────────
 
-// ─── SEARCHABLE DROPDOWN ──────────────────────────────────────────────────────
+const ITEM_H = 42;
+const SEARCH_H = 44;
+const MAX_LIST_H = 220;
+const LIST_GAP = 4; // marginTop of the list
+const EXTRA_GAP = 16; // breathing space between list and keyboard
 
-const SearchableDropdown = ({ label, data = [], placeholder, value, onChange }) => {
-  const [isOpen, setIsOpen] = useState(false);
+const DropdownField = ({
+  label,
+  data,
+  value,
+  onChange,
+  error,
+  scrollRef,
+  scrollYRef,
+  kbTopRef,
+  placeholder,
+}) => {
+  const insets = useSafeAreaInsets();
+
+  const [open, setOpen] = useState(false); // what the user wants
+  const [mounted, setMounted] = useState(false); // keeps list alive while closing
   const [search, setSearch] = useState('');
-  const searchRef = useRef(null);
+  const heightAnim = useRef(new Animated.Value(0)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const triggerRef = useRef(null);
+  const justOpened = useRef(false);
 
-  const selectedItem = data.find(item => item.value === value);
+  const options = data || [];
+  const selected = options.find(o => o.value === value);
 
-  const filtered = data.filter(item =>
-    item.label.toLowerCase().includes(search.toLowerCase())
+  const filtered = options.filter(o =>
+    String(o.label ?? '')
+      .toLowerCase()
+      .includes(search.toLowerCase()),
   );
 
-  const handleOpen = () => {
-    setIsOpen(true);
-    setSearch('');
-    // auto-focus search box after modal opens
-    setTimeout(() => searchRef.current?.focus(), 150);
+  // list height follows the real content, capped at MAX_LIST_H
+  const contentH = filtered.length === 0 ? 48 : filtered.length * ITEM_H;
+  const targetH = Math.min(SEARCH_H + contentH, MAX_LIST_H);
+
+  // latest values for the keyboard listener (it is registered only once)
+  const openRef = useRef(false);
+  const targetHRef = useRef(targetH);
+  const topInsetRef = useRef(insets.top);
+  openRef.current = open;
+  targetHRef.current = targetH;
+  topInsetRef.current = insets.top;
+
+  /**
+   * Scroll the sheet so that the WHOLE list (trigger + list) sits above the
+   * keyboard and the field never goes above the visible top of the scroll area.
+   * kbTop = Y of the keyboard top edge on the screen (null = no keyboard).
+   */
+  const ensureListVisible = kbTop => {
+    if (!triggerRef.current || !scrollRef?.current) return;
+
+    const run = viewTop => {
+      if (!triggerRef.current) return;
+      triggerRef.current.measureInWindow((x, y, w, h) => {
+        const visibleBottom = kbTop || kbTopRef?.current || SCREEN_HEIGHT;
+        const listBottom = y + h + LIST_GAP + targetHRef.current + EXTRA_GAP;
+
+        let delta = 0;
+        if (listBottom > visibleBottom) delta = listBottom - visibleBottom;
+
+        // keep the field (and its label) inside the visible scroll area
+        const minTop = viewTop + 24;
+        if (y - delta < minTop) delta = y - minTop;
+
+        if (delta > 1) {
+          scrollRef.current?.scrollTo({
+            y: (scrollYRef?.current || 0) + delta,
+            animated: true,
+          });
+        }
+      });
+    };
+
+    if (typeof scrollRef.current.measureInWindow === 'function') {
+      scrollRef.current.measureInWindow((x, vy) => run(vy || 0));
+    } else {
+      run(topInsetRef.current + 60);
+    }
   };
 
-  const handleSelect = (item) => {
+  // single place that runs every animation
+  useEffect(() => {
+    if (!open && !mounted) return;
+
+    Animated.parallel([
+      Animated.timing(heightAnim, {
+        toValue: open ? targetH : 0,
+        duration: open ? 220 : 180,
+        easing: open ? Easing.out(Easing.cubic) : Easing.in(Easing.cubic),
+        useNativeDriver: false,
+      }),
+      Animated.timing(fadeAnim, {
+        toValue: open ? 1 : 0,
+        duration: open ? 220 : 160,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: false,
+      }),
+    ]).start(({ finished }) => {
+      if (!finished) return;
+      if (open) {
+        if (justOpened.current) {
+          justOpened.current = false;
+          ensureListVisible();
+        }
+      } else {
+        setMounted(false);
+        setSearch('');
+      }
+    });
+  }, [open, targetH]);
+
+  // when the keyboard shows (user taps Search) -> re-scroll so the list stays visible
+  useEffect(() => {
+    const sub = Keyboard.addListener(KB_SHOW, e => {
+      if (!openRef.current) return;
+      const kbTop = e?.endCoordinates?.screenY;
+      // wait a little so the sheet has resized / moved above the keyboard
+      setTimeout(() => ensureListVisible(kbTop), Platform.OS === 'ios' ? 120 : 180);
+    });
+    return () => sub.remove();
+  }, []);
+
+  const toggle = () => {
+    if (open) {
+      Keyboard.dismiss();
+      setOpen(false);
+    } else {
+      justOpened.current = true;
+      setMounted(true);
+      setOpen(true);
+    }
+  };
+
+  const handleSelect = item => {
     onChange && onChange(item.value);
-    setIsOpen(false);
-    setSearch('');
+    Keyboard.dismiss();
+    setOpen(false);
   };
 
-  const handleClear = () => {
-    onChange && onChange(null);
-    setIsOpen(false);
-    setSearch('');
-  };
+  const arrowRotate = fadeAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '180deg'],
+  });
 
   return (
-    <View style={styles.inputWrapper}>
-      {label ? <Text style={styles.filterLabel}>{label}</Text> : null}
+    <View collapsable={false} style={styles.field}>
+      {label ? <Text style={styles.inputLabel}>{label}</Text> : null}
 
-      {/* Trigger Button */}
+      {/* Trigger */}
       <TouchableOpacity
+        ref={triggerRef}
+        collapsable={false}
+        style={[
+          styles.dropdown,
+          open && styles.dropdownOpen,
+          error && styles.inputError,
+        ]}
+        onPress={toggle}
         activeOpacity={0.8}
-        onPress={handleOpen}
-        style={styles.dropdownTrigger}
       >
-        <Text
-          style={[
-            styles.dropdownTriggerText,
-            !selectedItem && { color: COLORS.mutedText },
-          ]}
-          numberOfLines={1}
-        >
-          {selectedItem ? selectedItem.label : placeholder}
-        </Text>
-        <View style={styles.dropdownTriggerIcons}>
-          {selectedItem ? (
-            <TouchableOpacity
-              onPress={handleClear}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <Icon name="close" size={15} color={COLORS.mutedText} />
-            </TouchableOpacity>
-          ) : null}
-          <Icon name="keyboard-arrow-down" size={20} color={COLORS.accent} />
+        <View style={styles.ddTriggerLeft}>
+          <Text
+            style={selected ? styles.selectedText : styles.placeholder}
+            numberOfLines={1}
+          >
+            {selected ? selected.label : placeholder || 'Select...'}
+          </Text>
         </View>
+
+        {selected ? (
+          <TouchableOpacity
+            onPress={() => onChange && onChange(null)}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            style={{ marginRight: 6 }}
+          >
+            <Icon name="close" size={15} color="#8a9daf" />
+          </TouchableOpacity>
+        ) : null}
+
+        <Animated.View style={{ transform: [{ rotate: arrowRotate }] }}>
+          <Icon name="keyboard-arrow-down" size={20} color="#8a9daf" />
+        </Animated.View>
       </TouchableOpacity>
 
-      {/* Dropdown Modal */}
-      <Modal
-        visible={isOpen}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setIsOpen(false)}
-      >
-        <TouchableOpacity
-          style={styles.sdModalOverlay}
-          activeOpacity={1}
-          onPress={() => { setIsOpen(false); setSearch(''); }}
+      {/* Animated list */}
+      {mounted && (
+        <Animated.View
+          style={[
+            styles.dropdownMenu,
+            {
+              height: heightAnim,
+              opacity: fadeAnim,
+              overflow: 'hidden',
+              transform: [
+                {
+                  translateY: fadeAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [-6, 0],
+                  }),
+                },
+              ],
+            },
+          ]}
         >
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            style={styles.sdKAV}
+          <View style={[styles.ddSearchWrap, { height: SEARCH_H }]}>
+            <Icon
+              name="search"
+              size={16}
+              color="#aaa"
+              style={{ marginRight: 6 }}
+            />
+            <TextInput
+              style={styles.ddSearchInput}
+              placeholder="Search..."
+              placeholderTextColor="#bbb"
+              value={search}
+              onChangeText={setSearch}
+              autoCorrect={false}
+              autoCapitalize="none"
+              returnKeyType="done"
+              blurOnSubmit
+              underlineColorAndroid="transparent"
+            />
+            {search.length > 0 && (
+              <TouchableOpacity
+                onPress={() => setSearch('')}
+                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+              >
+                <Icon name="close" size={14} color="#ccc" />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="always"
+            nestedScrollEnabled
           >
-            <TouchableOpacity activeOpacity={1}>
-              <View style={styles.sdContainer}>
-                {/* Header */}
-                <View style={styles.sdHeader}>
-                  <Text style={styles.sdTitle}>{label || placeholder}</Text>
-                  <TouchableOpacity onPress={() => { setIsOpen(false); setSearch(''); }}>
-                    <Icon name="close" size={20} color={COLORS.mutedText} />
+            {filtered.length === 0 ? (
+              <Text style={styles.ddNoResult}>No results found</Text>
+            ) : (
+              filtered.map(item => {
+                const isActive = item.value === value;
+                return (
+                  <TouchableOpacity
+                    key={String(item.value)}
+                    style={[
+                      styles.fdItem,
+                      { height: ITEM_H },
+                      isActive && styles.fdItemActive,
+                    ]}
+                    onPress={() => handleSelect(item)}
+                    activeOpacity={0.7}
+                  >
+                    <Text
+                      style={[
+                        styles.fdItemText,
+                        isActive && styles.fdItemTextActive,
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {item.label}
+                    </Text>
+                    {isActive && (
+                      <Icon name="check" size={16} color="#1482cc" />
+                    )}
                   </TouchableOpacity>
-                </View>
+                );
+              })
+            )}
+          </ScrollView>
+        </Animated.View>
+      )}
 
-                {/* Search Box */}
-                <View style={styles.sdSearchBox}>
-                  <Icon name="search" size={16} color={COLORS.accent} />
-                  <TextInput
-                    ref={searchRef}
-                    style={styles.sdSearchInput}
-                    placeholder="Search..."
-                    placeholderTextColor={COLORS.mutedText}
-                    value={search}
-                    onChangeText={setSearch}
-                    autoCorrect={false}
-                  />
-                  {search ? (
-                    <TouchableOpacity onPress={() => setSearch('')}>
-                      <Icon name="close" size={14} color={COLORS.mutedText} />
-                    </TouchableOpacity>
-                  ) : null}
-                </View>
-
-                {/* Count */}
-                <Text style={styles.sdCount}>
-                  {filtered.length} result{filtered.length !== 1 ? 's' : ''}
-                </Text>
-
-                {/* List */}
-                <FlatList
-                  data={filtered}
-                  keyExtractor={item => String(item.value)}
-                  style={styles.sdList}
-                  keyboardShouldPersistTaps="handled"
-                  renderItem={({ item }) => {
-                    const isSelected = item.value === value;
-                    return (
-                      <TouchableOpacity
-                        style={[styles.sdItem, isSelected && styles.sdItemSelected]}
-                        onPress={() => handleSelect(item)}
-                        activeOpacity={0.7}
-                      >
-                        <Text
-                          style={[
-                            styles.sdItemText,
-                            isSelected && styles.sdItemTextSelected,
-                          ]}
-                        >
-                          {item.label}
-                        </Text>
-                        {isSelected && (
-                          <Icon name="check-circle" size={16} color={COLORS.accent} />
-                        )}
-                      </TouchableOpacity>
-                    );
-                  }}
-                  ListEmptyComponent={
-                    <View style={styles.sdEmpty}>
-                      <Icon name="search-off" size={28} color={COLORS.mutedText} />
-                      <Text style={styles.sdEmptyText}>No results found</Text>
-                    </View>
-                  }
-                />
-              </View>
-            </TouchableOpacity>
-          </KeyboardAvoidingView>
-        </TouchableOpacity>
-      </Modal>
+      {error ? <Text style={styles.errorText}>{error}</Text> : null}
     </View>
   );
 };
 
-// ─── INPUT FIELD ──────────────────────────────────────────────────────────────
+// ─── INPUT FIELD (date) ──────────────────────────────────────────────────────
 
 const InputField = ({ label, placeholder, icon, value, onChange, onPress }) => (
   <View style={styles.field}>
-    {label ? <Text style={styles.filterLabel}>{label}</Text> : null}
+    <Text style={styles.inputLabel}>{label}</Text>
     <TouchableOpacity activeOpacity={0.8} onPress={onPress}>
-      <View style={styles.inputContainer}>
+      <View style={styles.filterInputContainer}>
         <TextInput
           placeholder={placeholder}
-          placeholderTextColor={COLORS.mutedText}
-          style={styles.input}
-          value={value}
+          placeholderTextColor="#aab8c4"
+          style={styles.filterInput}
+          value={value || ''}
           onChangeText={onChange}
           editable={!onPress}
+          pointerEvents={onPress ? 'none' : 'auto'}
         />
-        {icon && <Icon name={icon} size={18} color={COLORS.accent} />}
+        {icon && <Icon name={icon} size={18} color="#1482cc" />}
       </View>
     </TouchableOpacity>
   </View>
 );
+
+// ─── FILTER BOTTOM SHEET (same as Totalleadscreen1) ──────────────────────────
+
+const FilterBottomSheet = ({
+  visible,
+  onClose,
+  onApply,
+  onReset,
+  renderFields,
+}) => {
+  const insets = useSafeAreaInsets();
+  const translateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
+  const backdropAnim = useRef(new Animated.Value(0)).current;
+  const [modalMounted, setModalMounted] = useState(false);
+  const scrollAtTop = useRef(true);
+  const isClosing = useRef(false);
+
+  const scrollRef1 = useRef(null);
+  const scrollYRef = useRef(0);
+
+  // ── keyboard handling (manual, same on Android + iOS) ──
+  // wrapRef = full-screen area that holds the sheet (bottom aligned)
+  const wrapRef = useRef(null);
+  const kbTopRef = useRef(null);
+  const [wrapH, setWrapH] = useState(0);
+  const [kbOverlap, setKbOverlap] = useState(0); // how much the keyboard covers the wrapper
+
+  useEffect(() => {
+    if (!modalMounted) return;
+
+    const showSub = Keyboard.addListener(KB_SHOW, e => {
+      const kbTop = e?.endCoordinates?.screenY ?? null;
+      kbTopRef.current = kbTop;
+      if (kbTop == null || !wrapRef.current) return;
+      // If Android already resized the window, overlap is 0 -> no double shift.
+      wrapRef.current.measureInWindow((x, y, w, h) => {
+        setKbOverlap(Math.max(0, y + h - kbTop));
+      });
+    });
+    const hideSub = Keyboard.addListener(KB_HIDE, () => {
+      kbTopRef.current = null;
+      setKbOverlap(0);
+    });
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, [modalMounted]);
+
+  const animateOpen = () => {
+    translateY.stopAnimation();
+    backdropAnim.stopAnimation();
+
+    translateY.setValue(SCREEN_HEIGHT);
+    backdropAnim.setValue(0);
+
+    Animated.parallel([
+      Animated.spring(translateY, {
+        toValue: 0,
+        damping: 32,
+        stiffness: 180,
+        mass: 1,
+        overshootClamping: true,
+        useNativeDriver: true,
+      }),
+      Animated.timing(backdropAnim, {
+        toValue: 1,
+        duration: 280,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
+  const animateClose = (vy = 0) => {
+    if (isClosing.current) return;
+
+    isClosing.current = true;
+
+    Keyboard.dismiss();
+
+    translateY.stopAnimation();
+    backdropAnim.stopAnimation();
+
+    const duration = vy > 1.2 ? 180 : 250;
+
+    Animated.parallel([
+      Animated.timing(translateY, {
+        toValue: SCREEN_HEIGHT,
+        duration,
+        easing: Easing.inOut(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(backdropAnim, {
+        toValue: 0,
+        duration: 220,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }),
+    ]).start(({ finished }) => {
+      isClosing.current = false;
+
+      if (finished) {
+        setModalMounted(false);
+        setKbOverlap(0);
+        onClose();
+      }
+    });
+  };
+
+  const snapBack = () => {
+    Animated.spring(translateY, {
+      toValue: 0,
+      useNativeDriver: true,
+      damping: 22,
+      stiffness: 300,
+      mass: 0.8,
+    }).start();
+  };
+
+  // Drag from the handle
+  const handlePan = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dy) > 4,
+      onPanResponderGrant: () => {
+        translateY.stopAnimation(val => {
+          translateY.setOffset(val);
+          translateY.setValue(0);
+        });
+      },
+      onPanResponderMove: (_, g) => {
+        translateY.setValue(g.dy > 0 ? g.dy : g.dy * 0.06);
+      },
+      onPanResponderRelease: (_, g) => {
+        translateY.flattenOffset();
+        if (g.dy > 80 || g.vy > 0.5) animateClose(g.vy);
+        else snapBack();
+      },
+      onPanResponderTerminate: () => {
+        translateY.flattenOffset();
+        snapBack();
+      },
+    }),
+  ).current;
+
+  // Drag down from the content when scrolled to top
+  const scrollPan = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_, g) =>
+        scrollAtTop.current && g.dy > 8 && Math.abs(g.dy) > Math.abs(g.dx),
+      onPanResponderGrant: () => {
+        translateY.stopAnimation(val => {
+          translateY.setOffset(val);
+          translateY.setValue(0);
+        });
+      },
+      onPanResponderMove: (_, g) => {
+        if (g.dy > 0) translateY.setValue(g.dy);
+      },
+      onPanResponderRelease: (_, g) => {
+        translateY.flattenOffset();
+        if (g.dy > 80 || g.vy > 0.5) animateClose(g.vy);
+        else snapBack();
+      },
+      onPanResponderTerminate: () => {
+        translateY.flattenOffset();
+        snapBack();
+      },
+    }),
+  ).current;
+
+  useEffect(() => {
+    if (visible) {
+      isClosing.current = false;
+      setModalMounted(true);
+      requestAnimationFrame(() => animateOpen());
+    } else {
+      if (modalMounted) animateClose();
+    }
+  }, [visible]);
+
+  if (!modalMounted) return null;
+
+  // sheet never taller than the space left above the keyboard / under the status bar
+  const availableH = (wrapH || SCREEN_HEIGHT) - kbOverlap - insets.top - 8;
+  const sheetMaxH = Math.min(SCREEN_HEIGHT * 0.9, availableH);
+
+  return (
+    <Modal
+      transparent
+      visible={modalMounted}
+      onRequestClose={() => animateClose()}
+      animationType="none"
+      statusBarTranslucent
+      supportedOrientations={['portrait', 'landscape']}
+    >
+      <Animated.View style={[styles.backdrop, { opacity: backdropAnim }]}>
+        <TouchableOpacity
+          style={StyleSheet.absoluteFill}
+          activeOpacity={1}
+          onPress={() => animateClose()}
+        />
+      </Animated.View>
+
+      {/* KeyboardAvoidingView removed: the sheet is lifted manually by kbOverlap */}
+      <View
+        ref={wrapRef}
+        collapsable={false}
+        onLayout={e => setWrapH(e.nativeEvent.layout.height)}
+        style={[styles.kavWrapper, { paddingBottom: kbOverlap }]}
+        pointerEvents="box-none"
+      >
+        <Animated.View
+          style={[
+            styles.sheet,
+            { maxHeight: sheetMaxH, transform: [{ translateY }] },
+          ]}
+        >
+          <View {...handlePan.panHandlers} style={styles.dragHandleWrap}>
+            <View style={styles.dragHandleLight} />
+          </View>
+
+          <ScrollView
+            ref={scrollRef1}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            scrollEventThrottle={16}
+            nestedScrollEnabled
+            onScroll={e => {
+              const y = e.nativeEvent.contentOffset.y;
+              scrollYRef.current = y;
+              scrollAtTop.current = y <= 2;
+            }}
+            contentContainerStyle={{
+              paddingBottom:
+                (kbOverlap > 0 ? 0 : Math.max(insets.bottom, 0)) + 24,
+            }}
+            {...scrollPan.panHandlers}
+          >
+            <View style={styles.sheetHeader}>
+              <Text style={styles.sheetTitle}>Filter Leads</Text>
+            </View>
+
+            {renderFields({ scrollRef: scrollRef1, scrollYRef, kbTopRef })}
+
+            <View style={styles.sheetButtonRow}>
+              <TouchableOpacity style={styles.sheetResetBtn} onPress={onReset}>
+                <Icon
+                  name="refresh"
+                  size={16}
+                  color="#5a7080"
+                  style={{ marginRight: 6 }}
+                />
+                <Text style={styles.sheetResetBtnText}>Reset</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.sheetApplyBtn} onPress={onApply}>
+                <Text style={styles.sheetApplyBtnText}>Apply Filter</Text>
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        </Animated.View>
+      </View>
+    </Modal>
+  );
+};
 
 // ─── MAKE CALL ────────────────────────────────────────────────────────────────
 
@@ -415,7 +817,8 @@ const makeCall = phoneNumber => {
     },
   ]);
 };
-const sendMail = async (email) => {
+
+const sendMail = async email => {
   if (!email) return;
 
   try {
@@ -437,6 +840,7 @@ const sendMail = async (email) => {
     showAlert('Error', 'Unable to open email app.');
   }
 };
+
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
 
 const ChangeRM = ({ setHideBottomNav }) => {
@@ -467,31 +871,26 @@ const ChangeRM = ({ setHideBottomNav }) => {
     active: null,
   });
 
-  const filterAnim = useRef(new Animated.Value(screenHeight)).current;
-
+  // open: hide bottom nav, then show the sheet (sheet animates itself)
   const openFilterModal = () => {
-    setHideBottomNav(true);
+    setHideBottomNav && setHideBottomNav(true);
+    DeviceEventEmitter.emit('toggleBottomNav', false);
     setShowFilterModal(true);
-    filterAnim.setValue(screenHeight);
-    requestAnimationFrame(() => {
-      Animated.spring(filterAnim, {
-        toValue: 0,
-        useNativeDriver: true,
-        damping: 18,
-      }).start();
-    });
   };
 
-  const closeFilterModal = () => {
-    Animated.timing(filterAnim, {
-      toValue: screenHeight,
-      duration: 250,
-      useNativeDriver: true,
-    }).start(() => {
-      setShowFilterModal(false);
-      setHideBottomNav(false);
-    });
+  // called by the sheet AFTER its close animation is finished
+  const handleSheetClosed = () => {
+    setShowFilterModal(false);
+    setHideBottomNav && setHideBottomNav(false);
+    DeviceEventEmitter.emit('toggleBottomNav', true);
   };
+
+  useEffect(() => {
+    return () => {
+      setHideBottomNav && setHideBottomNav(false);
+      DeviceEventEmitter.emit('toggleBottomNav', true);
+    };
+  }, []);
 
   const formatDate = date => {
     if (!date) return '';
@@ -504,6 +903,7 @@ const ChangeRM = ({ setHideBottomNav }) => {
 
   const onDateChange = (event, selectedDate, key) => {
     key === 'fromDate' ? setShowFromPicker(false) : setShowToPicker(false);
+    if (event?.type === 'dismissed') return;
     if (selectedDate) onChange(key, formatDate(selectedDate));
   };
 
@@ -591,19 +991,7 @@ const ChangeRM = ({ setHideBottomNav }) => {
     },
   });
 
-  const { data: projectList = [] } = useQuery({
-    queryKey: ['project'],
-    queryFn: async () => {
-      const res = await api.get('/api/pm/getAllPropertyProjects');
-      return res.data.data || [];
-    },
-  });
-
   const Property = AllProperty?.map(item => ({ label: item.name, value: item.id }));
-  const projectOptions = projectList?.map(item => ({
-    label: item.project_name,
-    value: item.id,
-  }));
 
   const toggleSelect = id => {
     setSelected(prev =>
@@ -650,7 +1038,7 @@ const ChangeRM = ({ setHideBottomNav }) => {
 
   const applyFilter = () => {
     setAppliedFilters(filters);
-    closeFilterModal();
+    setShowFilterModal(false); // sheet animates out, then handleSheetClosed runs
   };
 
   const resetFilters = () => {
@@ -665,7 +1053,7 @@ const ChangeRM = ({ setHideBottomNav }) => {
     };
     setFilters(cleared);
     setAppliedFilters(cleared);
-    closeFilterModal();
+    setShowFilterModal(false);
   };
 
   const renderLeadCard = useCallback(
@@ -781,7 +1169,7 @@ const ChangeRM = ({ setHideBottomNav }) => {
     if (isFetchingMore) {
       return (
         <View style={styles.footerLoader}>
-          <ActivityIndicator size="small" color='#fff'/>
+          <ActivityIndicator size="small" color="#fff" />
           <Text style={styles.footerText}>Loading more...</Text>
         </View>
       );
@@ -809,13 +1197,12 @@ const ChangeRM = ({ setHideBottomNav }) => {
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
       {/* TOP BAR: [back + icon + title] ............ [change] */}
-      {/* TOP BAR: [back + icon + title] ............ [change] */}
-<View
-  style={[
-    styles.topBarContainer,
-    { paddingTop: insets.top + verticalScale(10) },
-  ]}
->
+      <View
+        style={[
+          styles.topBarContainer,
+          { paddingTop: insets.top + verticalScale(10) },
+        ]}
+      >
         <View style={styles.topBar}>
           <View style={styles.leftHeader}>
             <TouchableOpacity
@@ -824,12 +1211,7 @@ const ChangeRM = ({ setHideBottomNav }) => {
               activeOpacity={0.7}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
-              <Icon1
-                name="chevron-back"
-                size={23}
-                color="#fff"
-                // style={styles.backIcon}
-              />
+              <Icon1 name="chevron-back" size={23} color="#fff" />
             </TouchableOpacity>
             <MaterialCommunityIcons
               name="account-switch"
@@ -872,6 +1254,7 @@ const ChangeRM = ({ setHideBottomNav }) => {
         renderItem={renderLeadCard}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
         onEndReached={loadMore}
         onEndReachedThreshold={0.4}
         ListFooterComponent={renderFooter}
@@ -918,7 +1301,7 @@ const ChangeRM = ({ setHideBottomNav }) => {
 
             {isInitialLoading && (
               <View style={styles.initialLoader}>
-                <ActivityIndicator size="large" color='#fff' />
+                <ActivityIndicator size="large" color="#fff" />
               </View>
             )}
 
@@ -999,76 +1382,46 @@ const ChangeRM = ({ setHideBottomNav }) => {
         </View>
       )}
 
-      {/* ── Filter Bottom Sheet ── */}
-      {showFilterModal && (
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.bottomSheetOverlay}
-          keyboardVerticalOffset={0}
-        >
-          <TouchableOpacity
-            style={StyleSheet.absoluteFill}
-            activeOpacity={1}
-            onPress={closeFilterModal}
-          />
-          <Animated.View
-            style={[
-              styles.bottomSheet,
-              { transform: [{ translateY: filterAnim }] },
-            ]}
-          >
-            <View style={styles.handleBar} />
-
-            <View style={styles.modalHeader}>
-              <View style={styles.filterModalTitleRow}>
-                <Icon name="filter-list" size={17} color={COLORS.accent} />
-                <Text style={styles.modalTitle}>Filter Leads</Text>
-              </View>
-              <TouchableOpacity onPress={closeFilterModal}>
-                <Icon name="close" size={20} color={COLORS.mutedText} />
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.filterDivider} />
-
-            <ScrollView
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={{ paddingBottom: 8 }}
-              keyboardShouldPersistTaps="handled"
-            >
-              <SearchableDropdown
+      {/* ── Filter Bottom Sheet (same as Totalleadscreen1) ── */}
+      <FilterBottomSheet
+        visible={showFilterModal}
+        onClose={handleSheetClosed}
+        onApply={applyFilter}
+        onReset={resetFilters}
+        renderFields={({ scrollRef: sRef, scrollYRef, kbTopRef }) => {
+          const dd = { scrollRef: sRef, scrollYRef, kbTopRef };
+          return (
+            <>
+              <DropdownField
                 label="Property Location"
                 data={Property}
                 placeholder="Select Location"
                 value={filters.location}
                 onChange={value => onChange('location', value)}
+                {...dd}
               />
-
-              <SearchableDropdown
+              <DropdownField
                 label="Relationship Manager"
                 data={Rm}
                 placeholder="Select RM"
                 value={filters.rm_id}
                 onChange={value => onChange('rm_id', value)}
+                {...dd}
               />
 
-              <Text style={styles.filterLabel}>Date Range</Text>
-              <View style={styles.dateRow}>
-                <View style={styles.dateField}>
-                  <Text style={styles.dateSubLabel}>From</Text>
+              <View style={styles.sheetDateRow}>
+                <View style={{ width: '48%' }}>
                   <InputField
+                    label="From Date"
                     placeholder="YYYY-MM-DD"
                     icon="calendar-today"
                     value={filters.fromDate}
                     onPress={() => setShowFromPicker(true)}
                   />
                 </View>
-                <View style={styles.dateSeparator}>
-                  <Icon name="arrow-forward" size={16} color={COLORS.mutedText} />
-                </View>
-                <View style={styles.dateField}>
-                  <Text style={styles.dateSubLabel}>To</Text>
+                <View style={{ width: '48%' }}>
                   <InputField
+                    label="To Date"
                     placeholder="YYYY-MM-DD"
                     icon="calendar-today"
                     value={filters.toDate}
@@ -1076,45 +1429,27 @@ const ChangeRM = ({ setHideBottomNav }) => {
                   />
                 </View>
               </View>
-            </ScrollView>
 
-            {showFromPicker && (
-              <DateTimePicker
-                value={filters.fromDate ? new Date(filters.fromDate) : new Date()}
-                mode="date"
-                display="default"
-                onChange={(e, d) => onDateChange(e, d, 'fromDate')}
-              />
-            )}
-            {showToPicker && (
-              <DateTimePicker
-                value={filters.toDate ? new Date(filters.toDate) : new Date()}
-                mode="date"
-                display="default"
-                onChange={(e, d) => onDateChange(e, d, 'toDate')}
-              />
-            )}
-
-            <View style={styles.filterDivider} />
-
-            <View style={styles.filterBtnRow}>
-              <TouchableOpacity style={styles.resetBtn} onPress={resetFilters}>
-                <Icon name="refresh" size={14} color="#5a7080" />
-                <Text style={styles.resetBtnText}>Reset</Text>
-              </TouchableOpacity>
-              <View style={styles.filterActionBtns}>
-                <TouchableOpacity style={styles.cancelBtn} onPress={closeFilterModal}>
-                  <Text style={styles.cancelBtnText}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.applyBtn} onPress={applyFilter}>
-                  <Icon name="check" size={14} color="#fff" />
-                  <Text style={styles.applyBtnText}>Apply</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </Animated.View>
-        </KeyboardAvoidingView>
-      )}
+              {showFromPicker && (
+                <DateTimePicker
+                  value={filters.fromDate ? new Date(filters.fromDate) : new Date()}
+                  mode="date"
+                  display="default"
+                  onChange={(e, d) => onDateChange(e, d, 'fromDate')}
+                />
+              )}
+              {showToPicker && (
+                <DateTimePicker
+                  value={filters.toDate ? new Date(filters.toDate) : new Date()}
+                  mode="date"
+                  display="default"
+                  onChange={(e, d) => onDateChange(e, d, 'toDate')}
+                />
+              )}
+            </>
+          );
+        }}
+      />
 
       {/* ── Custom Alert ── */}
       <CustomAlertHost />
@@ -1177,11 +1512,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  backIcon: {
-    width: 20,
-    height: 20,
-    tintColor: '#ffffff',
-  },
   screenTitle: {
     color: '#ffffff',
     fontSize: 17,
@@ -1238,7 +1568,7 @@ const styles = StyleSheet.create({
   // ── Lead Card ──
   card: {
     backgroundColor: 'rgba(4, 35, 70, 0.62)',
-     borderRadius: 12, padding: 12, marginBottom: 10,
+    borderRadius: 12, padding: 12, marginBottom: 10,
     borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.2)',
   },
   cardSelected: { borderColor: 'rgba(0,207,255,0.45)' },
@@ -1338,101 +1668,172 @@ const styles = StyleSheet.create({
   assignBtnDisabled: { backgroundColor: 'rgba(30,156,232,0.35)' },
   assignBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
 
-  // ── Filter Bottom Sheet ──
-  bottomSheetOverlay: {
+  // ── Filter bottom sheet (same as Totalleadscreen1) ──
+  backdrop: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.45)',
-    justifyContent: 'flex-end',
-    zIndex: 99999,
-    elevation: 99999,
   },
-  bottomSheet: {
-    backgroundColor: COLORS.modalBg, borderTopLeftRadius: 24, borderTopRightRadius: 24,
-    padding: 18, paddingBottom: 30, maxHeight: '85%',
+  kavWrapper: { flex: 1, justifyContent: 'flex-end' },
+  sheet: {
+    backgroundColor: '#21283a',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    maxHeight: SCREEN_HEIGHT * 0.9,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 20,
   },
-  handleBar: {
-    width: 38, height: 4, backgroundColor: '#b0bec5',
-    borderRadius: 4, alignSelf: 'center', marginBottom: 14,
+  dragHandleWrap: { alignItems: 'center', paddingBottom: 8, paddingTop: 4 },
+  dragHandleLight: {
+    width: 38,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#b0bec5',
+    alignSelf: 'center',
   },
-  filterModalTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  filterDivider: { height: 1, backgroundColor: 'rgba(255,255,255,0.08)', marginVertical: 12 },
-  filterLabel: {
-    color: '#8a9daf', fontSize: 11, fontWeight: '600', letterSpacing: 0.6,
-    textTransform: 'uppercase', marginBottom: 6, marginTop: 4,
+  sheetHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
   },
-  dateRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
-  dateField: { flex: 1 },
-  dateSubLabel: { color: COLORS.mutedText, fontSize: 11, marginBottom: 4 },
-  dateSeparator: { paddingTop: 18 },
-  filterBtnRow: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4,
+  sheetTitle: { color: '#d7dbe2', fontSize: 18, fontWeight: '700' },
+  sheetDateRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
   },
-  resetBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 14, paddingVertical: 8,
-    borderRadius: 14, borderWidth: 1, borderColor: '#39415a',
+  sheetButtonRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 4,
+    gap: 10,
+  },
+  sheetResetBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 14,
     backgroundColor: '#2b3348',
+    borderWidth: 1,
+    borderColor: '#39415a',
   },
-  resetBtnText: { color: '#c3cbdb', fontSize: 13, fontWeight: '600' },
-  filterActionBtns: { flexDirection: 'row', gap: 10 },
-  applyBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#1e9ce8',
-    paddingHorizontal: 18, paddingVertical: 8, borderRadius: 14, minWidth: 80, justifyContent: 'center',
+  sheetResetBtnText: { fontSize: 14, color: '#c3cbdb', fontWeight: '600' },
+  sheetApplyBtn: {
+    flex: 1,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: '#1e9ce8',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  applyBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
+  sheetApplyBtnText: { color: '#ffffff', fontSize: 15, fontWeight: '600' },
 
-  // ── Input Field ──
-  inputWrapper: { marginBottom: 10, width: '100%' },
-  field: { marginBottom: 10 },
-  inputContainer: {
-    flexDirection: 'row', alignItems: 'center', backgroundColor: '#2b3348',
-    borderWidth: 1, borderColor: '#39415a', borderRadius: 12, paddingHorizontal: 12, height: 46,
+  inputLabel: {
+    color: '#9aa8bd',
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: 2,
+    marginTop: 2,
   },
-  input: { color: COLORS.white, flex: 1, fontSize: 13 },
+  field: { marginBottom: 5, width: '100%' },
 
-  // ── Searchable Dropdown ──
-  dropdownTrigger: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    height: 46, backgroundColor: '#2b3348',
-    borderRadius: 12, paddingHorizontal: 14,
-    borderWidth: 1, borderColor: '#39415a',
+  dropdown: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#2b3348',
+    borderWidth: 1,
+    borderColor: '#39415a',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
   },
-  dropdownTriggerText: { color: COLORS.white, fontSize: 13, flex: 1 },
-  dropdownTriggerIcons: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  dropdownOpen: { borderColor: '#4aa3df', backgroundColor: '#28304a' },
+  inputError: { borderColor: '#e05a2b' },
+  errorText: { color: '#e05a2b', fontSize: 11, marginTop: 4 },
+  dropdownMenu: {
+    marginTop: LIST_GAP,
+    backgroundColor: '#2b3348',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#39415a',
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  fdItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#323a52',
+  },
+  fdItemActive: { backgroundColor: 'rgba(74,163,223,0.15)' },
+  fdItemText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#c3cbdb',
+    fontWeight: '500',
+  },
+  fdItemTextActive: { color: '#7cc4f2', fontWeight: '700' },
+  placeholder: { color: '#8a9daf', fontSize: 13 },
+  selectedText: { color: '#e6ebf2', fontSize: 13, fontWeight: '600' },
+  ddTriggerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+  },
+  ddSearchWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#39415a',
+    backgroundColor: '#28304a',
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
+  },
+  ddSearchInput: { flex: 1, fontSize: 13, color: '#e6ebf2', padding: 0 },
+  ddNoResult: {
+    textAlign: 'center',
+    color: '#6b7690',
+    fontSize: 12,
+    paddingVertical: 16,
+  },
 
-  // ── Searchable Dropdown Modal ──
-  sdModalOverlay: {
-    flex: 1, backgroundColor: 'rgba(0,0,0,0.45)',
-    justifyContent: 'flex-end',
+  filterInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#2b3348',
+    borderWidth: 1,
+    borderColor: '#39415a',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    height: 48,
   },
-  sdKAV: { justifyContent: 'flex-end' },
-  sdContainer: {
-    backgroundColor: COLORS.modalBg, borderTopLeftRadius: 24, borderTopRightRadius: 24,
-    padding: 16, paddingBottom: Platform.OS === 'ios' ? 34 : 20,
-    maxHeight: screenHeight * 0.65,
+  filterInput: {
+    flex: 1,
+    color: '#aab8c4',
+    fontSize: 14,
+    fontWeight: '500',
+    paddingVertical: 0,
   },
-  sdHeader: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12,
-  },
-  sdTitle: { color: '#d7dbe2', fontSize: 15, fontWeight: '700' },
-  sdSearchBox: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#28304a', borderRadius: 12,
-    paddingHorizontal: 12, height: 42, gap: 8,
-    borderWidth: 1, borderColor: '#39415a', marginBottom: 8,
-  },
-  sdSearchInput: { flex: 1, color: COLORS.white, fontSize: 13 },
-  sdCount: { color: COLORS.mutedText, fontSize: 11, marginBottom: 6, paddingLeft: 2 },
-  sdList: { maxHeight: screenHeight * 0.38 },
-  sdItem: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 12, paddingVertical: 13,
-    borderBottomWidth: 1, borderBottomColor: '#323a52',
-  },
-  sdItemSelected: { backgroundColor: 'rgba(74,163,223,0.15)' },
-  sdItemText: { color: COLORS.mutedText, fontSize: 13, flex: 1 },
-  sdItemTextSelected: { color: COLORS.accent, fontWeight: '600' },
-  sdEmpty: { alignItems: 'center', paddingVertical: 32, gap: 8 },
-  sdEmptyText: { color: COLORS.mutedText, fontSize: 13 },
 
   // ── Custom Alert ──
   alertOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24 },
