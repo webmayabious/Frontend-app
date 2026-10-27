@@ -392,8 +392,8 @@ const LeadCard = ({ item, navigation, setShowRemarks, setRemarksText }) => {
                   item?.active === '1'
                     ? 'rgba(45,168,94,0.15)'
                     : item?.active === '5'
-                    ? 'rgba(107,119,133,0.25)'
-                    : 'rgba(224,90,43,0.15)',
+                      ? 'rgba(107,119,133,0.25)'
+                      : 'rgba(224,90,43,0.15)',
               },
             ]}
           >
@@ -405,16 +405,16 @@ const LeadCard = ({ item, navigation, setShowRemarks, setRemarksText }) => {
                     item?.active === '1'
                       ? '#2da85e'
                       : item?.active === '5'
-                      ? '#aab8c4'
-                      : '#e05a2b',
+                        ? '#aab8c4'
+                        : '#e05a2b',
                 },
               ]}
             >
               {item?.active === '1'
                 ? 'Active'
                 : item?.active === '5'
-                ? 'Booking Done'
-                : 'Inactive'}
+                  ? 'Booking Done'
+                  : 'Inactive'}
             </Text>
           </View>
         </View>
@@ -1114,24 +1114,23 @@ const MissedFollowup = () => {
         <View
           style={[
             styles.topBarContainer,
-            { paddingTop:  verticalScale(10) },
-            // insets.top +
+            { paddingTop: insets.top + verticalScale(10) },
           ]}
         >
           <View style={styles.topBar}>
             <View style={styles.leftHeader}>
               <TouchableOpacity
-                onPress={() => navigation.navigate('Dashboard')}
+                onPress={() => navigation.goBack()}
                 style={styles.backBtn}
                 activeOpacity={0.7}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
-                 <Icon1
-                                   name="chevron-back"
-                                   size={23}
-                                   color="#fff"
-                                  //  style={styles.backIcon}
-                                 />
+                <Icon1
+                  name="chevron-back"
+                  size={23}
+                  color="#fff"
+                //  style={styles.backIcon}
+                />
               </TouchableOpacity>
               <Icon name="notifications-off" size={20} color="#ffffff" />
               <Text style={styles.screenTitle} numberOfLines={1}>
@@ -1432,7 +1431,7 @@ const styles = StyleSheet.create({
   },
   button: {
     flexDirection: 'row', alignItems: 'center', gap: 5, flexShrink: 1,
-    backgroundColor:'#00cfff18', borderWidth: 1, borderColor: '#00cfff40',
+    backgroundColor: '#00cfff18', borderWidth: 1, borderColor: '#00cfff40',
     borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5,
   },
   buttonText: { color: '#00cfff', fontSize: 11, fontWeight: '600' },

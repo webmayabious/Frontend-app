@@ -20,7 +20,6 @@ import {
   Easing,
   Modal,
   PanResponder,
-  KeyboardAvoidingView,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import Icon from 'react-native-vector-icons/MaterialIcons';
@@ -36,6 +35,10 @@ const COLORS = {
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window');
 const scale = size => (SCREEN_WIDTH / 375) * size;
 const verticalScale = size => (SCREEN_HEIGHT / 812) * size;
+
+// keyboard events (iOS "Will" = smoother, Android only has "Did")
+const KB_SHOW = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+const KB_HIDE = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
 
 /* ================= CALL ================= */
 const makeCall = phoneNumber => {
@@ -123,7 +126,8 @@ const formatCallBackDateTime = (date, time) => {
 const ITEM_H = 42;
 const SEARCH_H = 44;
 const MAX_LIST_H = 220;
-const FIELD_TOP_OFFSET = Platform.OS === 'ios' ? 280 : 200;
+const LIST_GAP = 4; // marginTop of the list
+const EXTRA_GAP = 16; // breathing space between list and keyboard
 
 const DropdownField = ({
   label,
@@ -133,14 +137,17 @@ const DropdownField = ({
   error,
   scrollRef,
   scrollYRef,
+  kbTopRef,
   placeholder,
 }) => {
+  const insets = useSafeAreaInsets();
+
   const [open, setOpen] = useState(false); // what the user wants
   const [mounted, setMounted] = useState(false); // keeps list alive while closing
   const [search, setSearch] = useState('');
   const heightAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const wrapRef = useRef(null);
+  const triggerRef = useRef(null);
   const justOpened = useRef(false);
 
   const options = data || [];
@@ -156,17 +163,49 @@ const DropdownField = ({
   const contentH = filtered.length === 0 ? 48 : filtered.length * ITEM_H;
   const targetH = Math.min(SEARCH_H + contentH, MAX_LIST_H);
 
-  const scrollFieldIntoView = () => {
-    if (!wrapRef.current || !scrollRef?.current) return;
-    wrapRef.current.measureInWindow((x, y) => {
-      const delta = y - FIELD_TOP_OFFSET;
-      if (delta > 0) {
-        scrollRef.current.scrollTo({
-          y: (scrollYRef?.current || 0) + delta,
-          animated: true,
-        });
-      }
-    });
+  // latest values for the keyboard listener (it is registered only once)
+  const openRef = useRef(false);
+  const targetHRef = useRef(targetH);
+  const topInsetRef = useRef(insets.top);
+  openRef.current = open;
+  targetHRef.current = targetH;
+  topInsetRef.current = insets.top;
+
+  /**
+   * Scroll the sheet so that the WHOLE list (trigger + list) sits above the
+   * keyboard and the field never goes above the visible top of the scroll area.
+   * kbTop = Y of the keyboard top edge on the screen (null = no keyboard).
+   */
+  const ensureListVisible = kbTop => {
+    if (!triggerRef.current || !scrollRef?.current) return;
+
+    const run = viewTop => {
+      if (!triggerRef.current) return;
+      triggerRef.current.measureInWindow((x, y, w, h) => {
+        const visibleBottom = kbTop || kbTopRef?.current || SCREEN_HEIGHT;
+        const listBottom = y + h + LIST_GAP + targetHRef.current + EXTRA_GAP;
+
+        let delta = 0;
+        if (listBottom > visibleBottom) delta = listBottom - visibleBottom;
+
+        // keep the field (and its label) inside the visible scroll area
+        const minTop = viewTop + 24;
+        if (y - delta < minTop) delta = y - minTop;
+
+        if (delta > 1) {
+          scrollRef.current?.scrollTo({
+            y: (scrollYRef?.current || 0) + delta,
+            animated: true,
+          });
+        }
+      });
+    };
+
+    if (typeof scrollRef.current.measureInWindow === 'function') {
+      scrollRef.current.measureInWindow((x, vy) => run(vy || 0));
+    } else {
+      run(topInsetRef.current + 60);
+    }
   };
 
   // single place that runs every animation
@@ -191,7 +230,7 @@ const DropdownField = ({
       if (open) {
         if (justOpened.current) {
           justOpened.current = false;
-          scrollFieldIntoView();
+          ensureListVisible();
         }
       } else {
         setMounted(false);
@@ -200,6 +239,17 @@ const DropdownField = ({
       }
     });
   }, [open, targetH]);
+
+  // when the keyboard shows (user taps Search) -> re-scroll so the list stays visible
+  useEffect(() => {
+    const sub = Keyboard.addListener(KB_SHOW, e => {
+      if (!openRef.current) return;
+      const kbTop = e?.endCoordinates?.screenY;
+      // wait a little so the sheet has resized / moved above the keyboard
+      setTimeout(() => ensureListVisible(kbTop), Platform.OS === 'ios' ? 120 : 180);
+    });
+    return () => sub.remove();
+  }, []);
 
   useEffect(() => {
     return () => DeviceEventEmitter.emit('toggleBottomNav', true);
@@ -229,11 +279,13 @@ const DropdownField = ({
   });
 
   return (
-    <View ref={wrapRef} collapsable={false} style={styles.field}>
+    <View collapsable={false} style={styles.field}>
       {label ? <Text style={styles.inputLabel}>{label}</Text> : null}
 
       {/* Trigger */}
       <TouchableOpacity
+        ref={triggerRef}
+        collapsable={false}
         style={[
           styles.dropdown,
           open && styles.dropdownOpen,
@@ -290,7 +342,9 @@ const DropdownField = ({
               onChangeText={setSearch}
               autoCorrect={false}
               autoCapitalize="none"
-              returnKeyType="search"
+              returnKeyType="done"
+              blurOnSubmit
+              underlineColorAndroid="transparent"
             />
             {search.length > 0 && (
               <TouchableOpacity
@@ -411,8 +465,8 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => {
                   data?.active === '1'
                     ? 'rgba(45,168,94,0.15)'
                     : data?.active === '5'
-                    ? 'rgba(107,119,133,0.25)'
-                    : 'rgba(224,90,43,0.15)',
+                      ? 'rgba(107,119,133,0.25)'
+                      : 'rgba(224,90,43,0.15)',
               },
             ]}
           >
@@ -424,16 +478,16 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => {
                     data?.active === '1'
                       ? '#2da85e'
                       : data?.active === '5'
-                      ? '#aab8c4'
-                      : '#e05a2b',
+                        ? '#aab8c4'
+                        : '#e05a2b',
                 },
               ]}
             >
               {data?.active === '1'
                 ? 'Active'
                 : data?.active === '5'
-                ? 'Booking Done'
-                : 'Inactive'}
+                  ? 'Booking Done'
+                  : 'Inactive'}
             </Text>
           </View>
         </View>
@@ -590,6 +644,35 @@ const FilterBottomSheet = ({
   const scrollRef1 = useRef(null);
   const scrollYRef = useRef(0);
 
+  // ── keyboard handling (manual, same on Android + iOS) ──
+  // wrapRef = full-screen area that holds the sheet (bottom aligned)
+  const wrapRef = useRef(null);
+  const kbTopRef = useRef(null);
+  const [wrapH, setWrapH] = useState(0);
+  const [kbOverlap, setKbOverlap] = useState(0); // how much the keyboard covers the wrapper
+
+  useEffect(() => {
+    if (!modalMounted) return;
+
+    const showSub = Keyboard.addListener(KB_SHOW, e => {
+      const kbTop = e?.endCoordinates?.screenY ?? null;
+      kbTopRef.current = kbTop;
+      if (kbTop == null || !wrapRef.current) return;
+      // If Android already resized the window, overlap is 0 -> no double shift.
+      wrapRef.current.measureInWindow((x, y, w, h) => {
+        setKbOverlap(Math.max(0, y + h - kbTop));
+      });
+    });
+    const hideSub = Keyboard.addListener(KB_HIDE, () => {
+      kbTopRef.current = null;
+      setKbOverlap(0);
+    });
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, [modalMounted]);
+
   const animateOpen = () => {
     translateY.stopAnimation();
     backdropAnim.stopAnimation();
@@ -644,6 +727,7 @@ const FilterBottomSheet = ({
 
       if (finished) {
         setModalMounted(false);
+        setKbOverlap(0);
         onClose();
       }
     });
@@ -724,6 +808,13 @@ const FilterBottomSheet = ({
 
   if (!modalMounted) return null;
 
+  // sheet never taller than the space left above the keyboard / under the status bar
+  const availableH = (wrapH || SCREEN_HEIGHT) - kbOverlap - insets.top - 8;
+  const sheetMaxH = Math.min(SCREEN_HEIGHT * 0.9, availableH);
+
+  // shared props for every dropdown inside the sheet
+  const ddShared = { scrollRef: scrollRef1, scrollYRef, kbTopRef };
+
   return (
     <Modal
       transparent
@@ -741,12 +832,20 @@ const FilterBottomSheet = ({
         />
       </Animated.View>
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.kavWrapper}
+      {/* KeyboardAvoidingView removed: the sheet is lifted manually by kbOverlap */}
+      <View
+        ref={wrapRef}
+        collapsable={false}
+        onLayout={e => setWrapH(e.nativeEvent.layout.height)}
+        style={[styles.kavWrapper, { paddingBottom: kbOverlap }]}
         pointerEvents="box-none"
       >
-        <Animated.View style={[styles.sheet, { transform: [{ translateY }] }]}>
+        <Animated.View
+          style={[
+            styles.sheet,
+            { maxHeight: sheetMaxH, transform: [{ translateY }] },
+          ]}
+        >
           <View {...handlePan.panHandlers} style={styles.dragHandleWrap}>
             <View style={styles.dragHandleLight} />
           </View>
@@ -763,7 +862,7 @@ const FilterBottomSheet = ({
               scrollAtTop.current = y <= 2;
             }}
             contentContainerStyle={{
-              paddingBottom: Math.max(insets.bottom, 0) + 24,
+              paddingBottom: (kbOverlap > 0 ? 0 : Math.max(insets.bottom, 0)) + 24,
             }}
             {...scrollPan.panHandlers}
           >
@@ -777,8 +876,7 @@ const FilterBottomSheet = ({
               placeholder="Select Lead Source"
               value={filters.lead_source}
               onChange={value => onChange('lead_source', value)}
-              scrollRef={scrollRef1}
-              scrollYRef={scrollYRef}
+              {...ddShared}
             />
             <DropdownField
               label="Property Location"
@@ -786,8 +884,7 @@ const FilterBottomSheet = ({
               placeholder="Select Location"
               value={filters.location}
               onChange={value => onChange('location', value)}
-              scrollRef={scrollRef1}
-              scrollYRef={scrollYRef}
+              {...ddShared}
             />
             <DropdownField
               label="Relationship Manager"
@@ -795,8 +892,7 @@ const FilterBottomSheet = ({
               placeholder="Select RM"
               value={filters.rm_id}
               onChange={value => onChange('rm_id', value)}
-              scrollRef={scrollRef1}
-              scrollYRef={scrollYRef}
+              {...ddShared}
             />
 
             <View style={styles.dateRow}>
@@ -826,8 +922,7 @@ const FilterBottomSheet = ({
               placeholder="Select Project"
               value={filters.project}
               onChange={value => onChange('project', value)}
-              scrollRef={scrollRef1}
-              scrollYRef={scrollYRef}
+              {...ddShared}
             />
             <DropdownField
               label="Lead Status"
@@ -835,8 +930,7 @@ const FilterBottomSheet = ({
               placeholder="Select Status"
               value={filters.active}
               onChange={value => onChange('active', value)}
-              scrollRef={scrollRef1}
-              scrollYRef={scrollYRef}
+              {...ddShared}
             />
 
             {/* Feedback section divider */}
@@ -851,6 +945,7 @@ const FilterBottomSheet = ({
               placeholder="Select Status"
               value={filters.call_status}
               onChange={value => onChange('call_status', value)}
+              {...ddShared}
             />
             <DropdownField
               label="Lead Qualification"
@@ -858,8 +953,7 @@ const FilterBottomSheet = ({
               placeholder="Select Qualification"
               value={filters.lead_qualification}
               onChange={value => onChange('lead_qualification', value)}
-              scrollRef={scrollRef1}
-              scrollYRef={scrollYRef}
+              {...ddShared}
             />
             <DropdownField
               label="Lead Status"
@@ -867,8 +961,7 @@ const FilterBottomSheet = ({
               placeholder="Select Status"
               value={filters.lead_status}
               onChange={value => onChange('lead_status', value)}
-              scrollRef={scrollRef1}
-              scrollYRef={scrollYRef}
+              {...ddShared}
             />
             <DropdownField
               label="Lead Sub Status"
@@ -876,8 +969,7 @@ const FilterBottomSheet = ({
               placeholder="Select Sub Status"
               value={filters.lead_sub_status}
               onChange={value => onChange('lead_sub_status', value)}
-              scrollRef={scrollRef1}
-              scrollYRef={scrollYRef}
+              {...ddShared}
             />
 
             <View style={styles.dateRow}>
@@ -960,7 +1052,7 @@ const FilterBottomSheet = ({
             </View>
           </ScrollView>
         </Animated.View>
-      </KeyboardAvoidingView>
+      </View>
     </Modal>
   );
 };
@@ -968,6 +1060,7 @@ const FilterBottomSheet = ({
 /* ================= MAIN SCREEN ================= */
 const TotalLeadScreen = () => {
   const navigation = useNavigation();
+  const insets = useSafeAreaInsets();
   const [showRemarks, setShowRemarks] = useState(false);
   const [remarksText, setRemarksText] = useState('');
   const [searchText, setSearchText] = useState('');
@@ -1023,7 +1116,7 @@ const TotalLeadScreen = () => {
       onChange(key, formatDate(selectedDate));
     }
   };
-const queryClient = useQueryClient();
+  const queryClient = useQueryClient();
   /* ================= INFINITE QUERY ================= */
   const {
     data,
@@ -1077,9 +1170,8 @@ const queryClient = useQueryClient();
     const email = item?.email?.toLowerCase() || '';
     const project = item?.propertyproject?.project_name?.toLowerCase() || '';
     const address = item?.propertylocation?.name?.toLowerCase() || '';
-    const rm = `${item?.relationshipManager?.usr_fname || ''} ${
-      item?.relationshipManager?.usr_lname || ''
-    }`
+    const rm = `${item?.relationshipManager?.usr_fname || ''} ${item?.relationshipManager?.usr_lname || ''
+      }`
       .trim()
       .toLowerCase();
     const remarks =
@@ -1254,13 +1346,13 @@ const queryClient = useQueryClient();
       animated: true,
     });
   };
-useFocusEffect(
-  React.useCallback(() => {
-    return () => {
-      queryClient.resetQueries({ queryKey: ['TotalLead'] });
-    };
-  }, [queryClient]),
-);
+  useFocusEffect(
+    React.useCallback(() => {
+      return () => {
+        queryClient.resetQueries({ queryKey: ['TotalLead'] });
+      };
+    }, [queryClient]),
+  );
   /* ================= RENDER ================= */
   return (
     <View style={styles.container}>
@@ -1279,7 +1371,7 @@ useFocusEffect(
 
         {/* TOP BAR: [back + icon + title] ............ [filter] */}
         <View
-          style={[styles.topBarContainer, { paddingTop: verticalScale(10) }]}
+          style={[styles.topBarContainer, { paddingTop: insets.top + verticalScale(10) }]}
         >
           <View style={styles.topBar}>
             <View style={styles.leftHeader}>
@@ -1289,17 +1381,7 @@ useFocusEffect(
                 activeOpacity={0.7}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
-                {/* <Image
-                  source={require('../asset/image/logo/backk.png')}
-                  style={styles.backIcon}
-                  resizeMode="contain"
-                /> */}
-                  <Icon1
-                    name="chevron-back"
-                    size={23}
-                    color="#fff"
-                    // style={styles.backIcon}
-                  />
+                <Icon1 name="chevron-back" size={23} color="#fff" />
               </TouchableOpacity>
               <Icon name="people" size={20} color="#ffffff" />
               <Text style={styles.screenTitle} numberOfLines={1}>
@@ -1321,6 +1403,7 @@ useFocusEffect(
         <ScrollView
           ref={scrollRef}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
           contentContainerStyle={styles.listContent}
           onScroll={event => {
             const { layoutMeasurement, contentOffset, contentSize } =
@@ -1650,18 +1733,9 @@ const styles = StyleSheet.create({
     marginTop: 10,
     gap: 6,
   },
-
-  //  button: {
-  //   backgroundColor: 'rgba(74,163,223,0.18)',
-  //   borderWidth: 1,
-  //   borderColor: 'rgba(74,163,223,0.45)',
-  //   borderRadius: 12,
-  //   paddingHorizontal: 12,
-  //   paddingVertical: 5,
-  // },
   button: {
     flexDirection: 'row', alignItems: 'center', gap: 5, flexShrink: 1,
-    backgroundColor:'#00cfff18', borderWidth: 1, borderColor: '#00cfff40',
+    backgroundColor: '#00cfff18', borderWidth: 1, borderColor: '#00cfff40',
     borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5,
   },
   buttonText: { color: '#00cfff', fontSize: 11, fontWeight: '600' },
@@ -1808,12 +1882,12 @@ const styles = StyleSheet.create({
   inputError: { borderColor: '#e05a2b' },
   errorText: { color: '#e05a2b', fontSize: 11, marginTop: 4 },
   dropdownMenu: {
-    marginTop: 4,
+    marginTop: LIST_GAP,
     backgroundColor: '#2b3348',
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#39415a',
-    overflow: Platform.OS === 'ios' ? 'visible' : 'hidden',
+    overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,

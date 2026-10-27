@@ -13,10 +13,9 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import Icon1 from 'react-native-vector-icons/Ionicons';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSelector } from 'react-redux';
 import ReactNativeBlobUtil from 'react-native-blob-util';
-
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window');
 const scale = size => (SCREEN_WIDTH / 375) * size;
 const verticalScale = size => (SCREEN_HEIGHT / 812) * size;
@@ -151,6 +150,7 @@ const SectionCard = ({ title, children }) => (
 
 const BookingDetailScreen = ({ navigation, route }) => {
   const data = route?.params?.data || {};
+  const insets = useSafeAreaInsets();
   const userRole = useSelector(state => state.userRole);
   const isAdmin = userRole?.includes('ADMIN');
 
@@ -183,7 +183,7 @@ const BookingDetailScreen = ({ navigation, route }) => {
         />
 
         {/* TOP BAR */}
-        <View style={[styles.topBarContainer, { paddingTop: verticalScale(10) }]}>
+        <View style={[styles.topBarContainer, { paddingTop: insets.top + verticalScale(10) }]}>
           <View style={styles.topBar}>
             <View style={styles.leftHeader}>
               <TouchableOpacity

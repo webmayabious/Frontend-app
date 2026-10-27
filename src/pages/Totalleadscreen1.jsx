@@ -22,12 +22,14 @@ import {
 import DateTimePicker from '@react-native-community/datetimepicker';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import api from '../api/AxiosInstance';
 import Icon1 from 'react-native-vector-icons/Ionicons';
 const screenHeight = Dimensions.get('window').height;
 const SCREEN_WIDTH = Dimensions.get('window').width;
-
+const scale = size => (SCREEN_WIDTH / 375) * size;
+const verticalScale = size => (screenHeight / 812) * size;
 // ─── COLORS (ChangeRM er sathe same) ─────────────────────────────────────────
 
 const COLORS = {
@@ -575,8 +577,9 @@ const EMPTY_FILTERS = {
   siteVisitToDate: null,
 };
 
-const Totalleadscreen1 = ({setHideBottomNav}) => {
+const Totalleadscreen1 = ({ setHideBottomNav }) => {
   const navigation = useNavigation();
+  const insets = useSafeAreaInsets();
   const listRef = useRef(null);
   const [searchText, setSearchText] = useState('');
   const [showFilterModal, setShowFilterModal] = useState(false);
@@ -619,13 +622,14 @@ const Totalleadscreen1 = ({setHideBottomNav}) => {
   };
 
   useEffect(() => {
-      navigation.setParams({ hideBottomNav: showFilterModal });
-    }, [showFilterModal]);
+    navigation.setParams({ hideBottomNav: showFilterModal });
+  }, [showFilterModal]);
 
   useEffect(() => {
-    return () => 
-      setHideBottomNav && setHideBottomNav(false),
+    return () => {
+      setHideBottomNav && setHideBottomNav(false);
       DeviceEventEmitter.emit('toggleBottomNav', true);
+    };
   }, []);
 
   const formatDate = date => {
@@ -803,51 +807,37 @@ const Totalleadscreen1 = ({setHideBottomNav}) => {
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
       {/* ── Section Header ── */}
-      <View style={styles.sectionHeader}>
-        <View style={styles.sectionTitleRow}>
+      {/* ── Top Bar (same as ChangeRM / LeadsList) ── */}
+      <View style={[styles.topBarContainer, { paddingTop: insets.top + verticalScale(10) }]}>
+        <View style={styles.topBar}>
+          <View style={styles.leftHeader}>
             <TouchableOpacity
-                     onPress={() => navigation.navigate('LeadsListScreen')}
-                    style={styles.backBtn}
-                    activeOpacity={0.7}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                  >
-                
-            <Icon1
-                              name="chevron-back"
-                              size={23}
-                              color="#fff"
-                              // style={styles.backIcon}
-                            />
-                  </TouchableOpacity>
-          <Icon name="list-alt" size={20} color='#ffffff' />
-          <Text style={styles.sectionTitle}>Total Leads</Text>
-        </View>
-        <View style={styles.sectionActions}>
-          <TouchableOpacity style={styles.iconBtn} onPress={openFilterModal} activeOpacity={0.75}>
-            <Icon name="filter-alt" size={16} color={COLORS.accent} />
-          </TouchableOpacity>
+              onPress={() => navigation.navigate('LeadsListScreen')}
+              style={styles.backBtn}
+              activeOpacity={0.7}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Icon1 name="chevron-back" size={23} color="#fff" />
+            </TouchableOpacity>
+            <Icon name="list-alt" size={20} color="#ffffff" />
+            <Text style={styles.screenTitle} numberOfLines={1}>
+              Total Leads
+            </Text>
+          </View>
 
-          <TouchableOpacity
-            style={styles.changeBtn}
-            onPress={() => navigation.navigate('LeadsListScreen')}
-            activeOpacity={0.75}
-          >
-            <Text style={styles.changeBtnText}>Assign Leads</Text>
-          </TouchableOpacity>
+          <View style={styles.sectionActions}>
+            <TouchableOpacity style={styles.iconBtn} onPress={openFilterModal} activeOpacity={0.75}>
+              <Icon name="filter-alt" size={16} color={COLORS.accent} />
+            </TouchableOpacity>
 
-          {/* <TouchableOpacity
-            style={styles.closeBtn}
-            onPress={() => navigation.navigate('LeadsListScreen')}
-            activeOpacity={0.75}
-          >
-            <View style={styles.backButton}>
-              <Image
-                source={require('../asset/image/icon/Arrow.png')}
-                style={{ width: 11, height: 11, marginRight: 4 }}
-              />
-              <Text style={styles.closeBtnText}>Back</Text>
-            </View>
-          </TouchableOpacity> */}
+            <TouchableOpacity
+              style={styles.changeBtn}
+              onPress={() => navigation.navigate('LeadsListScreen')}
+              activeOpacity={0.75}
+            >
+              <Text style={styles.changeBtnText}>Assign Leads</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
 
@@ -926,12 +916,12 @@ const Totalleadscreen1 = ({setHideBottomNav}) => {
 
       {/* ── Filter Bottom Sheet ── */}
       <Modal
-              visible={showFilterModal}
-              transparent
-              animationType="none"
-              statusBarTranslucent
-              onRequestClose={closeFilterModal}
-            >
+        visible={showFilterModal}
+        transparent
+        animationType="none"
+        statusBarTranslucent
+        onRequestClose={closeFilterModal}
+      >
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.bottomSheetOverlay}
@@ -1174,14 +1164,40 @@ const styles = StyleSheet.create({
   footerText: { color: COLORS.accent, fontSize: 12 },
 
   // ── Section Header ──
+  topBarContainer: {
+    paddingHorizontal: scale(10),
+    paddingBottom: verticalScale(10),
+  },
+  topBar: {
+    height: 42,
+    borderRadius: scale(22),
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: scale(14),
+  },
+  leftHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    marginRight: 10,
+  },
+  screenTitle: {
+    color: '#ffffff',
+    fontSize: 17,
+    marginLeft: 6,
+    fontWeight: '700',
+    flexShrink: 1,
+  },
   sectionHeader: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     backgroundColor: COLORS.sectionBg, borderRadius: 20, marginHorizontal: 12,
     marginTop: 10, marginBottom: 10, paddingHorizontal: 14, paddingVertical: 8,
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)',
   },
-  sectionTitleRow: { flexDirection: 'row', alignItems: 'center'},
-  sectionTitle: { color: '#ffffff', fontSize: 17, fontWeight: '700', marginLeft:6},
+  sectionTitleRow: { flexDirection: 'row', alignItems: 'center' },
+  sectionTitle: { color: '#ffffff', fontSize: 17, fontWeight: '700', marginLeft: 6 },
   sectionActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   iconBtn: {
     width: 30, height: 28, alignItems: 'center', justifyContent: 'center',
@@ -1208,8 +1224,8 @@ const styles = StyleSheet.create({
     borderColor: COLORS.borderColor, borderRadius: 20, paddingHorizontal: 12,
     height: 40, backgroundColor: 'rgba(255,255,255,0.06)',
   },
-    backBtn: {
-       paddingRight: 12,
+  backBtn: {
+    paddingRight: 12,
     justifyContent: 'center',
     alignItems: 'center',
   },

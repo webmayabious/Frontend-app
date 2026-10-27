@@ -1,4 +1,4 @@
-// UploadedLeads.js (Same design as TotalBookingsAgreementsTillDateScreen - logic unchanged)
+// UploadedLeads.js (Filter UI same as TotalLeadScreen - logic unchanged)
 import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
@@ -19,9 +19,9 @@ import {
   Easing,
   Modal,
   PanResponder,
-  KeyboardAvoidingView,
   ActivityIndicator,
 } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { useNavigation } from '@react-navigation/native';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
@@ -35,6 +35,10 @@ const COLORS = {
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window');
 const scale = size => (SCREEN_WIDTH / 375) * size;
 const verticalScale = size => (SCREEN_HEIGHT / 812) * size;
+
+// keyboard events (iOS "Will" = smoother, Android only has "Did")
+const KB_SHOW = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+const KB_HIDE = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
 
 /* ================= CALL ================= */
 const makeCall = phoneNumber => {
@@ -102,7 +106,8 @@ const sendMail = async email => {
 const ITEM_H = 42;
 const SEARCH_H = 44;
 const MAX_LIST_H = 220;
-const FIELD_TOP_OFFSET = Platform.OS === 'ios' ? 280 : 200;
+const LIST_GAP = 4; // marginTop of the list
+const EXTRA_GAP = 16; // breathing space between list and keyboard
 
 const DropdownField = ({
   label,
@@ -112,14 +117,17 @@ const DropdownField = ({
   error,
   scrollRef,
   scrollYRef,
+  kbTopRef,
   placeholder,
 }) => {
+  const insets = useSafeAreaInsets();
+
   const [open, setOpen] = useState(false); // what the user wants
   const [mounted, setMounted] = useState(false); // keeps list alive while closing
   const [search, setSearch] = useState('');
   const heightAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const wrapRef = useRef(null);
+  const triggerRef = useRef(null);
   const justOpened = useRef(false);
 
   const options = data || [];
@@ -135,17 +143,49 @@ const DropdownField = ({
   const contentH = filtered.length === 0 ? 48 : filtered.length * ITEM_H;
   const targetH = Math.min(SEARCH_H + contentH, MAX_LIST_H);
 
-  const scrollFieldIntoView = () => {
-    if (!wrapRef.current || !scrollRef?.current) return;
-    wrapRef.current.measureInWindow((x, y) => {
-      const delta = y - FIELD_TOP_OFFSET;
-      if (delta > 0) {
-        scrollRef.current.scrollTo({
-          y: (scrollYRef?.current || 0) + delta,
-          animated: true,
-        });
-      }
-    });
+  // latest values for the keyboard listener (it is registered only once)
+  const openRef = useRef(false);
+  const targetHRef = useRef(targetH);
+  const topInsetRef = useRef(insets.top);
+  openRef.current = open;
+  targetHRef.current = targetH;
+  topInsetRef.current = insets.top;
+
+  /**
+   * Scroll the sheet so that the WHOLE list (trigger + list) sits above the
+   * keyboard and the field never goes above the visible top of the scroll area.
+   * kbTop = Y of the keyboard top edge on the screen (null = no keyboard).
+   */
+  const ensureListVisible = kbTop => {
+    if (!triggerRef.current || !scrollRef?.current) return;
+
+    const run = viewTop => {
+      if (!triggerRef.current) return;
+      triggerRef.current.measureInWindow((x, y, w, h) => {
+        const visibleBottom = kbTop || kbTopRef?.current || SCREEN_HEIGHT;
+        const listBottom = y + h + LIST_GAP + targetHRef.current + EXTRA_GAP;
+
+        let delta = 0;
+        if (listBottom > visibleBottom) delta = listBottom - visibleBottom;
+
+        // keep the field (and its label) inside the visible scroll area
+        const minTop = viewTop + 24;
+        if (y - delta < minTop) delta = y - minTop;
+
+        if (delta > 1) {
+          scrollRef.current?.scrollTo({
+            y: (scrollYRef?.current || 0) + delta,
+            animated: true,
+          });
+        }
+      });
+    };
+
+    if (typeof scrollRef.current.measureInWindow === 'function') {
+      scrollRef.current.measureInWindow((x, vy) => run(vy || 0));
+    } else {
+      run(topInsetRef.current + 60);
+    }
   };
 
   // single place that runs every animation
@@ -170,7 +210,7 @@ const DropdownField = ({
       if (open) {
         if (justOpened.current) {
           justOpened.current = false;
-          scrollFieldIntoView();
+          ensureListVisible();
         }
       } else {
         setMounted(false);
@@ -179,6 +219,17 @@ const DropdownField = ({
       }
     });
   }, [open, targetH]);
+
+  // when the keyboard shows (user taps Search) -> re-scroll so the list stays visible
+  useEffect(() => {
+    const sub = Keyboard.addListener(KB_SHOW, e => {
+      if (!openRef.current) return;
+      const kbTop = e?.endCoordinates?.screenY;
+      // wait a little so the sheet has resized / moved above the keyboard
+      setTimeout(() => ensureListVisible(kbTop), Platform.OS === 'ios' ? 120 : 180);
+    });
+    return () => sub.remove();
+  }, []);
 
   useEffect(() => {
     return () => DeviceEventEmitter.emit('toggleBottomNav', true);
@@ -208,11 +259,13 @@ const DropdownField = ({
   });
 
   return (
-    <View ref={wrapRef} collapsable={false} style={styles.field}>
+    <View collapsable={false} style={styles.field}>
       {label ? <Text style={styles.inputLabel}>{label}</Text> : null}
 
       {/* Trigger */}
       <TouchableOpacity
+        ref={triggerRef}
+        collapsable={false}
         style={[
           styles.dropdown,
           open && styles.dropdownOpen,
@@ -269,7 +322,9 @@ const DropdownField = ({
               onChangeText={setSearch}
               autoCorrect={false}
               autoCapitalize="none"
-              returnKeyType="search"
+              returnKeyType="done"
+              blurOnSubmit
+              underlineColorAndroid="transparent"
             />
             {search.length > 0 && (
               <TouchableOpacity
@@ -326,6 +381,27 @@ const DropdownField = ({
     </View>
   );
 };
+
+/* ================= DATE INPUT FIELD ================= */
+const InputField = ({ label, placeholder, icon, value, onChange, onPress }) => (
+  <View style={styles.field}>
+    <Text style={styles.inputLabel}>{label}</Text>
+    <TouchableOpacity activeOpacity={0.8} onPress={onPress}>
+      <View style={styles.filterInputContainer}>
+        <TextInput
+          placeholder={placeholder}
+          placeholderTextColor="#aab8c4"
+          style={styles.filterInput}
+          value={value}
+          onChangeText={onChange}
+          editable={!onPress}
+          pointerEvents={onPress ? 'none' : 'auto'}
+        />
+        {icon && <Icon name={icon} size={18} color="#1482cc" />}
+      </View>
+    </TouchableOpacity>
+  </View>
+);
 
 /* ================= SMALL SHARED PIECES ================= */
 const RemarksText = ({ remarks }) => {
@@ -415,40 +491,42 @@ const CardFooter = ({ onViewInteraction, status }) => (
   </View>
 );
 
-const TopBar = ({ icon, title, onBack, onFilter }) => (
-  <View style={[styles.topBarContainer, { paddingTop: verticalScale(10) }]}>
-    <View style={styles.topBar}>
-      <View style={styles.leftHeader}>
+const TopBar = ({ icon, title, onBack, onFilter }) => {
+  const insets = useSafeAreaInsets();
+  return (
+    <View
+      style={[
+        styles.topBarContainer,
+        { paddingTop: insets.top + verticalScale(10) },
+      ]}
+    >
+      <View style={styles.topBar}>
+        <View style={styles.leftHeader}>
+          <TouchableOpacity
+            onPress={onBack}
+            style={styles.backBtn}
+            activeOpacity={0.7}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Icon1 name="chevron-back" size={23} color="#fff" />
+          </TouchableOpacity>
+          <Icon name={icon} size={20} color="#ffffff" />
+          <Text style={styles.screenTitle} numberOfLines={1}>
+            {title}
+          </Text>
+        </View>
+
         <TouchableOpacity
-          onPress={onBack}
-          style={styles.backBtn}
           activeOpacity={0.7}
+          onPress={onFilter}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
-      
-  <Icon1
-                    name="chevron-back"
-                    size={23}
-                    color="#fff"
-                    // style={styles.backIcon}
-                  />
+          <Icon name="filter-alt" size={18} color="#00e5ff" />
         </TouchableOpacity>
-        <Icon name={icon} size={20} color="#ffffff" />
-        <Text style={styles.screenTitle} numberOfLines={1}>
-          {title}
-        </Text>
       </View>
-
-      <TouchableOpacity
-        activeOpacity={0.7}
-        onPress={onFilter}
-        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-      >
-        <Icon name="filter-alt" size={18} color="#00e5ff" />
-      </TouchableOpacity>
     </View>
-  </View>
-);
+  );
+};
 
 /* ================= FILTER BOTTOM SHEET ================= */
 const FilterBottomSheet = ({
@@ -467,6 +545,35 @@ const FilterBottomSheet = ({
 
   const scrollRef1 = useRef(null);
   const scrollYRef = useRef(0);
+
+  // ── keyboard handling (manual, same on Android + iOS) ──
+  // wrapRef = full-screen area that holds the sheet (bottom aligned)
+  const wrapRef = useRef(null);
+  const kbTopRef = useRef(null);
+  const [wrapH, setWrapH] = useState(0);
+  const [kbOverlap, setKbOverlap] = useState(0); // how much the keyboard covers the wrapper
+
+  useEffect(() => {
+    if (!modalMounted) return;
+
+    const showSub = Keyboard.addListener(KB_SHOW, e => {
+      const kbTop = e?.endCoordinates?.screenY ?? null;
+      kbTopRef.current = kbTop;
+      if (kbTop == null || !wrapRef.current) return;
+      // If Android already resized the window, overlap is 0 -> no double shift.
+      wrapRef.current.measureInWindow((x, y, w, h) => {
+        setKbOverlap(Math.max(0, y + h - kbTop));
+      });
+    });
+    const hideSub = Keyboard.addListener(KB_HIDE, () => {
+      kbTopRef.current = null;
+      setKbOverlap(0);
+    });
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, [modalMounted]);
 
   const animateOpen = () => {
     translateY.stopAnimation();
@@ -522,6 +629,7 @@ const FilterBottomSheet = ({
 
       if (finished) {
         setModalMounted(false);
+        setKbOverlap(0);
         onClose();
       }
     });
@@ -602,6 +710,10 @@ const FilterBottomSheet = ({
 
   if (!modalMounted) return null;
 
+  // sheet never taller than the space left above the keyboard / under the status bar
+  const availableH = (wrapH || SCREEN_HEIGHT) - kbOverlap - insets.top - 8;
+  const sheetMaxH = Math.min(SCREEN_HEIGHT * 0.9, availableH);
+
   return (
     <Modal
       transparent
@@ -619,12 +731,20 @@ const FilterBottomSheet = ({
         />
       </Animated.View>
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.kavWrapper}
+      {/* KeyboardAvoidingView removed: the sheet is lifted manually by kbOverlap */}
+      <View
+        ref={wrapRef}
+        collapsable={false}
+        onLayout={e => setWrapH(e.nativeEvent.layout.height)}
+        style={[styles.kavWrapper, { paddingBottom: kbOverlap }]}
         pointerEvents="box-none"
       >
-        <Animated.View style={[styles.sheet, { transform: [{ translateY }] }]}>
+        <Animated.View
+          style={[
+            styles.sheet,
+            { maxHeight: sheetMaxH, transform: [{ translateY }] },
+          ]}
+        >
           <View {...handlePan.panHandlers} style={styles.dragHandleWrap}>
             <View style={styles.dragHandleLight} />
           </View>
@@ -641,7 +761,8 @@ const FilterBottomSheet = ({
               scrollAtTop.current = y <= 2;
             }}
             contentContainerStyle={{
-              paddingBottom: Math.max(insets.bottom, 0) + 24,
+              paddingBottom:
+                (kbOverlap > 0 ? 0 : Math.max(insets.bottom, 0)) + 24,
             }}
             {...scrollPan.panHandlers}
           >
@@ -649,7 +770,7 @@ const FilterBottomSheet = ({
               <Text style={styles.sheetTitle}>Filter Leads</Text>
             </View>
 
-            {renderFields({ scrollRef: scrollRef1, scrollYRef })}
+            {renderFields({ scrollRef: scrollRef1, scrollYRef, kbTopRef })}
 
             <View style={styles.buttonRow}>
               <TouchableOpacity style={styles.resetBtn} onPress={onReset}>
@@ -667,7 +788,7 @@ const FilterBottomSheet = ({
             </View>
           </ScrollView>
         </Animated.View>
-      </KeyboardAvoidingView>
+      </View>
     </Modal>
   );
 };
@@ -805,6 +926,28 @@ const UploadedLeads = () => {
     status: null,
   });
   const [appliedFilters, setAppliedFilters] = useState();
+  const [showFromPicker, setShowFromPicker] = useState(false);
+  const [showToPicker, setShowToPicker] = useState(false);
+
+  const formatDate = date => {
+    if (!date) return '';
+    const d = new Date(date);
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    return `${year}-${month}-${day}`;
+  };
+
+  const onDateChange = (event, selectedDate, key) => {
+    if (key === 'fromDate') setShowFromPicker(false);
+    if (key === 'toDate') setShowToPicker(false);
+
+    if (event?.type === 'dismissed') return;
+
+    if (selectedDate) {
+      onChange(key, formatDate(selectedDate));
+    }
+  };
 
   const {
     data: uploadleads,
@@ -960,6 +1103,7 @@ const UploadedLeads = () => {
         <ScrollView
           ref={scrollRef}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
           contentContainerStyle={styles.listContent}
           onScroll={event => {
             const { layoutMeasurement, contentOffset, contentSize } =
@@ -1030,46 +1174,88 @@ const UploadedLeads = () => {
           onClose={() => setShowFilterModal(false)}
           onApply={applyFilter}
           onReset={resetFilters}
-          renderFields={({ scrollRef: sRef, scrollYRef }) => (
-            <>
-              <DropdownField
-                label="Property Location"
-                data={Property}
-                placeholder="Select"
-                value={filters.location}
-                onChange={value => onChange('location', value)}
-                scrollRef={sRef}
-                scrollYRef={scrollYRef}
-              />
-              <DropdownField
-                label="RM"
-                data={Rm}
-                placeholder="Select"
-                value={filters.rm_id}
-                onChange={value => onChange('rm_id', value)}
-                scrollRef={sRef}
-                scrollYRef={scrollYRef}
-              />
-              <DropdownField
-                label="Project"
-                data={projectOptions}
-                placeholder="Select"
-                value={filters.project}
-                onChange={value => onChange('project', value)}
-                scrollRef={sRef}
-                scrollYRef={scrollYRef}
-              />
-              <DropdownField
-                label="Lead Status"
-                data={LeadStatus}
-                placeholder="Select"
-                value={filters.status}
-                onChange={value => onChange('status', value)}
-                scrollRef={sRef}
-                scrollYRef={scrollYRef}
-              />
-            </>
-          )}
+          renderFields={({ scrollRef: sRef, scrollYRef, kbTopRef }) => {
+            const dd = { scrollRef: sRef, scrollYRef, kbTopRef };
+            return (
+              <>
+                <DropdownField
+                  label="Property Location"
+                  data={Property}
+                  placeholder="Select Location"
+                  value={filters.location}
+                  onChange={value => onChange('location', value)}
+                  {...dd}
+                />
+                <DropdownField
+                  label="Relationship Manager"
+                  data={Rm}
+                  placeholder="Select RM"
+                  value={filters.rm_id}
+                  onChange={value => onChange('rm_id', value)}
+                  {...dd}
+                />
+
+                <View style={styles.dateRow}>
+                  <View style={{ width: '48%' }}>
+                    <InputField
+                      label="From Date"
+                      placeholder="YYYY-MM-DD"
+                      icon="calendar-today"
+                      value={filters.fromDate || ''}
+                      onPress={() => setShowFromPicker(true)}
+                    />
+                  </View>
+                  <View style={{ width: '48%' }}>
+                    <InputField
+                      label="To Date"
+                      placeholder="YYYY-MM-DD"
+                      icon="calendar-today"
+                      value={filters.toDate || ''}
+                      onPress={() => setShowToPicker(true)}
+                    />
+                  </View>
+                </View>
+
+                <DropdownField
+                  label="Project"
+                  data={projectOptions}
+                  placeholder="Select Project"
+                  value={filters.project}
+                  onChange={value => onChange('project', value)}
+                  {...dd}
+                />
+                <DropdownField
+                  label="Lead Status"
+                  data={LeadStatus}
+                  placeholder="Select Status"
+                  value={filters.status}
+                  onChange={value => onChange('status', value)}
+                  {...dd}
+                />
+
+                {showFromPicker && (
+                  <DateTimePicker
+                    value={
+                      filters.fromDate ? new Date(filters.fromDate) : new Date()
+                    }
+                    mode="date"
+                    display="default"
+                    onChange={(e, d) => onDateChange(e, d, 'fromDate')}
+                  />
+                )}
+                {showToPicker && (
+                  <DateTimePicker
+                    value={
+                      filters.toDate ? new Date(filters.toDate) : new Date()
+                    }
+                    mode="date"
+                    display="default"
+                    onChange={(e, d) => onDateChange(e, d, 'toDate')}
+                  />
+                )}
+              </>
+            );
+          }}
         />
 
         {/* TOP BUTTON */}
@@ -1268,17 +1454,17 @@ const styles = StyleSheet.create({
     marginTop: 10,
     gap: 6,
   },
-  // button: {
-  //   backgroundColor: '#1e9ce8',
-  //   borderRadius: 14,
-  //   paddingHorizontal: 12,
-  //   paddingVertical: 6,
-  //   flexShrink: 1,
-  // },
   button: {
-    flexDirection: 'row', alignItems: 'center', gap: 5, flexShrink: 1,
-    backgroundColor:'#00cfff18', borderWidth: 1, borderColor: '#00cfff40',
-    borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    flexShrink: 1,
+    backgroundColor: '#00cfff18',
+    borderWidth: 1,
+    borderColor: '#00cfff40',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
   },
   buttonText: { color: '#00cfff', fontSize: 11, fontWeight: '600' },
   completed: {
@@ -1411,12 +1597,12 @@ const styles = StyleSheet.create({
   inputError: { borderColor: '#e05a2b' },
   errorText: { color: '#e05a2b', fontSize: 11, marginTop: 4 },
   dropdownMenu: {
-    marginTop: 4,
+    marginTop: LIST_GAP,
     backgroundColor: '#2b3348',
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#39415a',
-    overflow: Platform.OS === 'ios' ? 'visible' : 'hidden',
+    overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,

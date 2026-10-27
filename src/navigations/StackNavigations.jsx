@@ -27,12 +27,16 @@ import TotalBookingsAgreementsPerMonth from '../pages/TotalBookingsAgreementsPer
 import BookingDetailScreen from '../pages/BookingDetailScreen';
 import LeadsassignedScreen from '../pages/LeadsassignedScreen';
 import Rmform from '../pages/Rmform';
-import NotificationScreen from '../pages/Notification/Notificationscreen'
-import Totalleadscreen1 from '../pages/Totalleadscreen1'
+import NotificationScreen from '../pages/Notification/Notificationscreen';
+import Totalleadscreen1 from '../pages/Totalleadscreen1';
+
 const Stack = createNativeStackNavigator();
 
 // Screens where BottomNav should NOT show
 const NO_BOTTOM_NAV_SCREENS = ['Login'];
+
+// Header sudhu ei screen(gulo)-te dekhabe
+const HEADER_SCREENS = ['Dashboard'];
 
 export default function StackNavigations() {
   const navigationRef = createNavigationContainerRef();
@@ -41,18 +45,10 @@ export default function StackNavigations() {
   const [hideBottomNav, setHideBottomNav] = useState(false);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
 
-  // ✅ FIX: keyboard খোলার সাথে সাথেই (কোনো delay/animation ছাড়া) bottom nav হাইড করার জন্য
-  // Android-এ 'keyboardDidShow' পুরো keyboard animation শেষ হওয়ার পরে fire হয় — তাই
-  // আগের কোডে nav কিছুক্ষণ keyboard-এর উপরে ভেসে থেকে তারপর হঠাৎ disappear করতো।
-  // এখানে 'keyboardDidShow'-এর পাশাপাশি Android-এ 'keyboardWillShow' listener-ও যোগ করা হলো —
-  // যেসব ডিভাইসে এটা সাপোর্ট করে (most modern Android + RN 0.73+), সেটা keyboard ওঠা শুরুর
-  // সাথে সাথেই fire হয়, ফলে nav সাথে সাথে সরে যায়, কোনো "কিছুক্ষণ থেকে যাওয়া" থাকে না।
   useEffect(() => {
     const showSub = Keyboard.addListener('keyboardDidShow', () => setKeyboardVisible(true));
     const hideSub = Keyboard.addListener('keyboardDidHide', () => setKeyboardVisible(false));
 
-    // Android/iOS উভয় জায়গাতেই যেখানে 'keyboardWillShow' পাওয়া যায় সেখানে সেটাও শোনা হচ্ছে,
-    // কারণ এটা keyboard ওঠা শুরুর মুহূর্তেই fire করে (didShow-এর চেয়ে আগে)।
     const willShowSub = Keyboard.addListener('keyboardWillShow', () => setKeyboardVisible(true));
     const willHideSub = Keyboard.addListener('keyboardWillHide', () => setKeyboardVisible(false));
 
@@ -64,12 +60,13 @@ export default function StackNavigations() {
     };
   }, []);
 
-  // ✅ কোনো Animated/transition নেই — showBottomNav false হওয়া মাত্র nav সাথে সাথে unmount হয়ে যায়
   const showBottomNav =
     isReady &&
     !NO_BOTTOM_NAV_SCREENS.includes(currentRoute) &&
     !hideBottomNav &&
     !keyboardVisible;
+
+  const showHeader = isReady && HEADER_SCREENS.includes(currentRoute);
 
   return (
     <NavigationContainer
@@ -86,17 +83,14 @@ export default function StackNavigations() {
       {/* Root container — position relative so absolute children work */}
       <View style={{ flex: 1, backgroundColor: '#070c4d' }}>
 
-        {/* HEADER */}
-        {isReady && currentRoute !== 'Login' && (
-          <Header routeName={currentRoute} />
-        )}
+        {/* HEADER — only on Dashboard */}
+        {showHeader && <Header routeName={currentRoute} />}
 
         {/* SCREENS */}
         <View style={{ flex: 1 }}>
           <Stack.Navigator
             screenOptions={{
               headerShown: false,
-              // ✅ FIX: white background overlap ঠেকাতে default screen background ফিক্স করা হলো
               contentStyle: { backgroundColor: '#070c4d' },
             }}
           >
@@ -139,17 +133,18 @@ export default function StackNavigations() {
 
         {/* ✅ BOTTOM NAV — instant hide, no animation/delay */}
         {showBottomNav && (
-          <View style={{
-            position: 'absolute',
-            bottom: 0,
-            left: 0,
-            right: 0,
-            zIndex: 99,
-          }}>
+          <View
+            style={{
+              position: 'absolute',
+              bottom: 0,
+              left: 0,
+              right: 0,
+              zIndex: 99,
+            }}
+          >
             <BottomNav routeName={currentRoute} />
           </View>
         )}
-
       </View>
     </NavigationContainer>
   );

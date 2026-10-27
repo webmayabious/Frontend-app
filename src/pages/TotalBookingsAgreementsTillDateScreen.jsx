@@ -1065,7 +1065,7 @@ const TotalBookingsAgreementsTillDateScreen = () => {
 
         {/* TOP BAR: [back + icon + title] ............ [filter] */}
         <View
-          style={[styles.topBarContainer, { paddingTop: verticalScale(10) }]}
+          style={[styles.topBarContainer, { paddingTop: insets.top + verticalScale(10) }]}
         >
           <View style={styles.topBar}>
             <View style={styles.leftHeader}>

@@ -32,13 +32,14 @@ import {
   Image,
   Keyboard,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSelector } from 'react-redux';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import Icon from 'react-native-vector-icons/Ionicons';
 import MaterialIcon from 'react-native-vector-icons/MaterialIcons';
 import api from '../../api/AxiosInstance';
 import { syncBadge } from './syncBadge';
+
 
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window');
 const scale = size => (SCREEN_WIDTH / 375) * size;
@@ -749,7 +750,7 @@ const AdvancedFilterModal = ({
 const NotificationScreen = ({ setHideBottomNav, navigation }) => {
   // per-type unread counts from Redux
   const unreadCounts = useSelector(state => state.unreadCounts);
-
+ const insets = useSafeAreaInsets();
   const [selectAll, setSelectAll] = useState(false);
   const [checkedIds, setCheckedIds] = useState([]);
   const [filter, setFilter] = useState(FILTER_OPTIONS[0]); // {label, value}
@@ -1165,7 +1166,7 @@ const NotificationScreen = ({ setHideBottomNav, navigation }) => {
         />
 
         {/* TOP BAR: [back + icon + title] ............ [filter] (same as ChangeRM) */}
-        <View style={[styles.topBarContainer, { paddingTop: verticalScale(10) }]}>
+        <View style={[styles.topBarContainer, { paddingTop: insets.top + verticalScale(10) }]}>
           <View style={styles.topBar}>
             <View style={styles.leftHeader}>
               {navigation?.goBack && (

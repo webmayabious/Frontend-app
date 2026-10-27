@@ -809,13 +809,17 @@ const ChangeRM = ({ setHideBottomNav }) => {
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
       {/* TOP BAR: [back + icon + title] ............ [change] */}
-      <View
-        style={[styles.topBarContainer, { paddingTop: verticalScale(10) }]}
-      >
+      {/* TOP BAR: [back + icon + title] ............ [change] */}
+<View
+  style={[
+    styles.topBarContainer,
+    { paddingTop: insets.top + verticalScale(10) },
+  ]}
+>
         <View style={styles.topBar}>
           <View style={styles.leftHeader}>
             <TouchableOpacity
-              onPress={() => navigation.navigate('Dashboard')}
+              onPress={() => navigation.goBack()}
               style={styles.backBtn}
               activeOpacity={0.7}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}

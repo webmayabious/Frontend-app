@@ -9,7 +9,6 @@ import {
   StatusBar,
   Platform,
   Image,
-  KeyboardAvoidingView,
   Dimensions,
   Animated,
   Easing,
@@ -18,16 +17,20 @@ import {
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import Icon1 from 'react-native-vector-icons/Ionicons';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { Dropdown } from 'react-native-element-dropdown';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '../api/AxiosInstance';
 import { useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSelector } from 'react-redux';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const screenHeight = Dimensions.get('window').height;
 const scale = size => (SCREEN_WIDTH / 375) * size;
 const verticalScale = size => (screenHeight / 812) * size;
+
+// keyboard events (iOS "Will" = smoother, Android only has "Did")
+const KB_SHOW = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+const KB_HIDE = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
 
 // ─── COLORS (Leads List / ChangeRM theme) ────────────────────────────────────
 
@@ -54,20 +57,27 @@ const LeadStatus = [
 const ITEM_H = 42;
 const SEARCH_H = 44;
 const MAX_LIST_H = 220;
-const FIELD_TOP_OFFSET = Platform.OS === 'ios' ? 280 : 200;
+const LIST_GAP = 4; // marginTop of the list
+const EXTRA_GAP = 16; // breathing space between list and keyboard
+const HEADER_H = 42 + 20; // header pill + its paddings
 
-// gives every DropdownField access to the page ScrollView
-const ScrollCtx = createContext({ scrollRef: null, scrollYRef: null });
+// gives every DropdownField access to the page ScrollView + keyboard position
+const ScrollCtx = createContext({
+  scrollRef: null,
+  scrollYRef: null,
+  kbTopRef: null,
+});
 
 const DropdownField = ({ label, data, value, onChange, error, placeholder }) => {
-  const { scrollRef, scrollYRef } = useContext(ScrollCtx);
+  const { scrollRef, scrollYRef, kbTopRef } = useContext(ScrollCtx);
+  const insets = useSafeAreaInsets();
 
   const [open, setOpen] = useState(false); // what the user wants
   const [mounted, setMounted] = useState(false); // keeps list alive while closing
   const [search, setSearch] = useState('');
   const heightAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const wrapRef = useRef(null);
+  const triggerRef = useRef(null);
   const justOpened = useRef(false);
 
   const options = data || [];
@@ -86,11 +96,33 @@ const DropdownField = ({ label, data, value, onChange, error, placeholder }) => 
   const contentH = filtered.length === 0 ? 48 : filtered.length * ITEM_H;
   const targetH = Math.min(SEARCH_H + contentH, MAX_LIST_H);
 
-  const scrollFieldIntoView = () => {
-    if (!wrapRef.current || !scrollRef?.current) return;
-    wrapRef.current.measureInWindow((x, y) => {
-      const delta = y - FIELD_TOP_OFFSET;
-      if (delta > 0) {
+  // latest values for the keyboard listener (it is registered only once)
+  const openRef = useRef(false);
+  const targetHRef = useRef(targetH);
+  const topInsetRef = useRef(insets.top);
+  openRef.current = open;
+  targetHRef.current = targetH;
+  topInsetRef.current = insets.top;
+
+  /**
+   * Scroll so that the WHOLE list (trigger + list) sits above the keyboard
+   * and the field never goes under the header.
+   * kbTop = Y of the keyboard top edge on the screen (null = no keyboard).
+   */
+  const ensureListVisible = kbTop => {
+    if (!triggerRef.current || !scrollRef?.current) return;
+    triggerRef.current.measureInWindow((x, y, w, h) => {
+      const visibleBottom = kbTop || kbTopRef?.current || screenHeight;
+      const listBottom = y + h + LIST_GAP + targetHRef.current + EXTRA_GAP;
+
+      let delta = 0;
+      if (listBottom > visibleBottom) delta = listBottom - visibleBottom;
+
+      // never push the field (and its label) under the header
+      const minTop = topInsetRef.current + HEADER_H + 24;
+      if (y - delta < minTop) delta = y - minTop;
+
+      if (delta > 1) {
         scrollRef.current.scrollTo({
           y: (scrollYRef?.current || 0) + delta,
           animated: true,
@@ -121,7 +153,7 @@ const DropdownField = ({ label, data, value, onChange, error, placeholder }) => 
       if (open) {
         if (justOpened.current) {
           justOpened.current = false;
-          scrollFieldIntoView();
+          ensureListVisible();
         }
       } else {
         setMounted(false);
@@ -129,6 +161,17 @@ const DropdownField = ({ label, data, value, onChange, error, placeholder }) => 
       }
     });
   }, [open, targetH]);
+
+  // when the keyboard shows (user taps Search) -> re-scroll so the list stays visible
+  useEffect(() => {
+    const sub = Keyboard.addListener(KB_SHOW, e => {
+      if (!openRef.current) return;
+      const kbTop = e?.endCoordinates?.screenY;
+      // wait a little so the parent has added the keyboard padding
+      setTimeout(() => ensureListVisible(kbTop), Platform.OS === 'ios' ? 60 : 120);
+    });
+    return () => sub.remove();
+  }, []);
 
   const toggle = () => {
     if (open) {
@@ -153,11 +196,13 @@ const DropdownField = ({ label, data, value, onChange, error, placeholder }) => 
   });
 
   return (
-    <View ref={wrapRef} collapsable={false} style={styles.inputWrapper}>
+    <View collapsable={false} style={styles.inputWrapper}>
       {label ? <Text style={styles.label}>{label}</Text> : null}
 
       {/* Trigger */}
       <TouchableOpacity
+        ref={triggerRef}
+        collapsable={false}
         style={[styles.dropdown, open && styles.dropdownOpen, error && styles.inputError]}
         onPress={toggle}
         activeOpacity={0.8}
@@ -205,7 +250,9 @@ const DropdownField = ({ label, data, value, onChange, error, placeholder }) => 
               onChangeText={setSearch}
               autoCorrect={false}
               autoCapitalize="none"
-              returnKeyType="search"
+              returnKeyType="done"
+              blurOnSubmit
+              underlineColorAndroid="transparent"
             />
             {search.length > 0 && (
               <TouchableOpacity
@@ -378,6 +425,7 @@ const maritalData = [
 
 export default function MeetingsEdit({ route }) {
   const { id } = route.params;
+  const insets = useSafeAreaInsets();
   const userRole = useSelector(state => state.userRole);
   const isAdmin = userRole?.includes('ADMIN');
   const [projects, setProjects] = useState([]);
@@ -407,13 +455,33 @@ export default function MeetingsEdit({ route }) {
     purpose_of_purchase: '',
     planning_to_buy_date: '',
     interested_in_site_visit: '',
-    active: ''
+    active: '',
   });
 
   const navigation = useNavigation();
   const queryClient = useQueryClient();
-const scrollRef = useRef(null);
-const scrollYRef = useRef(0);
+  const scrollRef = useRef(null);
+  const scrollYRef = useRef(0);
+
+  // keyboard state (handled manually for BOTH Android and iOS)
+  const [kbHeight, setKbHeight] = useState(0);
+  const kbTopRef = useRef(null);
+
+  useEffect(() => {
+    const showSub = Keyboard.addListener(KB_SHOW, e => {
+      kbTopRef.current = e?.endCoordinates?.screenY ?? null;
+      setKbHeight(e?.endCoordinates?.height || 0);
+    });
+    const hideSub = Keyboard.addListener(KB_HIDE, () => {
+      kbTopRef.current = null;
+      setKbHeight(0);
+    });
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
+
   const onChange = (key, value) => setForm(prev => ({ ...prev, [key]: value }));
 
   useEffect(() => {
@@ -518,7 +586,6 @@ const scrollYRef = useRef(0);
               'Uploadleads',
               'Leads Assigned',
               'AssignRm',
-              
             ].includes(query.queryKey[0]),
         });
         navigation.goBack();
@@ -533,11 +600,9 @@ const scrollYRef = useRef(0);
   };
 
   return (
-    <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: '#1a2d3e' }}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 120 : 0}
-    >
+    // KeyboardAvoidingView removed: it fought with the manual keyboard padding
+    // (double shift on iOS, no effect on Android with translucent StatusBar).
+    <View style={{ flex: 1, backgroundColor: '#1a2d3e' }}>
       <View style={styles.container}>
         {/* Same background as Leads List / ChangeRM / Meeting / Dashboard screens */}
         <Image
@@ -550,7 +615,7 @@ const scrollYRef = useRef(0);
         <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
         {/* TOP BAR: [back + icon + title] (same as ChangeRM) */}
-        <View style={[styles.topBarContainer, { paddingTop: verticalScale(10) }]}>
+        <View style={[styles.topBarContainer, { paddingTop: insets.top + verticalScale(10) }]}>
           <View style={styles.topBar}>
             <View style={styles.leftHeader}>
               <TouchableOpacity
@@ -559,12 +624,7 @@ const scrollYRef = useRef(0);
                 activeOpacity={0.7}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
-                <Icon1
-                  name="chevron-back"
-                  size={23}
-                  color="#fff"
-                  // style={styles.backIcon}
-                />
+                <Icon1 name="chevron-back" size={23} color="#fff" />
               </TouchableOpacity>
               <Icon name="event-note" size={20} color="#ffffff" />
               <Text style={styles.screenTitle} numberOfLines={1}>
@@ -574,177 +634,182 @@ const scrollYRef = useRef(0);
           </View>
         </View>
 
-   <ScrollCtx.Provider value={{ scrollRef, scrollYRef }}>
-  <ScrollView
-    ref={scrollRef}
-    onScroll={e => { scrollYRef.current = e.nativeEvent.contentOffset.y; }}
-    scrollEventThrottle={16}
-    showsVerticalScrollIndicator={false}
-    keyboardShouldPersistTaps="handled"
-    contentContainerStyle={{ paddingBottom: 120 }}
-  >
-          {/* Personal Details */}
-          <Section title="Personal Details" icon="person">
-            <DropdownField
-              label="Reference *"
-              data={References || []}
-              placeholder="Select"
-              value={form.reference}
-              onChange={value => onChange('reference', value)}
-            />
-            <InputField
-              label="Name *"
-              placeholder="Your Name"
-              value={form.name}
-              onChangeText={v => onChange('name', v)}
-            />
-            {errors.name && <Text style={styles.error}>{errors.name}</Text>}
-
-            <InputField
-              label="Residence Address"
-              placeholder="City"
-              value={form.address}
-              onChangeText={v => onChange('address', v)}
-            />
-
-            <InputField
-              label="Mobile No. *"
-              placeholder="Enter Mobile"
-              value={form.phone}
-              onChangeText={v => onChange('phone', v)}
-            />
-            {errors.phone && <Text style={styles.error}>{errors.phone}</Text>}
-
-            <InputField
-              label="Email id *"
-              placeholder="Enter Email"
-              value={form.email}
-              onChangeText={v => onChange('email', v)}
-            />
-            {errors.email && <Text style={styles.error}>{errors.email}</Text>}
-
-            <DobGenderRow form={form} onChange={onChange} />
-
-            <DropdownField
-              label="Marital Status"
-              data={maritalData}
-              placeholder="Select"
-              value={form.marital_status}
-              onChange={value => onChange('marital_status', value)}
-            />
-            <InputField
-              label="Office Location"
-              placeholder="Location"
-              value={form.office_location}
-              onChangeText={v => onChange('office_location', v)}
-            />
-            <InputField
-              label="Industry"
-              placeholder="Industry"
-              value={form.industry}
-              onChangeText={v => onChange('industry', v)}
-            />
-            <InputField
-              label="Occupation"
-              placeholder="Occupation"
-              value={form.occupation}
-              onChangeText={v => onChange('occupation', v)}
-            />
-            {isAdmin && (
-              <DropdownField
-                label="Company *"
-                data={Company || []}
-                placeholder="Select"
-                value={form.com_id}
-                onChange={value => onChange('com_id', value)}
-              />
-            )}
-            <DropdownField
-              label="Project *"
-              data={projectOptions || []}
-              placeholder="Select"
-              value={form.project_id}
-              onChange={value => onChange('project_id', value)}
-            />
-            {errors.project_id && <Text style={styles.error}>{errors.project_id}</Text>}
-          </Section>
-
-          {/* Lead Profile */}
-          <Section title="Lead Profile" icon="leaderboard">
-            <DropdownField
-              label="Lead Status"
-              data={LeadStatus}
-              placeholder="Select"
-              value={form.active}
-              onChange={value => onChange('active', value)}
-            />
-            <DropdownField
-              label="Location of Property *"
-              data={Property || []}
-              placeholder="Select"
-              value={form.location_of_property}
-              onChange={value => onChange('location_of_property', value)}
-            />
-            <InputField
-              label="Budget"
-              placeholder="Enter Budget"
-              value={form.budget}
-              onChangeText={v => onChange('budget', v)}
-            />
-            <InputField
-              label="BHK"
-              placeholder="2BHK / 3BHK"
-              value={form.flat_type}
-              onChangeText={v => onChange('flat_type', v)}
-            />
-            <InputField
-              label="Loan Requirement"
-              placeholder="Yes / No"
-              value={form.loan_requirement}
-              onChangeText={v => onChange('loan_requirement', v)}
-            />
-            <InputField
-              label="Preferred Bank"
-              placeholder="Bank Name"
-              value={form.preferred_bank}
-              onChangeText={v => onChange('preferred_bank', v)}
-            />
-            <InputField
-              label="Purpose of Purchase"
-              placeholder="Purpose"
-              value={form.purpose_type}
-              onChangeText={v => onChange('purpose_type', v)}
-            />
-            <InputField
-              label="Planning To Buy"
-              placeholder="Time"
-              value={form.planning_to_buy_date}
-              onChangeText={v => onChange('planning_to_buy_date', v)}
-            />
-            <InputField
-              label="Interested in Site Visit"
-              placeholder="Yes / No"
-              value={form.interested_in_site_visit}
-              onChangeText={v => onChange('interested_in_site_visit', v)}
-            />
-          </Section>
-
-          <TouchableOpacity
-            style={[styles.button, saving && styles.buttonDisabled]}
-            onPress={onSave}
-            disabled={saving}
-            activeOpacity={0.8}
+        <ScrollCtx.Provider value={{ scrollRef, scrollYRef, kbTopRef }}>
+          <ScrollView
+            ref={scrollRef}
+            onScroll={e => {
+              scrollYRef.current = e.nativeEvent.contentOffset.y;
+            }}
+            scrollEventThrottle={16}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            nestedScrollEnabled
+            contentContainerStyle={{
+              // + keyboard height, so the page can scroll above the keyboard
+              paddingBottom: Math.max(insets.bottom, 0) + 120 + kbHeight,
+            }}
           >
-            <Icon name={saving ? 'hourglass-top' : 'check-circle'} size={16} color="#fff" />
-            <Text style={styles.buttonText}>
-              {saving ? 'Updating...' : 'Update'}
-            </Text>
-          </TouchableOpacity>
-        </ScrollView>
+            {/* Personal Details */}
+            <Section title="Personal Details" icon="person">
+              <DropdownField
+                label="Reference *"
+                data={References || []}
+                placeholder="Select"
+                value={form.reference}
+                onChange={value => onChange('reference', value)}
+              />
+              <InputField
+                label="Name *"
+                placeholder="Your Name"
+                value={form.name}
+                onChangeText={v => onChange('name', v)}
+              />
+              {errors.name && <Text style={styles.error}>{errors.name}</Text>}
+
+              <InputField
+                label="Residence Address"
+                placeholder="City"
+                value={form.address}
+                onChangeText={v => onChange('address', v)}
+              />
+
+              <InputField
+                label="Mobile No. *"
+                placeholder="Enter Mobile"
+                value={form.phone}
+                onChangeText={v => onChange('phone', v)}
+              />
+              {errors.phone && <Text style={styles.error}>{errors.phone}</Text>}
+
+              <InputField
+                label="Email id *"
+                placeholder="Enter Email"
+                value={form.email}
+                onChangeText={v => onChange('email', v)}
+              />
+              {errors.email && <Text style={styles.error}>{errors.email}</Text>}
+
+              <DobGenderRow form={form} onChange={onChange} />
+
+              <DropdownField
+                label="Marital Status"
+                data={maritalData}
+                placeholder="Select"
+                value={form.marital_status}
+                onChange={value => onChange('marital_status', value)}
+              />
+              <InputField
+                label="Office Location"
+                placeholder="Location"
+                value={form.office_location}
+                onChangeText={v => onChange('office_location', v)}
+              />
+              <InputField
+                label="Industry"
+                placeholder="Industry"
+                value={form.industry}
+                onChangeText={v => onChange('industry', v)}
+              />
+              <InputField
+                label="Occupation"
+                placeholder="Occupation"
+                value={form.occupation}
+                onChangeText={v => onChange('occupation', v)}
+              />
+              {isAdmin && (
+                <DropdownField
+                  label="Company *"
+                  data={Company || []}
+                  placeholder="Select"
+                  value={form.com_id}
+                  onChange={value => onChange('com_id', value)}
+                />
+              )}
+              <DropdownField
+                label="Project *"
+                data={projectOptions || []}
+                placeholder="Select"
+                value={form.project_id}
+                onChange={value => onChange('project_id', value)}
+              />
+              {errors.project_id && <Text style={styles.error}>{errors.project_id}</Text>}
+            </Section>
+
+            {/* Lead Profile */}
+            <Section title="Lead Profile" icon="leaderboard">
+              <DropdownField
+                label="Lead Status"
+                data={LeadStatus}
+                placeholder="Select"
+                value={form.active}
+                onChange={value => onChange('active', value)}
+              />
+              <DropdownField
+                label="Location of Property *"
+                data={Property || []}
+                placeholder="Select"
+                value={form.location_of_property}
+                onChange={value => onChange('location_of_property', value)}
+              />
+              <InputField
+                label="Budget"
+                placeholder="Enter Budget"
+                value={form.budget}
+                onChangeText={v => onChange('budget', v)}
+              />
+              <InputField
+                label="BHK"
+                placeholder="2BHK / 3BHK"
+                value={form.flat_type}
+                onChangeText={v => onChange('flat_type', v)}
+              />
+              <InputField
+                label="Loan Requirement"
+                placeholder="Yes / No"
+                value={form.loan_requirement}
+                onChangeText={v => onChange('loan_requirement', v)}
+              />
+              <InputField
+                label="Preferred Bank"
+                placeholder="Bank Name"
+                value={form.preferred_bank}
+                onChangeText={v => onChange('preferred_bank', v)}
+              />
+              <InputField
+                label="Purpose of Purchase"
+                placeholder="Purpose"
+                value={form.purpose_type}
+                onChangeText={v => onChange('purpose_type', v)}
+              />
+              <InputField
+                label="Planning To Buy"
+                placeholder="Time"
+                value={form.planning_to_buy_date}
+                onChangeText={v => onChange('planning_to_buy_date', v)}
+              />
+              <InputField
+                label="Interested in Site Visit"
+                placeholder="Yes / No"
+                value={form.interested_in_site_visit}
+                onChangeText={v => onChange('interested_in_site_visit', v)}
+              />
+            </Section>
+
+            <TouchableOpacity
+              style={[styles.button, saving && styles.buttonDisabled]}
+              onPress={onSave}
+              disabled={saving}
+              activeOpacity={0.8}
+            >
+              <Icon name={saving ? 'hourglass-top' : 'check-circle'} size={16} color="#fff" />
+              <Text style={styles.buttonText}>
+                {saving ? 'Updating...' : 'Update'}
+              </Text>
+            </TouchableOpacity>
+          </ScrollView>
         </ScrollCtx.Provider>
       </View>
-      
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 
@@ -864,7 +929,6 @@ const styles = StyleSheet.create({
     borderColor: COLORS.fieldBorder,
   },
 
-  // ── Dropdown (react-native-element-dropdown) ──
   // ── Inline Dropdown ──
   dropdown: {
     flexDirection: 'row',
@@ -881,11 +945,12 @@ const styles = StyleSheet.create({
   inputError: { borderColor: '#e05a2b' },
   errorText: { color: '#e05a2b', fontSize: 11, marginTop: 4 },
   dropdownMenu: {
-    marginTop: 4,
+    marginTop: LIST_GAP,
     backgroundColor: COLORS.fieldBg,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: COLORS.fieldBorder,
+    overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,
@@ -920,14 +985,6 @@ const styles = StyleSheet.create({
   },
   ddSearchInput: { flex: 1, fontSize: 13, color: '#e6ebf2', padding: 0 },
   ddNoResult: { textAlign: 'center', color: '#6b7690', fontSize: 12, paddingVertical: 16 },
-  placeholderStyle: { color: COLORS.mutedText, fontSize: 13 },
-  selectedTextStyle: { color: '#e6ebf2', fontSize: 13, fontWeight: '600' },
-  itemTextStyle: { color: '#c3cbdb', fontSize: 13, fontWeight: '500' },
-  itemContainer: {
-    paddingVertical: 0,
-    borderBottomWidth: 1,
-    borderBottomColor: '#323a52',
-  },
 
   // ── DOB / gender ──
   row: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },

@@ -415,40 +415,37 @@ const CardFooter = ({ onViewInteraction, status }) => (
   </View>
 );
 
-const TopBar = ({ icon, title, onBack, onFilter }) => (
-  <View style={[styles.topBarContainer, { paddingTop: verticalScale(10) }]}>
-    <View style={styles.topBar}>
-      <View style={styles.leftHeader}>
+const TopBar = ({ icon, title, onBack, onFilter }) => {
+  const insets = useSafeAreaInsets();
+  return (
+    <View style={[styles.topBarContainer, { paddingTop: insets.top + verticalScale(10) }]}>
+      <View style={styles.topBar}>
+        <View style={styles.leftHeader}>
+          <TouchableOpacity
+            onPress={onBack}
+            style={styles.backBtn}
+            activeOpacity={0.7}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Icon1 name="chevron-back" size={23} color="#fff" />
+          </TouchableOpacity>
+          <Icon name={icon} size={20} color="#ffffff" />
+          <Text style={styles.screenTitle} numberOfLines={1}>
+            {title}
+          </Text>
+        </View>
+
         <TouchableOpacity
-          onPress={onBack}
-          style={styles.backBtn}
           activeOpacity={0.7}
+          onPress={onFilter}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
-        
-  <Icon1
-                    name="chevron-back"
-                    size={23}
-                    color="#fff"
-                    // style={styles.backIcon}
-                  />
+          <Icon name="filter-alt" size={18} color="#00e5ff" />
         </TouchableOpacity>
-        <Icon name={icon} size={20} color="#ffffff" />
-        <Text style={styles.screenTitle} numberOfLines={1}>
-          {title}
-        </Text>
       </View>
-
-      <TouchableOpacity
-        activeOpacity={0.7}
-        onPress={onFilter}
-        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-      >
-        <Icon name="filter-alt" size={18} color="#00e5ff" />
-      </TouchableOpacity>
     </View>
-  </View>
-);
+  );
+};
 
 /* ================= FILTER BOTTOM SHEET ================= */
 const FilterBottomSheet = ({

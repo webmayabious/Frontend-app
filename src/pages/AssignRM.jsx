@@ -22,6 +22,7 @@ import {
   DeviceEventEmitter,
   PermissionsAndroid,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import Icon1 from 'react-native-vector-icons/Ionicons';
@@ -585,6 +586,7 @@ const sendMail = async email => {
 
 const AssignRM = ({ setHideBottomNav }) => {
   const navigation = useNavigation();
+  const insets = useSafeAreaInsets();
   const [selected, setSelected] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [selectedRM, setSelectedRM] = useState(null);
@@ -1049,7 +1051,12 @@ const AssignRM = ({ setHideBottomNav }) => {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         {/* TOP BAR: [back + icon + title] ............ [assign] (same as ChangeRM) */}
-        <View style={[styles.topBarContainer, { paddingTop: verticalScale(10) }]}>
+        <View
+          style={[
+            styles.topBarContainer,
+            { paddingTop: insets.top + verticalScale(10) },
+          ]}
+        >
           <View style={styles.topBar}>
             <View style={styles.leftHeader}>
               <TouchableOpacity
@@ -1062,7 +1069,7 @@ const AssignRM = ({ setHideBottomNav }) => {
                   name="chevron-back"
                   size={23}
                   color="#fff"
-                  // style={styles.backIcon}
+                // style={styles.backIcon}
                 />
               </TouchableOpacity>
               <MaterialCommunityIcons
@@ -1645,9 +1652,9 @@ const styles = StyleSheet.create({
   // ── Lead Card ──
   card: {
     backgroundColor: 'rgba(4, 35, 70, 0.62)',
-     borderRadius: 12, padding: 12, marginBottom: 10,
+    borderRadius: 12, padding: 12, marginBottom: 10,
     borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.2)',
-    minHeight:120
+    minHeight: 120
   },
   cardSelected: { borderColor: 'rgba(0,207,255,0.45)' },
   cardTop: { marginBottom: 8 },

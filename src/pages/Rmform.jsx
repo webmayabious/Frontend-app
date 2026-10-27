@@ -9,7 +9,6 @@ import {
   StatusBar,
   Platform,
   Alert,
-  KeyboardAvoidingView,
   Dimensions,
   Animated,
   Keyboard,
@@ -21,9 +20,16 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '../api/AxiosInstance';
 import { useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSelector } from 'react-redux';
 import Icon1 from 'react-native-vector-icons/Ionicons';
-const SCREEN_WIDTH = Dimensions.get('window').width;
+const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window');
+const scale = size => (SCREEN_WIDTH / 375) * size;
+const verticalScale = size => (SCREEN_HEIGHT / 812) * size;
+
+// keyboard events (iOS "Will" = smoother, Android only has "Did")
+const KB_SHOW = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+const KB_HIDE = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
 
 // ─── COLORS (Leads List / ChangeRM theme) ────────────────────────────────────
 
@@ -53,9 +59,9 @@ const ErrorText = ({ msg }) =>
 
 // ─── DROPDOWN FIELD ───────────────────────────────────────────────────────────
 
-// Used only for calculation (nothing is resized)
-const LIST_HEIGHT = 220;
-const FIELD_TOP_OFFSET = 120;
+const LIST_HEIGHT = 220; // max height of the open list (search + items)
+const LIST_GAP = 4; // marginTop of the list
+const EXTRA_GAP = 16; // breathing space between list and keyboard
 
 // Inline dropdown
 const DropdownField = ({
@@ -66,12 +72,15 @@ const DropdownField = ({
   error,
   scrollRef,
   scrollYRef,
+  kbTopRef,
   placeholder,
 }) => {
+  const insets = useSafeAreaInsets();
+
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const dropAnim = useRef(new Animated.Value(0)).current;
-  const wrapRef = useRef(null);
+  const triggerRef = useRef(null);
 
   const options = data || [];
   const selected = options.find(o => o.value === value);
@@ -85,18 +94,47 @@ const DropdownField = ({
     outputRange: [0, LIST_HEIGHT],
   });
 
-  // Animate the screen so this field moves up toward the top
-  const scrollFieldUp = () => {
-    if (!wrapRef.current || !scrollRef?.current) return;
-    wrapRef.current.measureInWindow((x, y) => {
-      const delta = y - FIELD_TOP_OFFSET;
-      if (delta > 0) {
-        scrollRef.current.scrollTo({
-          y: (scrollYRef?.current || 0) + delta,
-          animated: true,
-        });
-      }
-    });
+  // latest values for the keyboard listener (it is registered only once)
+  const openRef = useRef(false);
+  const topInsetRef = useRef(insets.top);
+  openRef.current = open;
+  topInsetRef.current = insets.top;
+
+  /**
+   * Scroll the page so that the WHOLE list (trigger + list) sits above the
+   * keyboard and the field never goes under the header.
+   * kbTop = Y of the keyboard top edge on the screen (null = no keyboard).
+   */
+  const ensureListVisible = kbTop => {
+    if (!triggerRef.current || !scrollRef?.current) return;
+
+    const run = viewTop => {
+      if (!triggerRef.current) return;
+      triggerRef.current.measureInWindow((x, y, w, h) => {
+        const visibleBottom = kbTop || kbTopRef?.current || SCREEN_HEIGHT;
+        const listBottom = y + h + LIST_GAP + LIST_HEIGHT + EXTRA_GAP;
+
+        let delta = 0;
+        if (listBottom > visibleBottom) delta = listBottom - visibleBottom;
+
+        // keep the field (and its label) below the header
+        const minTop = viewTop + 24;
+        if (y - delta < minTop) delta = y - minTop;
+
+        if (delta > 1) {
+          scrollRef.current?.scrollTo({
+            y: (scrollYRef?.current || 0) + delta,
+            animated: true,
+          });
+        }
+      });
+    };
+
+    if (typeof scrollRef.current.measureInWindow === 'function') {
+      scrollRef.current.measureInWindow((x, vy) => run(vy || 0));
+    } else {
+      run(topInsetRef.current + 60);
+    }
   };
 
   const close = (duration = 180) => {
@@ -118,14 +156,26 @@ const DropdownField = ({
     } else {
       DeviceEventEmitter.emit('toggleBottomNav', false); // hide the nav as soon as it opens
       setOpen(true);
-      scrollFieldUp();
       Animated.timing(dropAnim, {
         toValue: 1,
         duration: 200,
         useNativeDriver: false,
-      }).start(scrollFieldUp);
+      }).start(({ finished }) => {
+        if (finished) ensureListVisible();
+      });
     }
   };
+
+  // when the keyboard shows (user taps Search) -> re-scroll so the list stays visible
+  useEffect(() => {
+    const sub = Keyboard.addListener(KB_SHOW, e => {
+      if (!openRef.current) return;
+      const kbTop = e?.endCoordinates?.screenY;
+      // wait a little so the parent has added the keyboard padding
+      setTimeout(() => ensureListVisible(kbTop), Platform.OS === 'ios' ? 60 : 120);
+    });
+    return () => sub.remove();
+  }, []);
 
   useEffect(() => {
     return () => DeviceEventEmitter.emit('toggleBottomNav', true); // restore on leaving the screen
@@ -137,11 +187,13 @@ const DropdownField = ({
   };
 
   return (
-    <View ref={wrapRef} collapsable={false} style={styles.field}>
+    <View collapsable={false} style={styles.field}>
       <Text style={styles.label}>{label}</Text>
 
       {/* Trigger */}
       <TouchableOpacity
+        ref={triggerRef}
+        collapsable={false}
         style={[
           styles.dropdown,
           open && styles.dropdownOpen,
@@ -181,7 +233,9 @@ const DropdownField = ({
               onChangeText={setSearch}
               autoCorrect={false}
               autoCapitalize="none"
-              returnKeyType="search"
+              returnKeyType="done"
+              blurOnSubmit
+              underlineColorAndroid="transparent"
             />
             {search.length > 0 && (
               <TouchableOpacity
@@ -236,7 +290,7 @@ const DropdownField = ({
 
 // ─── DOB + GENDER ROW ─────────────────────────────────────────────────────────
 
-const DobGenderRow = ({ form, onChange,errors }) => {
+const DobGenderRow = ({ form, onChange, errors }) => {
   const [date, setDate] = React.useState(null);
   const [show, setShow] = React.useState(false);
 
@@ -249,28 +303,17 @@ const DobGenderRow = ({ form, onChange,errors }) => {
     }
   }, [form.date_of_birth]);
 
-  // const handleDateChange = (event, selectedDate) => {
-  //   setShow(false);
-  //   if (selectedDate) {
-  //     setDate(selectedDate);
-  //     onChange('date_of_birth', selectedDate.toISOString().split('T')[0]);
-  //   } else {
-  //     setDate(null);
-  //     onChange('date_of_birth', null);
-  //   }
-  // };
-const handleDateChange = (event, selectedDate) => {
-  setShow(false);
-  if (event?.type === 'dismissed') return; // user cancelled, keep existing value
-  if (selectedDate) {
-    setDate(selectedDate);
-    onChange('date_of_birth', selectedDate.toISOString().split('T')[0]);
-  }
-};
+  const handleDateChange = (event, selectedDate) => {
+    setShow(false);
+    if (event?.type === 'dismissed') return; // user cancelled, keep existing value
+    if (selectedDate) {
+      setDate(selectedDate);
+      onChange('date_of_birth', selectedDate.toISOString().split('T')[0]);
+    }
+  };
   const displayDate = date
     ? `${String(date.getDate()).padStart(2, '0')}-${String(date.getMonth() + 1).padStart(2, '0')}-${date.getFullYear()}`
     : 'dd-mm-yyyy';
-console.log(errors)
   return (
     <View style={styles.row}>
       <View style={{ flex: 1, marginRight: 10 }}>
@@ -299,7 +342,7 @@ console.log(errors)
             <Icon name="calendar-today" size={18} color={COLORS.accent} />
           )}
         </TouchableOpacity>
-<ErrorText msg={errors.date_of_birth} />
+        <ErrorText msg={errors.date_of_birth} />
         {show && (
           <DateTimePicker
             value={date || new Date()}
@@ -330,19 +373,6 @@ console.log(errors)
 
 // ─── INPUT FIELD ──────────────────────────────────────────────────────────────
 
-// const InputField = ({ label, placeholder, value, onChangeText, keyboardType }) => (
-//   <View style={styles.inputWrapper}>
-//     <Text style={styles.label}>{label}</Text>
-//     <TextInput
-//       placeholder={placeholder}
-//       placeholderTextColor={COLORS.mutedText}
-//       style={styles.input}
-//       value={value}
-//       onChangeText={onChangeText}
-//       keyboardType={keyboardType || 'default'}
-//     />
-//   </View>
-// );
 const InputField = ({ label, placeholder, value, onChangeText, keyboardType, error }) => (
   <View style={styles.inputWrapper}>
     <Text style={styles.label}>{label}</Text>
@@ -385,6 +415,7 @@ const LeadStatus = [
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
 
 export default function Rmform() {
+  const insets = useSafeAreaInsets();
   const userRole = useSelector(state => state.userRole);
   const isAdmin = userRole?.includes('ADMIN');
   const [projects, setProjects] = useState([]);
@@ -392,6 +423,26 @@ export default function Rmform() {
   const [errors, setErrors] = useState({});
   const scrollRef = useRef(null);
   const scrollYRef = useRef(0);
+
+  // keyboard state (handled manually for BOTH Android and iOS)
+  const [kbHeight, setKbHeight] = useState(0);
+  const kbTopRef = useRef(null);
+
+  useEffect(() => {
+    const showSub = Keyboard.addListener(KB_SHOW, e => {
+      kbTopRef.current = e?.endCoordinates?.screenY ?? null;
+      setKbHeight(e?.endCoordinates?.height || 0);
+    });
+    const hideSub = Keyboard.addListener(KB_HIDE, () => {
+      kbTopRef.current = null;
+      setKbHeight(0);
+    });
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
+
   const [form, setForm] = useState({
     name: '',
     address: '',
@@ -457,62 +508,49 @@ export default function Rmform() {
   });
   const Company = allOwnCompany?.data?.data?.map(item => ({ label: item.com_name, value: item.id }));
 
-  // const validateForm = () => {
-  //   let e = {};
-  //   if (!form.reference) e.reference = 'Reference is required';
-  //   if (!form.name?.trim()) e.name = 'Name is required';
-  //   if (!form.phone?.trim()) e.phone = 'Phone number is required';
-  //   else if (!/^[0-9]{10}$/.test(form.phone.trim())) e.phone = 'Enter a valid 10-digit phone number';
-  //   if (!form.email?.trim()) e.email = 'Email is required';
-  //   else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) e.email = 'Enter a valid email address';
-  //   if (!form.project_id) e.project_id = 'Project is required';
-  //   if (!form.location_of_property) e.location_of_property = 'Location of property is required';
-  //     if (!form.date_of_birth) e.date_of_birth = 'date of birth  is required';
-  //   return e;
-  // };
-const validateForm = () => {
-  let e = {};
+  const validateForm = () => {
+    let e = {};
 
-  if (!form.reference) e.reference = 'Reference is required';
-  if (!form.name?.trim()) e.name = 'Name is required';
+    if (!form.reference) e.reference = 'Reference is required';
+    if (!form.name?.trim()) e.name = 'Name is required';
 
-  // Residential address
-  const address = form.address?.trim();
-  if (!address) e.address = 'Residence address is required';
-  else if (address.length < 5) e.address = 'Address must be at least 5 characters';
-  else if (address.length > 200) e.address = 'Address must be under 200 characters';
+    // Residential address
+    const address = form.address?.trim();
+    if (!address) e.address = 'Residence address is required';
+    else if (address.length < 5) e.address = 'Address must be at least 5 characters';
+    else if (address.length > 200) e.address = 'Address must be under 200 characters';
 
-  if (!form.phone?.trim()) e.phone = 'Phone number is required';
-  else if (!/^[0-9]{10}$/.test(form.phone.trim())) e.phone = 'Enter a valid 10-digit phone number';
+    if (!form.phone?.trim()) e.phone = 'Phone number is required';
+    else if (!/^[0-9]{10}$/.test(form.phone.trim())) e.phone = 'Enter a valid 10-digit phone number';
 
-  if (!form.email?.trim()) e.email = 'Email is required';
-  else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) e.email = 'Enter a valid email address';
+    if (!form.email?.trim()) e.email = 'Email is required';
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) e.email = 'Enter a valid email address';
 
-  // Date of birth
-  if (!form.date_of_birth) {
-    e.date_of_birth = 'Date of birth is required';
-  } else {
-    const dob = new Date(form.date_of_birth);
-    const today = new Date();
-    if (isNaN(dob.getTime())) {
-      e.date_of_birth = 'Enter a valid date of birth';
-    } else if (dob > today) {
-      e.date_of_birth = 'Date of birth cannot be in the future';
+    // Date of birth
+    if (!form.date_of_birth) {
+      e.date_of_birth = 'Date of birth is required';
     } else {
-      let age = today.getFullYear() - dob.getFullYear();
-      const m = today.getMonth() - dob.getMonth();
-      if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) age--;
-      if (age < 18) e.date_of_birth = 'Lead must be at least 18 years old';
-      else if (age > 100) e.date_of_birth = 'Enter a valid date of birth';
+      const dob = new Date(form.date_of_birth);
+      const today = new Date();
+      if (isNaN(dob.getTime())) {
+        e.date_of_birth = 'Enter a valid date of birth';
+      } else if (dob > today) {
+        e.date_of_birth = 'Date of birth cannot be in the future';
+      } else {
+        let age = today.getFullYear() - dob.getFullYear();
+        const m = today.getMonth() - dob.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) age--;
+        if (age < 18) e.date_of_birth = 'Lead must be at least 18 years old';
+        else if (age > 100) e.date_of_birth = 'Enter a valid date of birth';
+      }
     }
-  }
 
-  if (!form.project_id) e.project_id = 'Project is required';
+    if (!form.project_id) e.project_id = 'Project is required';
     if (!form.com_id) e.com_id = 'Company is required';
-  if (!form.location_of_property) e.location_of_property = 'Location of property is required';
+    if (!form.location_of_property) e.location_of_property = 'Location of property is required';
 
-  return e;
-};
+    return e;
+  };
   const onSave = async () => {
     const err = validateForm();
     setErrors(err);
@@ -580,12 +618,13 @@ const validateForm = () => {
     }
   };
 
+  // shared props for every dropdown
+  const ddShared = { scrollRef, scrollYRef, kbTopRef };
+
   return (
-    <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: '#1a2d3e' }}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 120 : 0}
-    >
+    // KeyboardAvoidingView removed: it fought with the manual keyboard padding
+    // (double shift on iOS, no effect on Android with translucent StatusBar).
+    <View style={{ flex: 1, backgroundColor: '#1a2d3e' }}>
       <View style={styles.container}>
         {/* Same background as Leads List / ChangeRM / Meeting / Dashboard screens */}
         <Image
@@ -597,39 +636,24 @@ const validateForm = () => {
 
         <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
-        {/* ── Section Header ── */}
-        <View style={styles.sectionHeader}>
-          <View style={styles.sectionTitleRowHeader}>
-             <TouchableOpacity
-                            onPress={() => navigation.goBack()}
-                            style={styles.backBtn}
-                            activeOpacity={0.7}
-                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                          >
-                            <Icon1
-                              name="chevron-back"
-                              size={23}
-                              color="#fff"
-                              style={styles.backIcon}
-                            />
-                          </TouchableOpacity>
-            <Icon name="person-add" size={20} color='#ffffff' />
-            <Text style={styles.headerTitle}>Add New Lead</Text>
-          </View>
-
-          {/* <TouchableOpacity
-            style={styles.closeBtn}
-            onPress={() => navigation.goBack()}
-            activeOpacity={0.75}
-          >
-            <View style={styles.backButton}>
-              <Image
-                source={require('../asset/image/icon/Arrow.png')}
-                style={{ width: 11, height: 11, marginRight: 4 }}
-              />
-              <Text style={styles.closeBtnText}>Back</Text>
+        {/* TOP BAR (same as ChangeRM / LeadsList) */}
+        <View style={[styles.topBarContainer, { paddingTop: insets.top + verticalScale(10) }]}>
+          <View style={styles.topBar}>
+            <View style={styles.leftHeader}>
+              <TouchableOpacity
+                onPress={() => navigation.goBack()}
+                style={styles.backBtn}
+                activeOpacity={0.7}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Icon1 name="chevron-back" size={23} color="#fff" />
+              </TouchableOpacity>
+              <Icon name="person-add" size={20} color="#ffffff" />
+              <Text style={styles.screenTitle} numberOfLines={1}>
+                Add New Lead
+              </Text>
             </View>
-          </TouchableOpacity> */}
+          </View>
         </View>
 
         <ScrollView
@@ -640,7 +664,11 @@ const validateForm = () => {
           scrollEventThrottle={16}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
-          contentContainerStyle={{ paddingBottom: 120 }}
+          nestedScrollEnabled
+          contentContainerStyle={{
+            // + keyboard height, so the page can scroll above the keyboard
+            paddingBottom: Math.max(insets.bottom, 0) + 120 + kbHeight,
+          }}
         >
           {/* Personal Details */}
           <Section title="Personal Details" icon="person">
@@ -650,8 +678,7 @@ const validateForm = () => {
               placeholder="Select Reference"
               value={form.reference}
               onChange={value => onChange('reference', value)}
-              scrollRef={scrollRef}
-              scrollYRef={scrollYRef}
+              {...ddShared}
             />
             <ErrorText msg={errors.reference} />
 
@@ -669,7 +696,7 @@ const validateForm = () => {
               value={form.address}
               onChangeText={v => onChange('address', v)}
             />
-<ErrorText msg={errors.address} />
+            <ErrorText msg={errors.address} />
             <InputField
               label="Mobile No. *"
               placeholder="Enter 10-digit mobile number"
@@ -688,7 +715,7 @@ const validateForm = () => {
             />
             <ErrorText msg={errors.email} />
 
-            <DobGenderRow form={form} onChange={onChange} errors={errors}/>
+            <DobGenderRow form={form} onChange={onChange} errors={errors} />
 
             <DropdownField
               label="Marital Status"
@@ -696,8 +723,7 @@ const validateForm = () => {
               placeholder="Select Marital Status"
               value={form.marital_status}
               onChange={value => onChange('marital_status', value)}
-              scrollRef={scrollRef}
-              scrollYRef={scrollYRef}
+              {...ddShared}
             />
 
             <InputField
@@ -728,19 +754,17 @@ const validateForm = () => {
                 placeholder="Select Company"
                 value={form.com_id}
                 onChange={value => onChange('com_id', value)}
-                scrollRef={scrollRef}
-                scrollYRef={scrollYRef}
+                {...ddShared}
               />
             )}
-   <ErrorText msg={errors.com_id} />
+            <ErrorText msg={errors.com_id} />
             <DropdownField
               label="Project *"
               data={projectOptions}
               placeholder="Select Project"
               value={form.project_id}
               onChange={value => onChange('project_id', value)}
-              scrollRef={scrollRef}
-              scrollYRef={scrollYRef}
+              {...ddShared}
             />
             <ErrorText msg={errors.project_id} />
           </Section>
@@ -753,8 +777,7 @@ const validateForm = () => {
               placeholder="Select"
               value={form.active}
               onChange={value => onChange('active', value)}
-              scrollRef={scrollRef}
-              scrollYRef={scrollYRef}
+              {...ddShared}
             />
             <DropdownField
               label="Location of Property *"
@@ -762,8 +785,7 @@ const validateForm = () => {
               placeholder="Select Location"
               value={form.location_of_property}
               onChange={value => onChange('location_of_property', value)}
-              scrollRef={scrollRef}
-              scrollYRef={scrollYRef}
+              {...ddShared}
             />
             <ErrorText msg={errors.location_of_property} />
 
@@ -829,7 +851,7 @@ const validateForm = () => {
           </TouchableOpacity>
         </ScrollView>
       </View>
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 
@@ -852,44 +874,6 @@ const styles = StyleSheet.create({
     height: Dimensions.get('screen').height,
     backgroundColor: 'rgba(18,32,48,0.72)',
   },
-
-  // ── Section Header (same as Leads List) ──
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: COLORS.sectionBg,
-    borderRadius: 20,
-    marginHorizontal: 12,
-    marginTop: 10,
-    marginBottom: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
-  },
-  sectionTitleRowHeader: { flexDirection: 'row', alignItems: 'center', gap: 7 },
-  headerTitle: { color: COLORS.white, fontSize: 14, fontWeight: '700' },
-  closeBtn: {
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.25)',
-  },
-    backBtn: {
-    paddingRight: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  backIcon: {
-    width: 20,
-    height: 20,
-    tintColor: '#ffffff',
-  },
-  closeBtnText: { color: COLORS.white, fontSize: 11, fontWeight: '600' },
-  backButton: { flexDirection: 'row', alignItems: 'center' },
 
   // ── Section card ──
   section: {
@@ -963,12 +947,12 @@ const styles = StyleSheet.create({
   },
   dropdownOpen: { borderColor: '#4aa3df' },
   dropdownMenu: {
-    marginTop: 4,
+    marginTop: LIST_GAP,
     backgroundColor: COLORS.modalBg,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: COLORS.fieldBorder,
-    overflow: Platform.OS === 'ios' ? 'visible' : 'hidden',
+    overflow: 'hidden',
   },
   dropdownItem: {
     flexDirection: 'row',
@@ -1038,4 +1022,37 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: { opacity: 0.6 },
   buttonText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+
+  // ── Top Bar (same as ChangeRM) ──
+  topBarContainer: {
+    paddingHorizontal: scale(10),
+    paddingBottom: verticalScale(10),
+  },
+  topBar: {
+    height: 42,
+    borderRadius: scale(22),
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: scale(14),
+  },
+  leftHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    marginRight: 10,
+  },
+  backBtn: {
+    paddingRight: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  screenTitle: {
+    color: '#ffffff',
+    fontSize: 15,
+    marginLeft: 6,
+    fontWeight: '700',
+    flexShrink: 1,
+  },
 });

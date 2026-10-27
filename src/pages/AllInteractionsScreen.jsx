@@ -1,7 +1,7 @@
 // AllInteractionsScreen.js
 // React Native CLI - JavaScript
 
-import React, { useState , useRef} from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -13,7 +13,7 @@ import {
   Dimensions,
   ActivityIndicator,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
@@ -169,7 +169,7 @@ const InteractionCard = ({ item }) => {
 const AllInteractionsScreen = ({ route }) => {
   const { id } = route.params;
   const navigation = useNavigation();
-
+  const insets = useSafeAreaInsets();
   // ─── Scroll to Top Logic ────────────────────────────────────────────────────
   const [showTopBtn, setShowTopBtn] = useState(false);
   const scrollRef = useRef();
@@ -204,7 +204,7 @@ const AllInteractionsScreen = ({ route }) => {
 
         {/* TOP BAR: [back + icon + title] ............ [add new] */}
         <View
-          style={[styles.topBarContainer, { paddingTop: verticalScale(10) }]}
+          style={[styles.topBarContainer, { paddingTop: insets.top + verticalScale(10) }]}
         >
           <View style={styles.topBar}>
             <View style={styles.leftHeader}>

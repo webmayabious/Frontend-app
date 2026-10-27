@@ -23,6 +23,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import Icon1 from 'react-native-vector-icons/Ionicons';
 import { useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import api from '../api/AxiosInstance';
 import { useSelector } from 'react-redux';
@@ -724,6 +725,7 @@ const EMPTY_FILTERS = {
 
 const LeadsListScreen = ({setHideBottomNav} ) => {
   const navigation = useNavigation();
+   const insets = useSafeAreaInsets();
   const listRef = useRef(null);
   const [searchText, setSearchText] = useState('');
   const [showFilterModal, setShowFilterModal] = useState(false);
@@ -831,11 +833,12 @@ const LeadsListScreen = ({setHideBottomNav} ) => {
     navigation.setParams({ hideBottomNav: showFilterModal });
   }, [showFilterModal]);
 
-  useEffect(() => {
-    return () => 
-      setHideBottomNav && setHideBottomNav(false),
-      DeviceEventEmitter.emit('toggleBottomNav', true);
-  }, []);
+useEffect(() => {
+  return () => {
+    setHideBottomNav && setHideBottomNav(false);
+    DeviceEventEmitter.emit('toggleBottomNav', true);
+  };
+}, []);
 
   const formatDate = date => {
     if (!date) return '';
@@ -1031,11 +1034,11 @@ const LeadsListScreen = ({setHideBottomNav} ) => {
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
       {/* TOP BAR: [back + icon + title] ............ [filter + total leads] (same as ChangeRM) */}
-      <View style={[styles.topBarContainer, { paddingTop: verticalScale(10) }]}>
+      <View style={[styles.topBarContainer, { paddingTop: insets.top + verticalScale(10) }]}>
         <View style={styles.topBar}>
           <View style={styles.leftHeader}>
             <TouchableOpacity
-              onPress={() => navigation.navigate('Dashboard')}
+              onPress={() => navigation.goBack()}
               style={styles.backBtn}
               activeOpacity={0.7}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
