@@ -1369,7 +1369,7 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 10,
     borderLeftWidth: 4,
-    borderLeftColor: '#a78bfa',
+    borderLeftColor: '#4fc3f7',
   },
   cardHeader: {
     flexDirection: 'row',
