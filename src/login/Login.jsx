@@ -66,7 +66,7 @@ const LoginUI = () => {
         navigation.dispatch(
           CommonActions.reset({
             index: 0,
-            routes: [{ name: 'Dashboard' }],
+            routes: [{ name: 'Dashboard2' }],
           })
         );
       } else {
@@ -148,8 +148,8 @@ const LoginUI = () => {
       setShowPostLoginSplash(true);
       await new Promise(resolve => setTimeout(resolve, 2000));
 
-      navigation.replace('Dashboard', {
-        screen: 'Dashboard',
+      navigation.replace('Dashboard2', {
+        screen: 'Dashboard2',
       });
     } catch (error) {
       console.log('❌ LOGIN ERROR:', error);

@@ -1,5 +1,5 @@
-import React, { useRef, useState, useEffect } from 'react';
-import { View, Keyboard, Platform } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Keyboard } from 'react-native';
 import {
   NavigationContainer,
   createNavigationContainerRef,
@@ -29,17 +29,26 @@ import LeadsassignedScreen from '../pages/LeadsassignedScreen';
 import Rmform from '../pages/Rmform';
 import NotificationScreen from '../pages/Notification/Notificationscreen';
 import Totalleadscreen1 from '../pages/Totalleadscreen1';
-
+import Dashboard2 from '../pages/Dashboard2';
+import BookingFormScreen from '../pages/Bookingformscreen'
 const Stack = createNativeStackNavigator();
+
+// ✅ Created ONCE, outside the component.
+// (Before, it was re-created on every render.)
+const navigationRef = createNavigationContainerRef();
 
 // Screens where BottomNav should NOT show
 const NO_BOTTOM_NAV_SCREENS = ['Login'];
 
-// Header sudhu ei screen(gulo)-te dekhabe
-const HEADER_SCREENS = ['Dashboard'];
+// ✅ The header is now part of the screen itself (rendered by the stack),
+// so it appears in the same frame as the screen. No waiting for
+// onReady / onStateChange / setState.
+const withHeader = {
+  headerShown: true,
+  header: () => <Header />,
+};
 
 export default function StackNavigations() {
-  const navigationRef = createNavigationContainerRef();
   const [isReady, setIsReady] = useState(false);
   const [currentRoute, setCurrentRoute] = useState('');
   const [hideBottomNav, setHideBottomNav] = useState(false);
@@ -66,8 +75,6 @@ export default function StackNavigations() {
     !hideBottomNav &&
     !keyboardVisible;
 
-  const showHeader = isReady && HEADER_SCREENS.includes(currentRoute);
-
   return (
     <NavigationContainer
       ref={navigationRef}
@@ -83,10 +90,7 @@ export default function StackNavigations() {
       {/* Root container — position relative so absolute children work */}
       <View style={{ flex: 1, backgroundColor: '#070c4d' }}>
 
-        {/* HEADER — only on Dashboard */}
-        {showHeader && <Header routeName={currentRoute} />}
-
-        {/* SCREENS */}
+        {/* SCREENS (header is rendered inside the stack, per screen) */}
         <View style={{ flex: 1 }}>
           <Stack.Navigator
             screenOptions={{
@@ -95,7 +99,8 @@ export default function StackNavigations() {
             }}
           >
             <Stack.Screen name="Login" component={LoginUI} />
-            <Stack.Screen name="Dashboard" component={Dashboard} />
+            {/* <Stack.Screen name="Dashboard" component={Dashboard} options={withHeader} /> */}
+            <Stack.Screen name="Dashboard2" component={Dashboard2} options={withHeader} />
             <Stack.Screen name="ChangeRM">
               {props => (
                 <ChangeRM {...props} setHideBottomNav={setHideBottomNav} />
@@ -128,6 +133,7 @@ export default function StackNavigations() {
             <Stack.Screen name="Rmform" component={Rmform} />
             <Stack.Screen name="Totalleadscreen1" component={Totalleadscreen1} />
             <Stack.Screen name="NotificationScreen" component={NotificationScreen} />
+            <Stack.Screen name="BookingFormScreen" component={BookingFormScreen} />
           </Stack.Navigator>
         </View>
 

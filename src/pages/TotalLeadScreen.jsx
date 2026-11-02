@@ -1,10 +1,14 @@
-// TotalLeadScreen.js (Same design as TotalBookingsAgreementsTillDateScreen - logic unchanged)
-import React, { useEffect, useRef, useState } from 'react';
+// TotalLeadScreen.js
+// Same card design + same data-fetch pattern as LeadsListScreen
+// (FlatList, deduped infinite query, server-side search, "Showing 1 to N of T entries").
+// Keeps: "Book" button on every card -> BookingFormScreen with the lead's details pre-filled.
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
+  FlatList,
   TouchableOpacity,
   TextInput,
   StatusBar,
@@ -28,17 +32,47 @@ import { useQuery, useInfiniteQuery, useQueryClient } from '@tanstack/react-quer
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import api from '../api/AxiosInstance';
 import Icon1 from 'react-native-vector-icons/Ionicons';
+
 const COLORS = {
   white: '#FFFFFF',
   mutedText: '#8A90B4',
+  labelText: '#FFB85D',
+  gold: '#f4c542',
+  accent: '#00cfff',
+  accentDim: '#00cfff18',
+  accentBorder: '#00cfff40',
+  green: '#00C48C',
+  red: '#FF6B6B',
+  borderColor: '#ffffff20',
 };
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window');
 const scale = size => (SCREEN_WIDTH / 375) * size;
 const verticalScale = size => (SCREEN_HEIGHT / 812) * size;
 
+// Name of the booking form screen in your navigator.
+// Register it like:  <Stack.Screen name="BookingFormScreen" component={BookingFormScreen} />
+const BOOKING_FORM_ROUTE = 'BookingFormScreen';
+
 // keyboard events (iOS "Will" = smoother, Android only has "Did")
 const KB_SHOW = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
 const KB_HIDE = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+const EMPTY_FILTERS = {
+  company_id: null,
+  rm_id: null,
+  fromDate: null,
+  toDate: null,
+  project: null,
+  location: null,
+  active: null,
+  lead_status: null,
+  lead_sub_status: null,
+  lead_qualification: null,
+  call_status: null,
+  siteVisitFromDate: null,
+  siteVisitToDate: null,
+  lead_source: null,
+};
 
 /* ================= CALL ================= */
 const makeCall = phoneNumber => {
@@ -102,24 +136,33 @@ const sendMail = async email => {
   }
 };
 
-const formatCallBackDateTime = (date, time) => {
-  if (!date) return null;
+/* ================= DATE HELPERS ================= */
+const pad = n => String(n).padStart(2, '0');
 
-  const d = new Date(date);
-  const formattedDate = d.toLocaleDateString('en-GB', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
+const getTodayString = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+};
+
+// true if ANY feedback has a call back date equal to today
+const isCallbackToday = feedbacks => {
+  if (!Array.isArray(feedbacks)) return false;
+  const today = getTodayString();
+
+  return feedbacks.some(x => {
+    if (!x?.call_back_date) return false;
+    const raw = String(x.call_back_date).trim();
+
+    if (/^\d{4}-\d{2}-\d{2}/.test(raw)) {
+      return raw.substring(0, 10) === today;
+    }
+
+    const d = new Date(raw);
+    if (isNaN(d.getTime())) return false;
+    return (
+      `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` === today
+    );
   });
-
-  if (!time) return formattedDate;
-
-  const [h, m] = time.split(':').map(Number);
-  const ampm = h >= 12 ? 'PM' : 'AM';
-  const hour = h % 12 || 12;
-  const formattedTime = `${hour}:${String(m).padStart(2, '0')} ${ampm}`;
-
-  return `${formattedDate}, ${formattedTime}`;
 };
 
 /* ================= INLINE DROPDOWN ================= */
@@ -442,167 +485,193 @@ const RemarksText = ({ remarks }) => {
   );
 };
 
-/* ================= SITE CARD ================= */
-const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => {
+/* ================= SITE CARD (same design as Leads List) ================= */
+const SiteCard = ({ data, navigation }) => {
   const remarks =
     data?.propertyfeedbacks
       ?.map(x => x?.remarks)
       ?.filter(Boolean)
       ?.join(', ') || 'No Remarks Available';
 
+  const isTodayCard = isCallbackToday(data?.propertyfeedbacks);
+  const cardBorderColor = isTodayCard ? '#30bb7896' : 'rgba(255,255,255,0.2)';
+
+  const statusMeta =
+    data?.active === '1'
+      ? { text: 'Active', color: COLORS.green, bg: '#00C48C22', border: '#00C48C60' }
+      : data?.active === '5'
+        ? { text: 'Booking Done', color: '#9aa5b4', bg: '#6b778522', border: '#6b778560' }
+        : { text: 'Inactive', color: COLORS.red, bg: '#FF6B6B22', border: '#FF6B6B60' };
+
+  const siteVisit =
+    data?.propertyfeedbacks?.map(x => x?.site_visit_date).filter(Boolean).join(', ') || 'N/A';
+
+  const callBack =
+    data?.propertyfeedbacks
+      ?.filter(x => x?.call_back_date)
+      ?.map(x => `${x.call_back_date}${x.call_back_time ? ' / ' + x.call_back_time : ''}`)
+      ?.join(', ') || 'N/A';
+
+  // Opens the booking form with the lead's details already filled in.
+  // On this screen each item IS the lead, so the lead id is data.id.
+  const openBookingForm = () => {
+    const rm = data?.relationshipManager;
+    navigation.navigate(BOOKING_FORM_ROUTE, {
+      leadId: data?.id,
+      name: data?.name || '',
+      phone: data?.phone || '',
+      email: data?.email || '',
+      projectId: data?.propertyproject?.id ?? data?.project_id ?? null,
+      projectName: data?.propertyproject?.project_name || '',
+      locationId:
+        data?.propertylocation?.id ?? data?.location_of_property ?? null,
+      locationName: data?.propertylocation?.name || '',
+      sourceId: data?.mrreference?.id ?? data?.reference ?? null,
+      sourceName: data?.mrreference?.mrf_name || '',
+      rmId: rm?.id ?? rm?.usr_id ?? data?.rm_id ?? null,
+      rmName: rm ? `${rm.usr_fname} ${rm.usr_lname}` : '',
+    });
+  };
+
   return (
-    <View style={styles.card}>
-      {/* Header */}
-      <View style={styles.cardHeader}>
+    <View
+      style={[
+        styles.card,
+        { borderColor: cardBorderColor, borderWidth: isTodayCard ? 1 : 0.5 },
+      ]}
+    >
+      <View style={styles.cardTop}>
         <View style={styles.nameRow}>
-          <Text style={styles.name}>{data?.name}</Text>
+          <Text style={styles.cardName} numberOfLines={2}>
+            {data?.name || 'N/A'} |{' '}
+            <Text style={styles.section}>{data?.propertyproject?.project_name}</Text>
+          </Text>
 
           <View
             style={[
-              styles.activeBadge,
-              {
-                backgroundColor:
-                  data?.active === '1'
-                    ? 'rgba(45,168,94,0.15)'
-                    : data?.active === '5'
-                      ? 'rgba(107,119,133,0.25)'
-                      : 'rgba(224,90,43,0.15)',
-              },
+              styles.statusBadge,
+              { backgroundColor: statusMeta.bg, borderColor: statusMeta.border },
             ]}
           >
-            <Text
-              style={[
-                styles.activeText,
-                {
-                  color:
-                    data?.active === '1'
-                      ? '#2da85e'
-                      : data?.active === '5'
-                        ? '#aab8c4'
-                        : '#e05a2b',
-                },
-              ]}
+            <Text style={[styles.statusText, { color: statusMeta.color }]}>
+              {statusMeta.text}
+            </Text>
+          </View>
+
+          <View style={styles.iconRow}>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('MeetingsEdit', { id: data?.id })}
+              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
             >
-              {data?.active === '1'
-                ? 'Active'
-                : data?.active === '5'
-                  ? 'Booking Done'
-                  : 'Inactive'}
+              <Icon name="edit" size={17} color={COLORS.accent} />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+
+      <View style={styles.divider} />
+
+      <View style={styles.cardBody}>
+        <View style={styles.leftCol}>
+          <View style={styles.infoRow}>
+            <Icon name="call" size={12} color={COLORS.accent} />
+            <TouchableOpacity style={styles.infoTouch} onPress={() => makeCall(data?.phone)}>
+              <Text style={styles.phoneText} numberOfLines={1}>
+                {data?.phone || 'N/A'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.infoRow}>
+            <Icon name="email" size={12} color={COLORS.accent} />
+            <TouchableOpacity style={styles.infoTouch} onPress={() => sendMail(data?.email)}>
+              <Text style={styles.emailText} numberOfLines={1}>
+                {data?.email || 'N/A'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.infoRow}>
+            <Icon name="event" size={12} color={COLORS.gold} />
+            <Text style={styles.infoText} numberOfLines={1}>
+              Visit: {siteVisit}
             </Text>
           </View>
         </View>
 
-        <Icon
-          name="edit"
-          size={20}
-          color="#00e5ff"
-          onPress={() =>
-            navigation.navigate('MeetingsEdit', {
-              id: data?.id,
-            })
-          }
-        />
-      </View>
-
-      {/* Project & Location */}
-      <Text style={styles.location}>
-        {data?.propertyproject?.project_name} | {data?.propertylocation?.name}
-      </Text>
-
-      {/* Phone */}
-      <View style={styles.rowBetween}>
-        <TouchableOpacity onPress={() => makeCall(data?.phone)}>
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Text style={styles.label}>Phone: </Text>
-            <Text style={styles.phoneText}>{data?.phone || 'N/A'}</Text>
-          </View>
-        </TouchableOpacity>
-      </View>
-
-      {/* Email */}
-      <View style={styles.rowBetween}>
-        <TouchableOpacity onPress={() => sendMail(data?.email)}>
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Text style={styles.label}>Email: </Text>
-            <Text style={styles.emailText}>{data?.email || 'N/A'}</Text>
-          </View>
-        </TouchableOpacity>
-      </View>
-
-      {/* Site Visit Date & RM */}
-      <View style={styles.rowBetween}>
-        <View style={styles.leftBox}>
-          <Text style={styles.label}>
-            Site Visit Date:
-            <Text style={styles.value}>
-              {' '}
-              {data?.propertyfeedbacks?.map(x => x?.site_visit_date).join(', ')}
-            </Text>
-          </Text>
-        </View>
-        <View style={styles.rightBox}>
-          <Text style={styles.label}>
-            RM:{' '}
-            <Text style={styles.value}>
+        <View style={styles.rightCol}>
+          <View style={styles.infoRow}>
+            <Text style={styles.rmLabelCard}>RM: </Text>
+            <Text style={styles.rmValue} numberOfLines={1}>
               {data?.relationshipManager
                 ? `${data.relationshipManager.usr_fname} ${data.relationshipManager.usr_lname}`
                 : 'N/A'}
             </Text>
-          </Text>
-        </View>
-      </View>
+          </View>
 
-      {/* Call Back */}
-      <View style={styles.rowBetween}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.label}>
-            Call Back:{' '}
-            <Text style={styles.value}>
-              {data?.propertyfeedbacks
-                ?.map(x =>
-                  formatCallBackDateTime(x?.call_back_date, x?.call_back_time),
-                )
-                .filter(Boolean)
-                .join(', ') || 'N/A'}
+          <View style={styles.infoRow}>
+            <Icon name="location-on" size={12} color={COLORS.gold} />
+            <Text style={styles.infoText} numberOfLines={1}>
+              {data?.propertylocation?.name || 'N/A'}
             </Text>
+          </View>
+
+          <View style={styles.infoRow}>
+            <Text style={styles.refLabel}>Source: </Text>
+            <Text style={styles.refValue} numberOfLines={1}>
+              {data?.mrreference?.mrf_name || 'N/A'}
+            </Text>
+          </View>
+        </View>
+      </View>
+
+      <View style={styles.extraBlock}>
+        <View style={styles.extraRow}>
+          <Text style={styles.refLabel}>Project Form Name: </Text>
+          <Text style={[styles.value, { flex: 1 }]} numberOfLines={1} ellipsizeMode="tail">
+            {data?.project_form_name || 'N/A'}
           </Text>
         </View>
-      </View>
 
-      {/* Lead Source */}
-      <View style={styles.rowBetween}>
-        <Text style={styles.label}>
-          Lead Source:{' '}
-          <Text style={styles.value}>{data?.mrreference?.mrf_name}</Text>
-        </Text>
-      </View>
+        <View style={styles.extraRow}>
+          <Text style={styles.refLabel}>Call Back: </Text>
+          <Text style={[styles.value, { flex: 1 }]}>{callBack}</Text>
+        </View>
 
-      {/* Remarks */}
-      <View style={styles.remarksRow}>
-        <Text style={styles.label}>Remarks:</Text>
-        <View style={{ flex: 1 }}>
-          <RemarksText remarks={remarks} />
+        <View style={styles.extraRow}>
+          <Text style={styles.refLabel}>Remarks: </Text>
+          <View style={{ flex: 1 }}>
+            <RemarksText remarks={remarks} />
+          </View>
         </View>
       </View>
 
-      {/* Footer */}
+      {/* Footer: [View Interaction] [Book]            status
+          Book is hidden when the lead is already "Booking Done". */}
       <View style={styles.cardFooter}>
-        <TouchableOpacity
-          style={styles.button}
-          onPress={() =>
-            navigation.navigate('AllInteractionsScreen', {
-              id: data?.id,
-            })
-          }
-        >
-          <Icon name="forum" size={12} color={'#00cfff'} />
-          <Text style={styles.buttonText}>View Interaction</Text>
-        </TouchableOpacity>
+        <View style={styles.footerButtons}>
+          <TouchableOpacity
+            style={styles.interactionBtn}
+            onPress={() => navigation.navigate('AllInteractionsScreen', { id: data?.id })}
+            activeOpacity={0.8}
+          >
+            <Icon name="forum" size={12} color={COLORS.accent} />
+            <Text style={styles.interactionBtnText}>View Interaction</Text>
+          </TouchableOpacity>
 
-        <Text style={styles.completed}>
-          {data?.propertyfeedbacks
-            ?.map(x => x.propertycallstatus?.name)
-            .join(', ') || 'N/A'}
+          {data?.active !== '5' && (
+            <TouchableOpacity
+              style={styles.bookButton}
+              onPress={openBookingForm}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.bookButtonText}>Book</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        <Text style={styles.completed} numberOfLines={1}>
+          {data?.propertyfeedbacks?.map(x => x.propertycallstatus?.name).join(', ') || 'N/A'}
         </Text>
       </View>
     </View>
@@ -1061,42 +1130,27 @@ const FilterBottomSheet = ({
 const TotalLeadScreen = () => {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
-  const [showRemarks, setShowRemarks] = useState(false);
-  const [remarksText, setRemarksText] = useState('');
+  const queryClient = useQueryClient();
+  const listRef = useRef(null);
+
   const [searchText, setSearchText] = useState('');
   const [showFilterModal, setShowFilterModal] = useState(false);
+  const [showTopBtn, setShowTopBtn] = useState(false);
 
-  const [filters, setFilters] = useState({
-    company_id: null,
-    rm_id: null,
-    fromDate: null,
-    toDate: null,
-    project: null,
-    location: null,
-    active: null,
-    lead_status: null,
-    lead_sub_status: null,
-    lead_qualification: null,
-    call_status: null,
-    siteVisitFromDate: null,
-    siteVisitToDate: null,
-    lead_source: null,
-  });
+  const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [appliedFilters, setAppliedFilters] = useState();
   const [showFromPicker, setShowFromPicker] = useState(false);
   const [showToPicker, setShowToPicker] = useState(false);
   const [activePicker, setActivePicker] = useState(null);
-  const [showTopBtn, setShowTopBtn] = useState(false);
-  const scrollRef = useRef(null);
-  const loadMoreLock = useRef(false);
 
   const formatDate = date => {
     if (!date) return '';
     const d = new Date(date);
-    const day = String(d.getDate()).padStart(2, '0');
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const year = d.getFullYear();
-    return `${year}-${month}-${day}`;
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  };
+
+  const onChange = (key, value) => {
+    setFilters(prev => ({ ...prev, [key]: value }));
   };
 
   const onDateChange = (event, selectedDate, key) => {
@@ -1116,8 +1170,8 @@ const TotalLeadScreen = () => {
       onChange(key, formatDate(selectedDate));
     }
   };
-  const queryClient = useQueryClient();
-  /* ================= INFINITE QUERY ================= */
+
+  /* ================= INFINITE QUERY (same pattern as Leads List) ================= */
   const {
     data,
     fetchNextPage,
@@ -1126,12 +1180,13 @@ const TotalLeadScreen = () => {
     isLoading,
     isFetching,
   } = useInfiniteQuery({
-    queryKey: ['TotalLead', appliedFilters],
+    queryKey: ['TotalLead', appliedFilters, searchText],
     queryFn: async ({ pageParam = 1 }) => {
       const res = await api.get('/api/pm/getAllPropertyLeadsWithAndWihoutRM', {
         params: {
           page: pageParam,
           limit: 20,
+          search: searchText || undefined,
           company_id: filters.company_id || undefined,
           rm_id: filters.rm_id || undefined,
           fromDate: filters.fromDate || undefined,
@@ -1149,10 +1204,6 @@ const TotalLeadScreen = () => {
           reference: filters.lead_source || undefined,
         },
       });
-      console.log(
-        'LEAD API RESPONSE:',
-        JSON.stringify(res.data?.data?.[0], null, 2),
-      );
       return res.data;
     },
     getNextPageParam: lastPage => {
@@ -1162,47 +1213,21 @@ const TotalLeadScreen = () => {
     initialPageParam: 1,
   });
 
-  // সব pages থেকে data flatten করো
-  const leads = data?.pages?.flatMap(page => page.data) || [];
-  const filteredleads = leads?.filter(item => {
-    const name = item?.name?.toLowerCase() || '';
-    const phone = item?.phone?.toString() || '';
-    const email = item?.email?.toLowerCase() || '';
-    const project = item?.propertyproject?.project_name?.toLowerCase() || '';
-    const address = item?.propertylocation?.name?.toLowerCase() || '';
-    const rm = `${item?.relationshipManager?.usr_fname || ''} ${item?.relationshipManager?.usr_lname || ''
-      }`
-      .trim()
-      .toLowerCase();
-    const remarks =
-      item?.propertyfeedbacks
-        ?.map(x => x?.remarks)
-        ?.filter(Boolean)
-        ?.join(', ')
-        ?.toLowerCase() || 'no remarks available';
-    const search = searchText.toLowerCase().trim();
+  // flatten every page and remove duplicate ids (same as Leads List)
+  const leads = useMemo(() => {
+    const all = data?.pages?.flatMap(page => page.data) || [];
+    const seen = new Set();
+    return all.filter(item => {
+      if (!item?.id || seen.has(item.id)) return false;
+      seen.add(item.id);
+      return true;
+    });
+  }, [data]);
 
-    return (
-      name.includes(search) ||
-      phone.includes(search) ||
-      email.includes(search) ||
-      project.includes(search) ||
-      address.includes(search) ||
-      rm.includes(search) ||
-      remarks.includes(search)
-    );
-  });
-
-  // Count is derived from loaded pages, so it always starts at 1
-  const lastPage = data?.pages?.[data.pages.length - 1];
-  const totalRecords = lastPage?.totalRecords;
-  const startEntry = leads.length > 0 ? 1 : 0;
-  const endEntry = leads.length;
+  const totalRecords = data?.pages?.[0]?.totalRecords;
 
   const handleLoadMore = () => {
-    if (hasNextPage && !isFetchingNextPage) {
-      fetchNextPage();
-    }
+    if (hasNextPage && !isFetchingNextPage) fetchNextPage();
   };
 
   /* ================= FILTER QUERIES ================= */
@@ -1271,35 +1296,18 @@ const TotalLeadScreen = () => {
   });
 
   /* ================= DATA MAPPING ================= */
-  const Property = AllProperty?.map(item => ({
-    label: item.name,
-    value: item.id,
-  }));
-  const Rm = allRmList?.map(item => ({ label: item.name, value: item.id }));
-  const projectOptions = projectList?.map(item => ({
-    label: item.project_name,
-    value: item.id,
-  }));
-  const leadQualificationOptions = leadQualificationList?.map(item => ({
-    label: item.name,
-    value: item.id,
-  }));
-  const leadStatusOptions = leadStatusList?.map(item => ({
-    label: item.name,
-    value: item.id,
-  }));
-  const leadSubStatusOptions = leadSubStatusList?.map(item => ({
-    label: item.name,
-    value: item.id,
-  }));
-  const callStatusListfetch = callStatusList?.map(item => ({
-    label: item.name,
-    value: item.id,
-  }));
-  const leadSourceOptions = mrReferenceList?.map(item => ({
-    label: item.mrf_name,
-    value: item.id,
-  }));
+  const toOptions = list => list?.map(item => ({ label: item.name, value: item.id })) || [];
+
+  const Property = toOptions(AllProperty);
+  const Rm = toOptions(allRmList);
+  const leadQualificationOptions = toOptions(leadQualificationList);
+  const leadStatusOptions = toOptions(leadStatusList);
+  const leadSubStatusOptions = toOptions(leadSubStatusList);
+  const callStatusListfetch = toOptions(callStatusList);
+  const projectOptions =
+    projectList?.map(item => ({ label: item.project_name, value: item.id })) || [];
+  const leadSourceOptions =
+    mrReferenceList?.map(item => ({ label: item.mrf_name, value: item.id })) || [];
 
   const LeadStatus = [
     { label: 'Active', value: '1' },
@@ -1308,44 +1316,21 @@ const TotalLeadScreen = () => {
   ];
 
   /* ================= HANDLERS ================= */
-  const onChange = (key, value) => {
-    setFilters(prev => ({ ...prev, [key]: value }));
-  };
-
   const applyFilter = () => {
     setAppliedFilters(filters);
     setShowFilterModal(false);
   };
 
   const resetFilters = () => {
-    const cleared = {
-      company_id: null,
-      rm_id: null,
-      fromDate: null,
-      toDate: null,
-      project: null,
-      location: null,
-      active: null,
-      lead_status: null,
-      lead_sub_status: null,
-      lead_qualification: null,
-      call_status: null,
-      siteVisitFromDate: null,
-      siteVisitToDate: null,
-      lead_source: null,
-    };
-    setFilters(cleared);
-    setAppliedFilters(cleared);
+    setFilters(EMPTY_FILTERS);
+    setAppliedFilters(EMPTY_FILTERS);
     setShowFilterModal(false);
   };
 
   const scrollToTop = () => {
-    scrollRef.current?.scrollTo({
-      x: 0,
-      y: 0,
-      animated: true,
-    });
+    listRef.current?.scrollToOffset({ offset: 0, animated: true });
   };
+
   useFocusEffect(
     React.useCallback(() => {
       return () => {
@@ -1353,6 +1338,7 @@ const TotalLeadScreen = () => {
       };
     }, [queryClient]),
   );
+
   /* ================= RENDER ================= */
   return (
     <View style={styles.container}>
@@ -1383,138 +1369,93 @@ const TotalLeadScreen = () => {
               >
                 <Icon1 name="chevron-back" size={23} color="#fff" />
               </TouchableOpacity>
-              <Icon name="people" size={20} color="#ffffff" />
+              <Icon name="people" size={23} color="#ffffff" />
               <Text style={styles.screenTitle} numberOfLines={1}>
-                Active Leads / Total Leads
+               Total Leads Till Date
               </Text>
             </View>
 
             <TouchableOpacity
-              activeOpacity={0.7}
+              style={styles.iconBtn}
+              activeOpacity={0.75}
               onPress={() => setShowFilterModal(true)}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
-              <Icon name="filter-alt" size={18} color="#00e5ff" />
+              <Icon name="filter-alt" size={16} color={COLORS.accent} />
             </TouchableOpacity>
           </View>
         </View>
 
-        {/* LIST */}
-        <ScrollView
-          ref={scrollRef}
+        {/* LIST (FlatList, same as Leads List) */}
+        <FlatList
+          ref={listRef}
+          data={leads}
+          keyExtractor={(item, i) => (item?.id != null ? `lead-${item.id}` : `lead-idx-${i}`)}
+          renderItem={({ item }) => <SiteCard data={item} navigation={navigation} />}
+          contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
-          contentContainerStyle={styles.listContent}
-          onScroll={event => {
-            const { layoutMeasurement, contentOffset, contentSize } =
-              event.nativeEvent;
+          onEndReached={handleLoadMore}
+          onEndReachedThreshold={0.4}
+          onScroll={e => setShowTopBtn(e.nativeEvent.contentOffset.y > 200)}
+          scrollEventThrottle={100}
+          ListHeaderComponent={
+            <>
+              {/* SEARCH */}
+              <View style={styles.searchRow}>
+                <View style={styles.searchBox}>
+                  <Icon name="search" size={16} color={COLORS.mutedText} />
+                  <TextInput
+                    placeholder="Search name / phone / email..."
+                    placeholderTextColor={COLORS.mutedText}
+                    value={searchText}
+                    onChangeText={setSearchText}
+                    style={styles.searchInput}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                  {searchText ? (
+                    <TouchableOpacity onPress={() => setSearchText('')}>
+                      <Icon name="close" size={15} color={COLORS.mutedText} />
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
+              </View>
 
-            const y = contentOffset.y;
+              {/* COUNT */}
+              {totalRecords != null && (
+                <View style={styles.countRow}>
+                  <Text style={styles.countText}>
+                    Showing {leads.length ? 1 : 0} to {leads.length} of {totalRecords} entries
+                  </Text>
+                  {isFetching && !isFetchingNextPage && !isLoading && (
+                    <ActivityIndicator size="small" color="#fff" />
+                  )}
+                </View>
+              )}
 
-            setShowTopBtn(y > 200);
+              {isLoading && (
+                <View style={styles.initialLoader}>
+                  <ActivityIndicator size="large" color="#fff" />
+                </View>
+              )}
 
-            const isNearBottom =
-              layoutMeasurement.height + y >= contentSize.height - 150;
-
-            if (
-              isNearBottom &&
-              hasNextPage &&
-              !isFetchingNextPage &&
-              !loadMoreLock.current
-            ) {
-              // lock so ONE scroll-to-bottom loads only ONE page (20 records)
-              loadMoreLock.current = true;
-              fetchNextPage().finally(() => {
-                setTimeout(() => {
-                  loadMoreLock.current = false;
-                }, 500);
-              });
-            }
-          }}
-          scrollEventThrottle={16}
-        >
-          {/* SEARCH */}
-          <View style={styles.searchContainer}>
-            <View style={styles.searchBox}>
-              <Icon name="search" size={16} color={COLORS.mutedText} />
-              <TextInput
-                placeholder="Search name / phone / email..."
-                placeholderTextColor={COLORS.mutedText}
-                value={searchText}
-                onChangeText={setSearchText}
-                style={styles.searchInput}
-                autoCapitalize="none"
-                autoCorrect={false}
-                clearButtonMode="while-editing"
-              />
-            </View>
-          </View>
-
-          {/* COUNT */}
-          {totalRecords != null && (
-            <Text style={styles.countText}>
-              Showing {startEntry} to {endEntry} of {totalRecords} entries
-            </Text>
-          )}
-
-          {/* CARDS */}
-          {isLoading ? (
-            <View style={styles.centerLoader}>
-              <ActivityIndicator size="large" color="#fff" />
-            </View>
-          ) : isFetching && !isFetchingNextPage && filteredleads?.length > 0 ? (
-            <View style={styles.centerLoader}>
-              <ActivityIndicator size="small" color="#fff" />
-              <Text style={styles.refreshingText}>Refreshing...</Text>
-            </View>
-          ) : filteredleads?.length > 0 ? (
-            filteredleads?.map((visit, i) => (
-              <SiteCard
-                key={visit.id || i}
-                data={visit}
-                setShowRemarks={setShowRemarks}
-                setRemarksText={setRemarksText}
-                navigation={navigation}
-              />
-            ))
-          ) : (
-            <View style={styles.emptyWrap}>
-              <Icon name="people" size={48} color="rgba(255,255,255,0.25)" />
-              <Text style={styles.empty}>No data found</Text>
-            </View>
-          )}
-
-          {isFetchingNextPage && (
-            <ActivityIndicator
-              size="small"
-              color="#999"
-              style={{
-                marginVertical: 12,
-                alignSelf: 'center',
-              }}
-            />
-          )}
-
-          <View style={{ height: 100 }} />
-        </ScrollView>
-
-        {/* REMARKS MODAL */}
-        {showRemarks && (
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalCard}>
-              <Icon name="check-circle" size={32} color="#4aa3df" />
-              <Text style={styles.modalTitle}>Latest Remarks</Text>
-              <Text style={styles.modalText}>{remarksText}</Text>
-
-              <TouchableOpacity
-                style={styles.modalCloseBtn}
-                onPress={() => setShowRemarks(false)}
-              >
-                <Text style={styles.modalCloseText}>OK</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
+              {!isLoading && leads.length === 0 && (
+                <View style={styles.emptyWrap}>
+                  <Icon name="people" size={48} color="rgba(255,255,255,0.25)" />
+                  <Text style={styles.empty}>No data found</Text>
+                </View>
+              )}
+            </>
+          }
+          ListFooterComponent={
+            isFetchingNextPage ? (
+              <View style={styles.footerLoader}>
+                <ActivityIndicator size="small" color="#fff" />
+                <Text style={styles.footerText}>Loading more...</Text>
+              </View>
+            ) : null
+          }
+        />
 
         {/* FILTER BOTTOM SHEET (animated Modal) */}
         <FilterBottomSheet
@@ -1544,7 +1485,7 @@ const TotalLeadScreen = () => {
 
         {/* TOP BUTTON */}
         {showTopBtn && (
-          <TouchableOpacity style={styles.topButton} onPress={scrollToTop}>
+          <TouchableOpacity style={styles.topButton} onPress={scrollToTop} activeOpacity={0.8}>
             <Icon name="keyboard-arrow-up" size={26} color="#fff" />
           </TouchableOpacity>
         )}
@@ -1600,11 +1541,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  backIcon: {
-    width: 20,
-    height: 20,
-    tintColor: '#ffffff',
-  },
   screenTitle: {
     color: '#ffffff',
     fontSize: 15,
@@ -1612,120 +1548,110 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     flexShrink: 1,
   },
+  iconBtn: {
+    width: 30,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,207,255,0.12)',
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: COLORS.accent,
+  },
 
   /* ── List ── */
-  listContent: { paddingHorizontal: scale(10), paddingBottom: verticalScale(10) },
-  centerLoader: { alignItems: 'center', justifyContent: 'center', marginTop: 40 },
-  refreshingText: { color: '#fff', marginTop: 8, fontSize: 12 },
+  listContent: { paddingHorizontal: 12, paddingBottom: 100 },
+  initialLoader: { paddingVertical: 32, alignItems: 'center' },
+  footerLoader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 16,
+  },
+  footerText: { color: COLORS.accent, fontSize: 12 },
   emptyWrap: { alignItems: 'center', marginTop: 80, gap: 12 },
   empty: { color: 'rgba(255,255,255,0.40)', fontSize: 15 },
-  searchContainer: {
-    position: 'relative',
-    zIndex: 100,
-    marginBottom: 10,
-  },
+
+  /* ── Search + count (same as Leads List) ── */
+  searchRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8, marginTop: 2 },
   searchBox: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.10)',
-    borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.13)',
+    borderColor: COLORS.borderColor,
+    borderRadius: 20,
     paddingHorizontal: 12,
-    paddingVertical: 9,
+    height: 40,
+    backgroundColor: 'rgba(255,255,255,0.06)',
   },
-  searchInput: {
-    flex: 1,
-    fontSize: 14,
-    color: '#fff',
-    padding: 0,
-    marginLeft: 8,
+  searchInput: { color: COLORS.white, marginLeft: 8, fontSize: 13, flex: 1, paddingVertical: 0 },
+  countRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+    paddingHorizontal: 2,
   },
-  countText: {
-    color: '#ffb300',
-    fontSize: 12,
-    fontWeight: '700',
-    marginBottom: 8,
-  },
+  countText: { color: COLORS.mutedText, fontSize: 12, fontWeight: '600' },
 
-  /* ── Card ── */
+  /* ── Lead Card (same as Leads List) ── */
   card: {
     backgroundColor: 'rgba(4, 35, 70, 0.62)',
-    borderRadius: 4,
+    borderRadius: 12,
     padding: 12,
     marginBottom: 10,
-    borderLeftWidth: 4,
-    borderLeftColor: '#ffb85d',
+    borderWidth: 0.5,
+    borderColor: 'rgba(255,255,255,0.2)',
   },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 4,
-  },
-  nameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    flexWrap: 'wrap',
-    marginRight: 8,
-  },
-  name: { color: '#ffffff', fontSize: 15, fontWeight: '600', flexShrink: 1 },
-  activeBadge: {
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    marginLeft: 6,
-  },
-  activeText: { fontSize: 11, fontWeight: '600' },
+  cardTop: { marginBottom: 8 },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  cardName: { color: COLORS.white, fontWeight: '800', fontSize: 13, flex: 1, minWidth: 0 },
+  statusBadge: { borderRadius: 20, paddingHorizontal: 8, paddingVertical: 2, borderWidth: 0.8, flexShrink: 0 },
+  statusText: { fontSize: 10, fontWeight: '700' },
+  iconRow: { flexDirection: 'row', alignItems: 'center', gap: 10, flexShrink: 0 },
+  divider: { height: 0.5, backgroundColor: 'rgba(255,255,255,0.12)', marginBottom: 8 },
+  cardBody: { flexDirection: 'row', gap: 8 },
+  leftCol: { flex: 1, gap: 5, minWidth: 0 },
+  rightCol: { flex: 1, gap: 5, minWidth: 0 },
+  infoRow: { flexDirection: 'row', alignItems: 'center', gap: 5, minWidth: 0 },
+  infoTouch: { flexShrink: 1 },
+  infoText: { color: COLORS.mutedText, fontSize: 11, flexShrink: 1 },
+  rmLabelCard: { color: COLORS.gold, fontSize: 11, fontWeight: '600' },
+  rmValue: { color: COLORS.gold, fontSize: 11, fontWeight: '600', flexShrink: 1 },
+  refLabel: { color: COLORS.labelText, fontSize: 10, fontWeight: '600' },
+  refValue: { color: COLORS.labelText, fontSize: 10, flexShrink: 1 },
+  section: { color: 'rgba(0, 208, 255, 0.84)' },
+  value: { color: COLORS.white, fontSize: 11, flexShrink: 1 },
   phoneText: {
-    color: '#4FC3F7',
-    backgroundColor: 'rgba(20,130,204,0.10)',
+    color: '#00acc1',
+    backgroundColor: 'rgba(0, 172, 193, 0.15)',
     paddingHorizontal: 4,
     paddingVertical: 2,
     borderRadius: 4,
     fontWeight: '600',
-    fontSize: 11.5,
+    fontSize: 11,
+    flexShrink: 1,
+    overflow: 'hidden',
   },
-  location: {
-    color: '#4FC3F7',
-    marginTop: 2,
-    fontSize: 12,
-    flexWrap: 'wrap',
-    lineHeight: 16,
-  },
-  rowBetween: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 5,
-    gap: 6,
-    flexWrap: 'wrap',
-  },
-  leftBox: { flex: 1, minWidth: 0 },
-  rightBox: { flex: 1, minWidth: 0 },
-  label: { fontSize: 11.5, color: '#afaea5', lineHeight: 18 },
-  value: { color: '#ffffff', fontSize: 11.5, flexShrink: 1 },
   emailText: {
-    color: '#4FC3F7',
+    color: '#00acc1',
     textDecorationLine: 'underline',
     fontWeight: '500',
-    fontSize: 11.5,
+    fontSize: 11,
+    flexShrink: 1,
   },
-  remarksRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginTop: 5,
+  extraBlock: {
+    marginTop: 8,
+    paddingTop: 8,
     gap: 5,
+    borderTopWidth: 0.5,
+    borderTopColor: 'rgba(255,255,255,0.12)',
   },
-  remarksCardText: {
-    fontSize: 11.5,
-    color: '#ffffff',
-    lineHeight: 18,
-  },
-  readMore: {
-    color: '#4FC3F7',
-    fontWeight: '600',
-  },
+  extraRow: { flexDirection: 'row', alignItems: 'flex-start' },
+  remarksCardText: { fontSize: 11, color: COLORS.white, lineHeight: 16 },
+  readMore: { color: COLORS.accent, fontWeight: '600' },
   cardFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1733,18 +1659,43 @@ const styles = StyleSheet.create({
     marginTop: 10,
     gap: 6,
   },
-  button: {
-    flexDirection: 'row', alignItems: 'center', gap: 5, flexShrink: 1,
-    backgroundColor: '#00cfff18', borderWidth: 1, borderColor: '#00cfff40',
-    borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5,
-  },
-  buttonText: { color: '#00cfff', fontSize: 11, fontWeight: '600' },
-  completed: {
-    color: '#8A90B4',
-    fontSize: 11,
+  footerButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
     flexShrink: 1,
-    textAlign: 'right',
+    flexWrap: 'wrap',
+    gap: 6,
   },
+  interactionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    flexShrink: 1,
+    backgroundColor: COLORS.accentDim,
+    borderWidth: 1,
+    borderColor: COLORS.accentBorder,
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+  },
+  interactionBtnText: { color: COLORS.accent, fontSize: 11, fontWeight: '600' },
+  // Book button: filled, so it stands out from "View Interaction"
+  bookButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#4aa3df',
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    elevation: 3,
+    shadowColor: '#1d6fe0',
+    shadowOpacity: 0.5,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+  },
+  bookButtonText: { color: '#ffffff', fontSize: 11, fontWeight: '700' },
+  completed: { color: COLORS.mutedText, fontSize: 11, flexShrink: 1, textAlign: 'right' },
 
   /* ── Top button (FAB style) ── */
   topButton: {
@@ -1764,46 +1715,6 @@ const styles = StyleSheet.create({
     elevation: 12,
     zIndex: 999,
   },
-
-  /* ── Remarks modal ── */
-  modalOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalCard: {
-    width: '88%',
-    maxHeight: SCREEN_HEIGHT * 0.72,
-    backgroundColor: '#21283a',
-    borderWidth: 1,
-    borderColor: '#39415a',
-    borderRadius: 24,
-    paddingHorizontal: 20,
-    paddingTop: 18,
-    paddingBottom: 18,
-    alignItems: 'center',
-  },
-  modalTitle: {
-    color: '#e6ebf2',
-    fontSize: 18,
-    marginBottom: 10,
-    fontWeight: '700',
-  },
-  modalText: { color: '#c3cbdb', textAlign: 'center', marginBottom: 15 },
-  modalCloseBtn: {
-    backgroundColor: '#1e9ce8',
-    height: 48,
-    borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
-    width: '100%',
-  },
-  modalCloseText: { color: '#ffffff', fontWeight: '600', fontSize: 15 },
 
   /* ── Filter bottom sheet ── */
   backdrop: {

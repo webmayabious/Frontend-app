@@ -1,4 +1,12 @@
-// SiteVisitsScreen.js (Same design as TotalBookingsAgreementsTillDateScreen - logic unchanged)
+// SiteVisitsScreen.js
+// Fixes: Monthly (and every dashboard range) now loads correctly
+//  - filters/appliedFilters start with the dashboard dates
+//  - re-applies filters whenever the dashboard sends new route params
+//  - fetch uses appliedFilters (not unapplied filters)
+//  - date strings from the dashboard are normalised to YYYY-MM-DD
+//  - date picker no longer shifts the day (timezone bug)
+// New: every card has a "Book" button that opens BookingFormScreen
+//  with the lead's details already filled in.
 import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
@@ -28,6 +36,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import api from '../api/AxiosInstance';
 import Icon1 from 'react-native-vector-icons/Ionicons';
+
 const COLORS = {
   white: '#FFFFFF',
   mutedText: '#8A90B4',
@@ -36,12 +45,15 @@ const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window');
 const scale = size => (SCREEN_WIDTH / 375) * size;
 const verticalScale = size => (SCREEN_HEIGHT / 812) * size;
 
+// Name of the booking form screen in your navigator.
+// Register it like:  <Stack.Screen name="BookingFormScreen" component={BookingFormScreen} />
+const BOOKING_FORM_ROUTE = 'BookingFormScreen';
+
 /* ================= CALL ================= */
 const makeCall = phoneNumber => {
   if (!phoneNumber) return;
 
   const cleanNumber = phoneNumber.replace(/\D/g, '');
-
   Alert.alert('Contact', `Choose an action for ${phoneNumber}`, [
     {
       text: 'Cancel',
@@ -60,7 +72,6 @@ const makeCall = phoneNumber => {
           if (supported) {
             await Linking.openURL(appUrl);
           } else {
-            // Opens WhatsApp Web or the app if installed
             await Linking.openURL(webUrl);
           }
         } catch (error) {
@@ -86,11 +97,9 @@ const sendMail = async email => {
       if (supported) {
         await Linking.openURL(gmailUrl);
       } else {
-        // Fallback to mailto
         await Linking.openURL(`mailto:${email}`);
       }
     } else {
-      // iOS
       await Linking.openURL(`mailto:${email}`);
     }
   } catch (error) {
@@ -114,8 +123,8 @@ const DropdownField = ({
   scrollYRef,
   placeholder,
 }) => {
-  const [open, setOpen] = useState(false); // what the user wants
-  const [mounted, setMounted] = useState(false); // keeps list alive while closing
+  const [open, setOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const [search, setSearch] = useState('');
   const heightAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -131,7 +140,6 @@ const DropdownField = ({
       .includes(search.toLowerCase()),
   );
 
-  // list height follows the real content, capped at MAX_LIST_H
   const contentH = filtered.length === 0 ? 48 : filtered.length * ITEM_H;
   const targetH = Math.min(SEARCH_H + contentH, MAX_LIST_H);
 
@@ -148,7 +156,6 @@ const DropdownField = ({
     });
   };
 
-  // single place that runs every animation
   useEffect(() => {
     if (!open && !mounted) return;
 
@@ -405,12 +412,27 @@ const EmailLink = ({ email }) => (
   </TouchableOpacity>
 );
 
-const CardFooter = ({ onViewInteraction, status }) => (
+// Footer: [View Interaction] [Book]            status
+// Book is hidden when the lead is already "Booking Done".
+const CardFooter = ({ onViewInteraction, onBook, showBook = true, status }) => (
   <View style={styles.cardFooter}>
-    <TouchableOpacity style={styles.button} onPress={onViewInteraction}>
-      <Icon name="forum" size={12} color={'#00cfff'} />
-      <Text style={styles.buttonText}>View Interaction</Text>
-    </TouchableOpacity>
+    <View style={styles.footerButtons}>
+      <TouchableOpacity style={styles.button} onPress={onViewInteraction}>
+        <Icon name="forum" size={12} color={'#00cfff'} />
+        <Text style={styles.buttonText}>View Interaction</Text>
+      </TouchableOpacity>
+
+      {showBook && onBook ? (
+        <TouchableOpacity
+          style={styles.bookButton}
+          onPress={onBook}
+          activeOpacity={0.85}
+        >
+          {/* <Icon name="book-online" size={13} color="#ffffff" /> */}
+          <Text style={styles.bookButtonText}>Book</Text>
+        </TouchableOpacity>
+      ) : null}
+    </View>
     <Text style={styles.completed}>{status}</Text>
   </View>
 );
@@ -418,7 +440,12 @@ const CardFooter = ({ onViewInteraction, status }) => (
 const TopBar = ({ icon, title, onBack, onFilter }) => {
   const insets = useSafeAreaInsets();
   return (
-    <View style={[styles.topBarContainer, { paddingTop: insets.top + verticalScale(10) }]}>
+    <View
+      style={[
+        styles.topBarContainer,
+        { paddingTop: insets.top + verticalScale(10) },
+      ]}
+    >
       <View style={styles.topBar}>
         <View style={styles.leftHeader}>
           <TouchableOpacity
@@ -467,8 +494,6 @@ const FilterBottomSheet = ({
   const scrollRef1 = useRef(null);
   const scrollYRef = useRef(0);
 
-  // Track keyboard height ourselves so the sheet always returns to the
-  // bottom once the keyboard is hidden.
   useEffect(() => {
     const showEvt =
       Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
@@ -556,7 +581,6 @@ const FilterBottomSheet = ({
     }).start();
   };
 
-  // Drag from the handle
   const handlePan = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
@@ -582,7 +606,6 @@ const FilterBottomSheet = ({
     }),
   ).current;
 
-  // Drag down from the content when scrolled to top
   const scrollPan = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => false,
@@ -734,7 +757,7 @@ const InputField = ({ label, placeholder, icon, value, onChange, onPress }) => (
           placeholder={placeholder}
           placeholderTextColor="#aab8c4"
           style={styles.filterInput}
-          value={value}
+          value={value || ''}
           onChangeText={onChange}
           editable={!onPress}
           pointerEvents={onPress ? 'none' : 'auto'}
@@ -748,6 +771,26 @@ const InputField = ({ label, placeholder, icon, value, onChange, onPress }) => (
 /* ================= CARD ================= */
 const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => {
   const remarks = data?.remarks || 'No Remarks Available';
+  const lead = data?.propertylead;
+
+  // Opens the booking form with the lead's details already filled in.
+  const openBookingForm = () => {
+    navigation.navigate(BOOKING_FORM_ROUTE, {
+      leadId: data?.property_lead_id,
+      name: lead?.name || '',
+      phone: lead?.phone || '',
+      email: lead?.email || '',
+      projectId: lead?.propertyproject?.id ?? null,
+      projectName: lead?.propertyproject?.project_name || '',
+      locationId: lead?.propertylocation?.id ?? null,
+      locationName: lead?.propertylocation?.name || '',
+      rmId: lead?.relationshipManager?.id ?? null,
+      rmName: lead?.relationshipManager
+        ? `${lead.relationshipManager.usr_fname} ${lead.relationshipManager.usr_lname}`
+        : '',
+      sourceName: lead?.mrreference?.mrf_name || '',
+    });
+  };
 
   return (
     <View style={styles.card}>
@@ -816,33 +859,105 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => {
             id: data?.property_lead_id,
           })
         }
+        onBook={openBookingForm}
+        showBook={data?.propertylead?.active !== '5'}
         status={data?.propertycallstatus?.name}
       />
     </View>
   );
 };
 
+/* ================= RANGE FROM DASHBOARD ================= */
+const fmtLocal = d =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
+    d.getDate(),
+  ).padStart(2, '0')}`;
+
+// Accepts "2026-10-29", "29-10-2026", "29/10/2026", "2026-10-29T00:00:00Z"
+// and always returns "YYYY-MM-DD" (or null if it cannot be understood).
+const normalizeISO = v => {
+  if (!v) return null;
+  const str = String(v).trim();
+
+  // YYYY-MM-DD (optionally followed by time)
+  let m = str.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+  if (m) {
+    return `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
+  }
+
+  // DD-MM-YYYY or DD/MM/YYYY
+  m = str.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
+  if (m) {
+    return `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
+  }
+
+  return null;
+};
+
+// Dashboard range -> [fromDate, toDate] for the site-visit date filter.
+// If the dashboard card sent exact from/to dates, those are used as they are.
+const rangeToDates = (range, from, to) => {
+  const f = normalizeISO(from);
+  const t = normalizeISO(to);
+  if (f && t) return [f, t]; // exact dates the card is showing
+
+  const now = new Date();
+  switch (range) {
+    case 'today':
+      return [fmtLocal(now), fmtLocal(now)];
+    case 'custom':
+      return [f || null, t || null];
+    case 'weekly': {
+      // current week, Monday to Sunday
+      const mon = new Date(now);
+      mon.setDate(now.getDate() - ((now.getDay() + 6) % 7));
+      const sun = new Date(mon);
+      sun.setDate(mon.getDate() + 6);
+      return [fmtLocal(mon), fmtLocal(sun)];
+    }
+    case 'monthly':
+      // matches the dashboard label: 01 Jan of this year to today
+      return [`${now.getFullYear()}-01-01`, fmtLocal(now)];
+    default:
+      // till_date or opened without params: no date filter
+      return [null, null];
+  }
+};
+
+const EMPTY_FILTERS = {
+  company_id: null,
+  rm_id: null,
+  fromDate: null,
+  toDate: null,
+  project: null,
+  location: null,
+  status: null,
+  lead_source: null,
+  siteVisitFromDate: null,
+  siteVisitToDate: null,
+};
+
 /* ================= MAIN SCREEN ================= */
-const SiteVisitsScreen = () => {
+const SiteVisitsScreen = ({ route }) => {
   const navigation = useNavigation();
+
+  // sent by the dashboard View button
+  const { range, period, from, to } = route?.params || {};
+  const [initFrom, initTo] = rangeToDates(range, from, to);
+
+  const initialFilters = {
+    ...EMPTY_FILTERS,
+    siteVisitFromDate: initFrom,
+    siteVisitToDate: initTo,
+  };
 
   const [showRemarks, setShowRemarks] = useState(false);
   const [remarksText, setRemarksText] = useState('');
   const [searchText, setSearchText] = useState('');
   const [showFilterModal, setShowFilterModal] = useState(false);
-  const [filters, setFilters] = useState({
-    company_id: null,
-    rm_id: null,
-    fromDate: null,
-    toDate: null,
-    project: null,
-    location: null,
-    status: null,
-    reference: null,
-    siteVisitFromDate: null,
-    siteVisitToDate: null,
-  });
-  const [appliedFilters, setAppliedFilters] = useState();
+  const [filters, setFilters] = useState(initialFilters);
+  // starts with the dashboard dates so the very first fetch is already filtered
+  const [appliedFilters, setAppliedFilters] = useState(initialFilters);
   const [showTopBtn, setShowTopBtn] = useState(false);
   const [page, setPage] = useState(1);
   const [allData, setAllData] = useState([]);
@@ -852,29 +967,46 @@ const SiteVisitsScreen = () => {
   const [showToPicker, setShowToPicker] = useState(false);
   const [pagination, setPagination] = useState(null);
 
+  // When the dashboard sends new params (View pressed again with another
+  // period) the screen may already be mounted, so re-apply the new dates.
+  const firstParamsRun = useRef(true);
+  useEffect(() => {
+    if (firstParamsRun.current) {
+      firstParamsRun.current = false;
+      return;
+    }
+    const [f, t] = rangeToDates(range, from, to);
+    const next = { ...EMPTY_FILTERS, siteVisitFromDate: f, siteVisitToDate: t };
+    setFilters(next);
+    setAppliedFilters(next);
+  }, [range, period, from, to]);
+
   const fetchSiteVisits = async (pageNum = 1, reset = false) => {
-    if (isFetchingMore) return;
+    if (isFetchingMore && !reset) return;
     setIsFetchingMore(true);
+
+    const f = appliedFilters || filters;
+
     try {
       const res = await api.get('/api/pm/siteVisitAndBookingsData', {
         params: {
           search: searchText || undefined,
-          company_id: filters.company_id || undefined,
-          rm_id: filters.rm_id || undefined,
-          fromDate: filters.fromDate || undefined,
-          toDate: filters.toDate || undefined,
-          project: filters.project || undefined,
-          location: filters.location || undefined,
-          status: filters.status || undefined,
-          reference: filters.lead_source || undefined,
-          siteVisitFromDate: filters.siteVisitFromDate || undefined,
-          siteVisitToDate: filters.siteVisitToDate || undefined,
+          company_id: f.company_id || undefined,
+          rm_id: f.rm_id || undefined,
+          fromDate: f.fromDate || undefined,
+          toDate: f.toDate || undefined,
+          project: f.project || undefined,
+          location: f.location || undefined,
+          status: f.status || undefined,
+          reference: f.lead_source || undefined,
+          siteVisitFromDate: f.siteVisitFromDate || undefined,
+          siteVisitToDate: f.siteVisitToDate || undefined,
           page: pageNum,
         },
       });
       const newData = res.data.data?.site_visits_till_dates || [];
       const totalPages = res.data.data?.pagination?.total_pages || 1;
-      const paginationData = res.data.data.pagination;
+      const paginationData = res.data.data?.pagination;
 
       setPagination(paginationData);
       setAllData(prev => (reset ? newData : [...prev, ...newData]));
@@ -889,7 +1021,7 @@ const SiteVisitsScreen = () => {
 
   // Initial load & filter change
   const [isLoading, setIsLoading] = useState(false);
-  React.useEffect(() => {
+  useEffect(() => {
     setIsLoading(true);
     setAllData([]);
     setPage(1);
@@ -899,7 +1031,6 @@ const SiteVisitsScreen = () => {
 
   const siteVisits = allData;
 
-  // Count is derived from what is loaded, so it always starts at 1
   const totalRecords = pagination?.total_records;
   const startEntry = allData.length > 0 ? 1 : 0;
   const endEntry = allData.length;
@@ -930,7 +1061,8 @@ const SiteVisitsScreen = () => {
 
     if (event.type === 'dismissed' || !selectedDate) return;
 
-    const date = selectedDate.toISOString().split('T')[0];
+    // local date (toISOString shifts the day for UTC+ timezones like India)
+    const date = fmtLocal(selectedDate);
 
     setFilters(prev => ({
       ...prev,
@@ -1002,23 +1134,12 @@ const SiteVisitsScreen = () => {
   };
 
   const applyFilter = () => {
-    setAppliedFilters(filters);
+    setAppliedFilters({ ...filters });
     setShowFilterModal(false);
   };
 
   const resetFilters = () => {
-    const cleared = {
-      company_id: null,
-      rm_id: null,
-      fromDate: null,
-      toDate: null,
-      project: null,
-      location: null,
-      status: null,
-      reference: null,
-      siteVisitFromDate: null,
-      siteVisitToDate: null,
-    };
+    const cleared = { ...EMPTY_FILTERS };
 
     setFilters(cleared);
     setAppliedFilters(cleared);
@@ -1037,7 +1158,7 @@ const SiteVisitsScreen = () => {
 
         <TopBar
           icon="place"
-          title="Site-Visits"
+          title={period ? `Site-Visits · ${period}` : 'Site-Visits'}
           onBack={() => navigation.goBack()}
           onFilter={() => setShowFilterModal(true)}
         />
@@ -1056,7 +1177,7 @@ const SiteVisitsScreen = () => {
             // Infinite scroll trigger
             const isNearBottom =
               layoutMeasurement.height + y >= contentSize.height - 200;
-            if (isNearBottom && hasMore && !isFetchingMore) {
+            if (isNearBottom && hasMore && !isFetchingMore && !isLoading) {
               fetchSiteVisits(page + 1);
             }
           }}
@@ -1200,7 +1321,7 @@ const SiteVisitsScreen = () => {
                 <DateTimePicker
                   value={
                     filters.siteVisitFromDate
-                      ? new Date(filters.siteVisitFromDate)
+                      ? new Date(`${filters.siteVisitFromDate}T00:00:00`)
                       : new Date()
                   }
                   mode="date"
@@ -1212,7 +1333,7 @@ const SiteVisitsScreen = () => {
                 <DateTimePicker
                   value={
                     filters.siteVisitToDate
-                      ? new Date(filters.siteVisitToDate)
+                      ? new Date(`${filters.siteVisitToDate}T00:00:00`)
                       : new Date()
                   }
                   mode="date"
@@ -1423,19 +1544,42 @@ const styles = StyleSheet.create({
     marginTop: 10,
     gap: 6,
   },
-  // button: {
-  //   backgroundColor: '#1e9ce8',
-  //   borderRadius: 14,
-  //   paddingHorizontal: 12,
-  //   paddingVertical: 6,
-  //   flexShrink: 1,
-  // },
+  footerButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexShrink: 1,
+    flexWrap: 'wrap',
+    gap: 6,
+  },
   button: {
-    flexDirection: 'row', alignItems: 'center', gap: 5, flexShrink: 1,
-    backgroundColor:'#00cfff18', borderWidth: 1, borderColor: '#00cfff40',
-    borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    flexShrink: 1,
+    backgroundColor: '#00cfff18',
+    borderWidth: 1,
+    borderColor: '#00cfff40',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
   },
   buttonText: { color: '#00cfff', fontSize: 11, fontWeight: '600' },
+  // Book button: filled, so it stands out from "View Interaction"
+  bookButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#4aa3df',
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    elevation: 3,
+    shadowColor: '#1d6fe0',
+    shadowOpacity: 0.5,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+  },
+  bookButtonText: { color: '#ffffff', fontSize: 11, fontWeight: '700' },
   completed: {
     color: '#8A90B4',
     fontSize: 11,
@@ -1459,7 +1603,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.6,
     shadowRadius: 10,
     elevation: 12,
-    zindex:999,
+    zIndex: 999,
   },
 
   /* ── Remarks modal ── */

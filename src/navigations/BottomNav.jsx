@@ -48,7 +48,7 @@ const BottomNav = ({ routeName }) => {
         },
       ]}
     >
-      <NavItem icon="view-dashboard" label="Dashboard" screen="Dashboard" routeName={routeName} />
+      <NavItem icon="view-dashboard" label="Dashboard" screen="Dashboard2" routeName={routeName} />
       {(isAdmin || isBusinessHead || isCITYHEAD || inTest) && (
         <NavItem icon="account-switch" label="Change RM" screen="ChangeRM" routeName={routeName} />
       )}

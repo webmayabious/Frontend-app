@@ -2007,7 +2007,7 @@ const styles = StyleSheet.create({
   },
   screenTitle: {
     color: '#ffffff',
-    fontSize: 17,
+    fontSize: 15,
     marginLeft: 6,
     fontWeight: '700',
     flexShrink: 1,

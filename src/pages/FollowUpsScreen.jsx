@@ -1,4 +1,5 @@
 // FollowUpsScreen.js (Filter UI same as TotalLeadScreen - logic unchanged)
+// + "Book" button on every card -> opens BookingFormScreen with lead details pre-filled
 import React, { useEffect, useRef, useState } from 'react';
 import {
   FlatList,
@@ -35,6 +36,9 @@ const COLORS = {
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window');
 const scale = size => (SCREEN_WIDTH / 375) * size;
 const verticalScale = size => (SCREEN_HEIGHT / 812) * size;
+
+// route name of the booking screen in your navigator
+const BOOKING_ROUTE = 'BookingFormScreen';
 
 // keyboard events (iOS "Will" = smoother, Android only has "Did")
 const KB_SHOW = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
@@ -460,12 +464,26 @@ const EmailLink = ({ email }) => (
   </TouchableOpacity>
 );
 
-const CardFooter = ({ onViewInteraction, status }) => (
+// Footer: [View Interaction] [Book]            status
+// Book is hidden when the lead is already "Booking Done".
+const CardFooter = ({ onViewInteraction, onBook, showBook = true, status }) => (
   <View style={styles.cardFooter}>
-    <TouchableOpacity style={styles.button} onPress={onViewInteraction}>
-      <Icon name="forum" size={12} color={'#00cfff'} />
-      <Text style={styles.buttonText}>View Interaction</Text>
-    </TouchableOpacity>
+    <View style={styles.footerButtons}>
+      <TouchableOpacity style={styles.button} onPress={onViewInteraction}>
+        <Icon name="forum" size={12} color={'#00cfff'} />
+        <Text style={styles.buttonText}>View Interaction</Text>
+      </TouchableOpacity>
+
+      {showBook && onBook ? (
+        <TouchableOpacity
+          style={styles.bookButton}
+          onPress={onBook}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.bookButtonText}>Book</Text>
+        </TouchableOpacity>
+      ) : null}
+    </View>
     <Text style={styles.completed}>{status}</Text>
   </View>
 );
@@ -824,6 +842,23 @@ const formatCallBackDateTime = (date, time) => {
 const FollowCard = ({ data, navigation, setShowRemarks, setRemarksText }) => {
   const remarks = data?.remarks || 'No Remarks Available';
 
+  // open the booking form with the lead's details already filled in
+  const openBooking = () => {
+    const lead = data?.propertylead;
+    const rm = lead?.relationshipManager;
+    navigation.navigate(BOOKING_ROUTE, {
+      leadId: data?.property_lead_id,
+      name: lead?.name,
+      phone: lead?.phone,
+      email: lead?.email,
+      projectId: lead?.project_id ?? lead?.propertyproject?.id,
+      locationId: lead?.location_of_property ?? lead?.propertylocation?.id,
+      sourceId: lead?.reference ?? lead?.mrreference?.id,
+      rmId: lead?.rm_id ?? rm?.usr_id ?? rm?.id,
+      rmName: rm ? `${rm.usr_fname} ${rm.usr_lname}` : undefined,
+    });
+  };
+
   return (
     <View style={styles.card}>
       {/* Header */}
@@ -910,6 +945,8 @@ const FollowCard = ({ data, navigation, setShowRemarks, setRemarksText }) => {
             id: data?.property_lead_id,
           })
         }
+        onBook={openBooking}
+        showBook={data?.propertylead?.active !== '5'}
         status={data?.propertycallstatus?.name}
       />
     </View>
@@ -1151,14 +1188,26 @@ const FollowUpsScreen = () => {
                   </View>
                 </View>
 
-                {/* COUNT */}
-                <Text style={styles.countText}>
-                  Showing {filteredfollowUps?.length || 0}
-                  {totalFollowUpsCount != null
-                    ? ` of ${totalFollowUpsCount}`
-                    : ''}{' '}
-                  Follow Ups
-                </Text>
+                {/* COUNT + MISSED FOLLOWUPS BUTTON */}
+                <View style={styles.countRow}>
+                  <Text style={styles.countText}>
+                    Showing {filteredfollowUps?.length || 0}
+                    {totalFollowUpsCount != null
+                      ? ` of ${totalFollowUpsCount}`
+                      : ''}{' '}
+                    Follow Ups
+                  </Text>
+
+                  <TouchableOpacity
+                    style={styles.missedBtn}
+                    activeOpacity={0.8}
+                    onPress={() => navigation.navigate('MissedFollowup')}
+                  >
+                    <Icon name="notifications-off" size={14} color="#ff8a65" />
+                    <Text style={styles.missedBtnText}>Missed Followups</Text>
+                    <Icon name="chevron-right" size={16} color="#ff8a65" />
+                  </TouchableOpacity>
+                </View>
               </>
             }
             ListEmptyComponent={
@@ -1363,12 +1412,33 @@ const styles = StyleSheet.create({
     padding: 0,
     marginLeft: 8,
   },
+
+  /* ── Count row + Missed Followups button ── */
+  countRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+    gap: 8,
+  },
   countText: {
     color: '#ffb300',
     fontSize: 12,
     fontWeight: '700',
-    marginBottom: 8,
+    flexShrink: 1,
   },
+  missedBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(255,138,101,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,138,101,0.35)',
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  missedBtnText: { color: '#ff8a65', fontSize: 11.5, fontWeight: '600' },
 
   /* ── Card ── */
   card: {
@@ -1455,6 +1525,13 @@ const styles = StyleSheet.create({
     marginTop: 10,
     gap: 6,
   },
+  footerButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexShrink: 1,
+    flexWrap: 'wrap',
+    gap: 6,
+  },
   button: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1467,7 +1544,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 5,
   },
-  buttonText: { color: '#00cfff', fontSize: 12, fontWeight: '600' },
+  buttonText: { color: '#00cfff', fontSize: 11, fontWeight: '600' },
+  // Book button: filled, so it stands out from "View Interaction"
+  bookButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#4aa3df',
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    elevation: 3,
+    shadowColor: '#1d6fe0',
+    shadowOpacity: 0.5,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+  },
+  bookButtonText: { color: '#ffffff', fontSize: 11, fontWeight: '700' },
   completed: {
     color: '#afaea5',
     fontSize: 11.5,
