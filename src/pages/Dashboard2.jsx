@@ -12,7 +12,7 @@ import {
   Dimensions,
   FlatList,
   Image,
-  KeyboardAvoidingView,
+  Keyboard,
   Modal,
   Platform,
   Pressable,
@@ -23,6 +23,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
@@ -119,11 +120,9 @@ function Reveal({children}) {
     },
   );
 
-  // No opacity here: card titles and headings are visible from the first
-  // frame; only a small slide-up plays, and the charts animate themselves.
-  const style = useAnimatedStyle(() => ({
-    transform: [{translateY: (1 - enter.value) * 18}],
-  }));
+  // No slide/opacity on the card itself: a translateY bigger than the gap
+  // between cards made neighbouring cards overlap while scrolling. Only the
+  // charts animate (see ChartLayer).
 
   // lets a card replay its chart animation (e.g. when the period changes)
   const replay = useCallback(() => {
@@ -135,14 +134,13 @@ function Reveal({children}) {
 
   return (
     <CardCtx.Provider value={ctx}>
-      <Animated.View
-        style={style}
+      <View
         onLayout={e => {
           top.value = e.nativeEvent.layout.y;
           height.value = e.nativeEvent.layout.height;
         }}>
         {children}
-      </Animated.View>
+      </View>
     </CardCtx.Provider>
   );
 }
@@ -645,6 +643,13 @@ function Card({
             horizontal
             pagingEnabled
             nestedScrollEnabled
+            // iOS: lock to one direction so a vertical swipe that starts on a
+            // chart scrolls the page instead of being captured by the chart
+            directionalLockEnabled
+            alwaysBounceHorizontal={false}
+            alwaysBounceVertical={false}
+            scrollEventThrottle={16}
+            decelerationRate="fast"
             bounces={false}
             overScrollMode="never"
             showsHorizontalScrollIndicator={false}
@@ -1752,17 +1757,47 @@ const initialsOf = n => {
   ).toUpperCase();
 };
 
+// returns the current keyboard height (0 when hidden)
+function useKeyboardHeight() {
+  const [h, setH] = useState(0);
+  useEffect(() => {
+    const showEvt = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvt = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const a = Keyboard.addListener(showEvt, e => setH(e.endCoordinates.height));
+    const b = Keyboard.addListener(hideEvt, () => setH(0));
+    return () => {
+      a.remove();
+      b.remove();
+    };
+  }, []);
+  return h;
+}
+
 // Card title that opens a searchable bottom sheet of RMs.
 // Works well with 100+ users: fixed-height sheet, search box, FlatList.
 function RmPicker({rms, valueId, name, onChange}) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const listRef = useRef(null);
+  const insets = useSafeAreaInsets();
+  const {height: winH} = useWindowDimensions();
+  const kb = useKeyboardHeight();
 
   const close = () => {
+    Keyboard.dismiss();
     setOpen(false);
     setQuery('');
   };
+
+  // Sheet is 75% of the screen normally. When the iOS keyboard is open it
+  // shrinks to the space that is left above the keyboard, so the header and
+  // search box are never pushed off the top.
+  const baseH = winH * 0.75;
+  const isIOS = Platform.OS === 'ios';
+  const sheetH =
+    isIOS && kb > 0
+      ? Math.min(baseH, winH - kb - insets.top - 12)
+      : baseH;
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -1827,66 +1862,75 @@ function RmPicker({rms, valueId, name, onChange}) {
         onRequestClose={close}>
         <View style={rp.backdrop}>
           <Pressable style={StyleSheet.absoluteFill} onPress={close} />
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-            style={rp.kav}>
-            <View style={rp.sheet}>
-              <View style={rp.handle} />
 
-              <View style={rp.headRow}>
-                <View style={{flex: 1}}>
-                  <Text style={rp.title}>Select RM</Text>
-                  <Text style={rp.count}>
-                    {filtered.length === rms.length
-                      ? `${rms.length} RMs`
-                      : `${filtered.length} of ${rms.length} RMs`}
-                  </Text>
-                </View>
-                <TouchableOpacity onPress={close} hitSlop={10} style={rp.closeBtn}>
-                  <Icon name="close" size={18} color="#cbd5e1" />
-                </TouchableOpacity>
+          <View
+            style={[
+              rp.sheet,
+              {
+                height: sheetH,
+                // lift the sheet above the iOS keyboard
+                marginBottom: isIOS ? kb : 0,
+                paddingBottom: isIOS && kb === 0 ? insets.bottom : 0,
+              },
+            ]}>
+            <View style={rp.handle} />
+
+            <View style={rp.headRow}>
+              <View style={{flex: 1}}>
+                <Text style={rp.title}>Select RM</Text>
+                <Text style={rp.count}>
+                  {filtered.length === rms.length
+                    ? `${rms.length} RMs`
+                    : `${filtered.length} of ${rms.length} RMs`}
+                </Text>
               </View>
-
-              {/* Search */}
-              <View style={rp.searchBox}>
-                <Icon name="search" size={18} color={C.muted} />
-                <TextInput
-                  value={query}
-                  onChangeText={setQuery}
-                  placeholder="Search by name or ID"
-                  placeholderTextColor="rgba(255,255,255,0.4)"
-                  style={rp.searchInput}
-                  autoCorrect={false}
-                  autoCapitalize="none"
-                  returnKeyType="search"
-                />
-                {query ? (
-                  <TouchableOpacity onPress={() => setQuery('')} hitSlop={10}>
-                    <Icon name="cancel" size={16} color={C.muted} />
-                  </TouchableOpacity>
-                ) : null}
-              </View>
-
-              {/* List */}
-              <FlatList
-                ref={listRef}
-                data={filtered}
-                keyExtractor={r => String(r.rm_id)}
-                renderItem={renderItem}
-                keyboardShouldPersistTaps="handled"
-                showsVerticalScrollIndicator={false}
-                initialNumToRender={15}
-                windowSize={7}
-                contentContainerStyle={{paddingBottom: 16}}
-                ListEmptyComponent={
-                  <View style={rp.empty}>
-                    <Icon name="person-search" size={36} color={C.muted} />
-                    <Text style={rp.emptyText}>No RM found</Text>
-                  </View>
-                }
-              />
+              <TouchableOpacity onPress={close} hitSlop={10} style={rp.closeBtn}>
+                <Icon name="close" size={18} color="#cbd5e1" />
+              </TouchableOpacity>
             </View>
-          </KeyboardAvoidingView>
+
+            {/* Search */}
+            <View style={rp.searchBox}>
+              <Icon name="search" size={18} color={C.muted} />
+              <TextInput
+                value={query}
+                onChangeText={setQuery}
+                placeholder="Search by name or ID"
+                placeholderTextColor="rgba(255,255,255,0.4)"
+                style={rp.searchInput}
+                autoCorrect={false}
+                autoCapitalize="none"
+                returnKeyType="search"
+                onSubmitEditing={Keyboard.dismiss}
+              />
+              {query ? (
+                <TouchableOpacity onPress={() => setQuery('')} hitSlop={10}>
+                  <Icon name="cancel" size={16} color={C.muted} />
+                </TouchableOpacity>
+              ) : null}
+            </View>
+
+            {/* List */}
+            <FlatList
+              ref={listRef}
+              data={filtered}
+              keyExtractor={r => String(r.rm_id)}
+              renderItem={renderItem}
+              style={{flex: 1}}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode={isIOS ? 'on-drag' : 'none'}
+              showsVerticalScrollIndicator={false}
+              initialNumToRender={15}
+              windowSize={7}
+              contentContainerStyle={{paddingBottom: 16}}
+              ListEmptyComponent={
+                <View style={rp.empty}>
+                  <Icon name="person-search" size={36} color={C.muted} />
+                  <Text style={rp.emptyText}>No RM found</Text>
+                </View>
+              }
+            />
+          </View>
         </View>
       </Modal>
     </>
@@ -1908,9 +1952,7 @@ const rp = StyleSheet.create({
     paddingVertical: 4,
   },
   backdrop: {flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end'},
-  kav: {width: '100%'},
   sheet: {
-    height: Dimensions.get('window').height * 0.75,
     backgroundColor: 'rgba(24,34,52,0.99)',
     borderTopLeftRadius: 22,
     borderTopRightRadius: 22,
@@ -2208,6 +2250,13 @@ export default function Dashboard2() {
 
   const bottomNavHeight = 60 + insets.bottom;
 
+  // Gap above the first card. Set TOP_EXTRA to match the previous pages.
+  // The scroll area itself starts at the very top, so the gap scrolls away
+  // with the content instead of cutting cards off with a hard edge.
+  // The app header is already above this screen, so no safe-area inset here.
+  const TOP_EXTRA = 14;
+  const TOP_GAP = TOP_EXTRA;
+
   return (
     <View style={s.root}>
       {/* Same background as the other screens */}
@@ -2234,10 +2283,13 @@ export default function Dashboard2() {
         }}
         contentInsetAdjustmentBehavior="never"
         automaticallyAdjustContentInsets={false}
+        directionalLockEnabled
+        alwaysBounceHorizontal={false}
+        decelerationRate="normal"
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           s.scroll,
-          {paddingTop: 14, paddingBottom: bottomNavHeight + 10},
+          {paddingTop: TOP_GAP, paddingBottom: bottomNavHeight + 10},
         ]}
         refreshControl={
           <RefreshControl
