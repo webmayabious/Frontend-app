@@ -95,7 +95,8 @@ const parseAlert = (title = '', buttons = []) => {
   const cleanTitle = raw.replace(/^(?:[\u2705\u274C\u26A0]\uFE0F?|\uD83C\uDF89)\s*/, '');
   return { type, cleanTitle };
 };
-
+// Name of the booking form screen in your navigator
+const BOOKING_FORM_ROUTE = 'BookingFormScreen';
 const CustomAlertHost = () => {
   const [config, setConfig] = useState(null);
   const anim = useRef(new Animated.Value(0)).current;
@@ -849,7 +850,27 @@ const SiteCard = ({ data, navigation }) => {
       ?.map(x => x?.remarks)
       ?.filter(Boolean)
       ?.join(', ') || 'No Remarks Available';
+const isBookingDone = data?.active === '5';
 
+// Opens the booking form with the lead's details already filled in
+const openBookingForm = () => {
+  navigation.navigate(BOOKING_FORM_ROUTE, {
+    leadId: data?.id,
+    name: data?.name || '',
+    phone: data?.phone || '',
+    email: data?.email || '',
+    projectId: data?.propertyproject?.id ?? null,
+    projectName: data?.propertyproject?.project_name || '',
+    locationId: data?.propertylocation?.id ?? null,
+    locationName: data?.propertylocation?.name || '',
+    rmId: data?.relationshipManager?.id ?? null,
+    rmName: data?.relationshipManager
+      ? `${data.relationshipManager.usr_fname} ${data.relationshipManager.usr_lname}`
+      : '',
+    sourceId: data?.mrreference?.id ?? null,
+    sourceName: data?.mrreference?.mrf_name || '',
+  });
+};
   const statusMeta =
     data?.active === '1'
       ? { text: 'Active', color: COLORS.green, bg: '#00C48C22', border: '#00C48C60' }
@@ -879,13 +900,20 @@ const SiteCard = ({ data, navigation }) => {
               {statusMeta.text}
             </Text>
           </View>
-
-          <TouchableOpacity
+{!isBookingDone && (
+  <TouchableOpacity
+    onPress={() => navigation.navigate('MeetingsEdit', { id: data?.id })}
+    hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+  >
+    <Icon name="edit" size={17} color={COLORS.accent} />
+  </TouchableOpacity>
+)}
+          {/* <TouchableOpacity
             onPress={() => navigation.navigate('MeetingsEdit', { id: data?.id })}
             hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
           >
             <Icon name="edit" size={17} color={COLORS.accent} />
-          </TouchableOpacity>
+          </TouchableOpacity> */}
         </View>
       </View>
 
@@ -954,7 +982,7 @@ const SiteCard = ({ data, navigation }) => {
         </View>
       </View>
 
-      <View style={styles.cardFooter}>
+      {/* <View style={styles.cardFooter}>
         <TouchableOpacity
           style={styles.interactionBtn}
           onPress={() => navigation.navigate('AllInteractionsScreen', { id: data?.id })}
@@ -966,7 +994,33 @@ const SiteCard = ({ data, navigation }) => {
         <Text style={styles.completed} numberOfLines={1}>
           {data?.propertyfeedbacks?.map(x => x.propertycallstatus?.name).join(', ') || 'N/A'}
         </Text>
-      </View>
+      </View> */}
+      <View style={styles.cardFooter}>
+  <View style={styles.footerButtons}>
+    <TouchableOpacity
+      style={styles.interactionBtn}
+      onPress={() => navigation.navigate('AllInteractionsScreen', { id: data?.id })}
+      activeOpacity={0.8}
+    >
+      <Icon name="forum" size={12} color={COLORS.accent} />
+      <Text style={styles.interactionBtnText}>View Interaction</Text>
+    </TouchableOpacity>
+
+    {!isBookingDone && (
+      <TouchableOpacity
+        style={styles.bookButton}
+        onPress={openBookingForm}
+        activeOpacity={0.85}
+      >
+        <Text style={styles.bookButtonText}>Book</Text>
+      </TouchableOpacity>
+    )}
+  </View>
+
+  <Text style={styles.completed} numberOfLines={1}>
+    {data?.propertyfeedbacks?.map(x => x.propertycallstatus?.name).join(', ') || 'N/A'}
+  </Text>
+</View>
     </View>
   );
 };
@@ -1081,7 +1135,7 @@ const Totalleadscreen1 = ({ setHideBottomNav }) => {
           toDate: filters.toDate || undefined,
           project: filters.project || undefined,
           location: filters.location || undefined,
-          active: filters.active || undefined,
+          status: filters.active || undefined,
           lead_status: filters.lead_status || undefined,
           lead_sub_status: filters.lead_sub_status || undefined,
           lead_qualification: filters.lead_qualification || undefined,
@@ -1628,6 +1682,28 @@ const styles = StyleSheet.create({
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     marginTop: 10, gap: 6,
   },
+  footerButtons: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  flexShrink: 1,
+  flexWrap: 'wrap',
+  gap: 6,
+},
+bookButton: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 5,
+  backgroundColor: '#4aa3df',
+  borderRadius: 20,
+  paddingHorizontal: 14,
+  paddingVertical: 6,
+  elevation: 3,
+  shadowColor: '#1d6fe0',
+  shadowOpacity: 0.5,
+  shadowRadius: 6,
+  shadowOffset: { width: 0, height: 2 },
+},
+bookButtonText: { color: '#ffffff', fontSize: 11, fontWeight: '700' },
   interactionBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 5, flexShrink: 1,
     backgroundColor: COLORS.accentDim, borderWidth: 1, borderColor: COLORS.accentBorder,

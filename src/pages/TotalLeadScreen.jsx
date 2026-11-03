@@ -532,7 +532,7 @@ const SiteCard = ({ data, navigation }) => {
       rmName: rm ? `${rm.usr_fname} ${rm.usr_lname}` : '',
     });
   };
-
+const isBookingDone = data?.active === '5';
   return (
     <View
       style={[
@@ -563,7 +563,8 @@ const SiteCard = ({ data, navigation }) => {
               onPress={() => navigation.navigate('MeetingsEdit', { id: data?.id })}
               hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
             >
-              <Icon name="edit" size={17} color={COLORS.accent} />
+               {!isBookingDone && (
+              <Icon name="edit" size={17} color={COLORS.accent} />)}
             </TouchableOpacity>
           </View>
         </View>
@@ -1569,7 +1570,7 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingVertical: 16,
   },
-  footerText: { color: COLORS.accent, fontSize: 12 },
+  footerText: { color:'#fff', fontSize: 12 },
   emptyWrap: { alignItems: 'center', marginTop: 80, gap: 12 },
   empty: { color: 'rgba(255,255,255,0.40)', fontSize: 15 },
 

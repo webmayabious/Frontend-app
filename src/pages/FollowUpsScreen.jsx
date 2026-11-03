@@ -841,6 +841,8 @@ const formatCallBackDateTime = (date, time) => {
 /* ================= CARD ================= */
 const FollowCard = ({ data, navigation, setShowRemarks, setRemarksText }) => {
   const remarks = data?.remarks || 'No Remarks Available';
+const isBookingDone = data?.active === '5';
+// console.log('isBookingDone',isBookingDone,data);
 
   // open the booking form with the lead's details already filled in
   const openBooking = () => {
@@ -868,7 +870,7 @@ const FollowCard = ({ data, navigation, setShowRemarks, setRemarksText }) => {
           <StatusBadge active={data?.active} allowBookingDone={false} />
         </View>
 
-        <Icon
+        {/* <Icon
           name="edit"
           size={20}
           color="#00e5ff"
@@ -877,7 +879,19 @@ const FollowCard = ({ data, navigation, setShowRemarks, setRemarksText }) => {
               id: data?.property_lead_id,
             })
           }
-        />
+        /> */}
+        {!isBookingDone && (
+  <Icon
+    name="edit"
+    size={20}
+    color="#00e5ff"
+    onPress={() =>
+      navigation.navigate('MeetingsEdit', {
+        id: data?.property_lead_id,
+      })
+    }
+  />
+)}
       </View>
 
       {/* Info */}

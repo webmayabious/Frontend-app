@@ -791,7 +791,7 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => {
       sourceName: lead?.mrreference?.mrf_name || '',
     });
   };
-
+const isBookingDone = lead?.active === '5';
   return (
     <View style={styles.card}>
       {/* Header */}
@@ -801,16 +801,19 @@ const SiteCard = ({ data, navigation, setShowRemarks, setRemarksText }) => {
           <StatusBadge active={data?.propertylead?.active} />
         </View>
 
-        <Icon
-          name="edit"
-          size={20}
-          color="#00e5ff"
-          onPress={() =>
-            navigation.navigate('MeetingsEdit', {
-              id: data?.property_lead_id,
-            })
-          }
-        />
+       {!isBookingDone && (
+  <Icon
+    name="edit"
+    size={20}
+    color="#00e5ff"
+    onPress={() =>
+      navigation.navigate('MeetingsEdit', {
+        id: data?.property_lead_id,
+      })
+    }
+  />
+)}
+
       </View>
 
       {/* Info */}
