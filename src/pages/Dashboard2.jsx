@@ -458,7 +458,7 @@ const PERIOD_ICONS = {
 const ACCENT = '#07a6f6';
 // Space between the bottom of the pill and the top of the menu (px).
 // Change this number to move the dropdown menu up or down.
-const MENU_TOP_OFFSET = 50;
+const MENU_TOP_OFFSET = Platform.OS === 'ios' ? 10 : 50;
 
 // Dropdown: a pill that opens a small floating menu with an arrow pointer.
 // It is shown in a Modal so the card never clips it.
