@@ -30,7 +30,9 @@ import Rmform from '../pages/Rmform';
 import NotificationScreen from '../pages/Notification/Notificationscreen';
 import Totalleadscreen1 from '../pages/Totalleadscreen1';
 import Dashboard2 from '../pages/Dashboard2';
-import BookingFormScreen from '../pages/Bookingformscreen'
+import BookingFormScreen from '../pages/Bookingformscreen';
+import DeveloperProject from '../developer/Developerproject';
+import CreateProject from '../developer/Createproject';
 const Stack = createNativeStackNavigator();
 
 // ✅ Created ONCE, outside the component.
@@ -134,6 +136,8 @@ export default function StackNavigations() {
             <Stack.Screen name="Totalleadscreen1" component={Totalleadscreen1} />
             <Stack.Screen name="NotificationScreen" component={NotificationScreen} />
             <Stack.Screen name="BookingFormScreen" component={BookingFormScreen} />
+             <Stack.Screen name="DeveloperProject" component={DeveloperProject} />
+             <Stack.Screen name="CreateProject" component={CreateProject} />
           </Stack.Navigator>
         </View>
 
